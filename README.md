@@ -11,8 +11,31 @@ the source stays package-friendly while the repository can also export a
 traditional `.unitypackage` artifact for teams that still import plugins that
 way.
 
+## Install From Git
+
+Use the repository URL directly in Unity Package Manager:
+
+```text
+https://github.com/attriax/sdk-unity.git
+```
+
+Or add it in a project manifest:
+
+```json
+{
+  "dependencies": {
+    "com.attriax.unity": "https://github.com/attriax/sdk-unity.git#v0.4.1"
+  }
+}
+```
+
+The repository root now includes a UPM manifest so Unity can load the SDK from
+the plain Git URL while local development in this workspace continues to use
+the embedded package source under `Packages/com.attriax.unity/`.
+
 ## Layout
 
+- `package.json` — repository-root UPM manifest for Git URL installs
 - `Packages/com.attriax.unity/` — source package consumed by Unity projects
 - `Packages/com.attriax.unity/Runtime/Internal/Generated/AttriaxSdkClient/` — generated internal API client embedded into the runtime package
 - `Assets/Editor/` — batch export tooling for `.unitypackage` generation

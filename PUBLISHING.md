@@ -4,6 +4,7 @@ This document covers the manual release workflow for the Attriax Unity SDK.
 
 The Unity repository ships two release surfaces:
 
+- the repository-root UPM entrypoint used by Package Manager Git URL installs
 - the embedded UPM package under `Packages/com.attriax.unity/`
 - the exported `.unitypackage` artifact under `sdk-unity/dist/`
 
@@ -12,6 +13,8 @@ must not publish Unity artifacts automatically.
 
 ## Release Inputs
 
+- `sdk-unity/package.json` must mirror the publishable package metadata needed
+  for Git URL installs from the repository root.
 - `Packages/com.attriax.unity/package.json` is the source of truth for the
   package version.
 - `sdk-unity/CHANGELOG.md` tracks repository-level release history.
@@ -47,9 +50,9 @@ artifacts, and release notes stay easy to review.
 ## Release Steps
 
 1. Ensure the intended public repository is reachable and that the package
-   metadata URLs in `Packages/com.attriax.unity/package.json` resolve.
-2. Update `Packages/com.attriax.unity/package.json` and both changelogs for the
-   new version.
+  metadata URLs in both package manifests resolve.
+2. Update `sdk-unity/package.json`, `Packages/com.attriax.unity/package.json`,
+  and both changelogs for the new version.
 3. Run `npm run sdk:unity:generate` if the SDK contract or generated client
    changed.
 4. Run `npm run unity:release:check`.
