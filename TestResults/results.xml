@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="7" result="Passed" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.1027936">
+  <test-suite type="TestSuite" id="1000" name="sdk-unity" fullname="sdk-unity" runstate="Runnable" testcasecount="59" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.102794" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1073" name="Attriax.EditorTests.dll" fullname="C:/Users/timon/Projects/attriax/sdk-unity/Library/ScriptAssemblies/Attriax.EditorTests.dll" runstate="Runnable" testcasecount="59" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.097877" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="72616" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1074" name="Attriax" fullname="Attriax" runstate="Runnable" testcasecount="59" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.097380" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1075" name="Unity" fullname="Attriax.Unity" runstate="Runnable" testcasecount="59" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.097030" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1076" name="Tests" fullname="Attriax.Unity.Tests" runstate="Runnable" testcasecount="59" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.096666" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1011" name="AttriaxConsentManagerTests" fullname="Attriax.Unity.Tests.AttriaxConsentManagerTests" classname="Attriax.Unity.Tests.AttriaxConsentManagerTests" runstate="Runnable" testcasecount="7" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.095200" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1014" name="InitAutoDetectsPendingFromWindowsTimezoneWithoutNetwork" fullname="Attriax.Unity.Tests.AttriaxConsentManagerTests.InitAutoDetectsPendingFromWindowsTimezoneWithoutNetwork" methodname="InitAutoDetectsPendingFromWindowsTimezoneWithoutNetwork" classname="Attriax.Unity.Tests.AttriaxConsentManagerTests" runstate="Runnable" seed="1420754956" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.054599" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1013" name="InitAutoDetectsPendingWithoutNetwork" fullname="Attriax.Unity.Tests.AttriaxConsentManagerTests.InitAutoDetectsPendingWithoutNetwork" methodname="InitAutoDetectsPendingWithoutNetwork" classname="Attriax.Unity.Tests.AttriaxConsentManagerTests" runstate="Runnable" seed="1806383066" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.000392" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1016" name="LocalOnlyConsentChecksRefreshUnresolvedPendingState" fullname="Attriax.Unity.Tests.AttriaxConsentManagerTests.LocalOnlyConsentChecksRefreshUnresolvedPendingState" methodname="LocalOnlyConsentChecksRefreshUnresolvedPendingState" classname="Attriax.Unity.Tests.AttriaxConsentManagerTests" runstate="Runnable" seed="1274589269" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.004088" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1015" name="NeedsConsentUsesRemoteCheckWhenGdprIsDisabled" fullname="Attriax.Unity.Tests.AttriaxConsentManagerTests.NeedsConsentUsesRemoteCheckWhenGdprIsDisabled" methodname="NeedsConsentUsesRemoteCheckWhenGdprIsDisabled" classname="Attriax.Unity.Tests.AttriaxConsentManagerTests" runstate="Runnable" seed="777779312" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.001838" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1012" name="PublicConsentFacadeExposesGdprHelpers" fullname="Attriax.Unity.Tests.AttriaxConsentManagerTests.PublicConsentFacadeExposesGdprHelpers" methodname="PublicConsentFacadeExposesGdprHelpers" classname="Attriax.Unity.Tests.AttriaxConsentManagerTests" runstate="Runnable" seed="1174269664" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.009649" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1017" name="RemoteConsentChecksRefreshUnresolvedPendingState" fullname="Attriax.Unity.Tests.AttriaxConsentManagerTests.RemoteConsentChecksRefreshUnresolvedPendingState" methodname="RemoteConsentChecksRefreshUnresolvedPendingState" classname="Attriax.Unity.Tests.AttriaxConsentManagerTests" runstate="Runnable" seed="2049656800" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.001263" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1018" name="SetConsentPersistsAndSyncsGrantedValues" fullname="Attriax.Unity.Tests.AttriaxConsentManagerTests.SetConsentPersistsAndSyncsGrantedValues" methodname="SetConsentPersistsAndSyncsGrantedValues" classname="Attriax.Unity.Tests.AttriaxConsentManagerTests" runstate="Runnable" seed="1936624396" result="Passed" start-time="2026-05-20 12:03:48Z" end-time="2026-05-20 12:03:48Z" duration="0.014189" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[Saving results to: TestResults\results.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

@@ -1,0 +1,3 @@
+-keep class com.attriax.unity.AttriaxUnityAndroidBridge { *; }
+-keep class com.android.installreferrer.** { *; }
+-dontwarn com.android.installreferrer.**

@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "com.attriax.unity": "file:com.attriax.unity",
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.test-framework": "1.4.5",
+    "com.unity.modules.jsonserialize": "1.0.0",
+    "com.unity.modules.unitywebrequest": "1.0.0"
+  }
+}

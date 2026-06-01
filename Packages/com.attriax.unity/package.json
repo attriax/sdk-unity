@@ -1,0 +1,36 @@
+{
+  "name": "com.attriax.unity",
+  "version": "0.4.1",
+  "displayName": "Attriax Unity SDK",
+  "description": "Attriax attribution, deep-link, dynamic-link, and analytics SDK for Unity applications.",
+  "unity": "6000.2",
+  "author": {
+    "name": "Attriax",
+    "url": "https://attriax.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/attriax/sdk-unity.git"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "attriax",
+    "analytics",
+    "attribution",
+    "deep-linking",
+    "unity"
+  ],
+  "documentationUrl": "https://github.com/attriax/sdk-unity/blob/main/Packages/com.attriax.unity/README.md",
+  "changelogUrl": "https://github.com/attriax/sdk-unity/blob/main/Packages/com.attriax.unity/CHANGELOG.md",
+  "licensesUrl": "https://github.com/attriax/sdk-unity/blob/main/Packages/com.attriax.unity/LICENSE",
+  "samples": [
+    {
+      "displayName": "Basic Integration",
+      "description": "Bootstrap and diagnostics scripts for AttriaxBehaviour and configured-singleton Unity integrations.",
+      "path": "Samples~/Basic Integration"
+    }
+  ],
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  }
+}
