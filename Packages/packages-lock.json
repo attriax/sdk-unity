@@ -1,9 +1,9 @@
 {
   "dependencies": {
     "com.attriax.unity": {
-      "version": "file:com.attriax.unity",
+      "version": "file:..",
       "depth": 0,
-      "source": "embedded",
+      "source": "local",
       "dependencies": {
         "com.unity.nuget.newtonsoft-json": "3.2.1"
       }

@@ -4,16 +4,16 @@
 
 ### Project Structure
 
-- `Packages/com.attriax.unity/` — publishable Unity package surface
-- `Packages/com.attriax.unity/Runtime/` — public runtime APIs and shared logic
-- `Packages/com.attriax.unity/Runtime/Internal/` — orchestration managers,
+- `sdk-unity/` root — publishable Unity package surface
+- `Runtime/` — public runtime APIs and shared logic
+- `Runtime/Internal/` — orchestration managers,
   persistence, generated gateway wrappers, and internal helpers
-- `Packages/com.attriax.unity/Runtime/Internal/Generated/AttriaxSdkClient/` —
+- `Runtime/Internal/Generated/AttriaxSdkClient/` —
   generated internal transport client
-- `Packages/com.attriax.unity/Runtime/Plugins/Android/` — Android native bridge
-- `Packages/com.attriax.unity/Runtime/Plugins/iOS/` — iOS native bridge
-- `Packages/com.attriax.unity/Samples~/` — public sample assets and scripts
-- `Packages/com.attriax.unity/Tests/Editor/` — EditMode regression tests
+- `Runtime/Plugins/Android/` — Android native bridge
+- `Runtime/Plugins/iOS/` — iOS native bridge
+- `Samples~/` — public sample assets and scripts
+- `Tests/Editor/` — EditMode regression tests
 - `Assets/Editor/` — Unity batch export tooling for `.unitypackage`
 
 ### Essential Commands
@@ -36,7 +36,7 @@ The supported generated-client workflow is documented in `SDK_CLIENT_GENERATION.
 - [ ] Added or updated EditMode tests
 - [ ] Expanded the public sample when public integration behavior changed
 - [ ] Updated repository and package README files when setup or behavior changed
-- [ ] Updated both changelogs for release-facing changes
+- [ ] Updated the changelog for release-facing changes
 - [ ] Ran `npm run unity:test:editor`
 - [ ] Ran `npm run sdk:unity:validate`
 - [ ] Re-tested Android/iOS device behavior when the native bridge changed
@@ -45,7 +45,7 @@ The supported generated-client workflow is documented in `SDK_CLIENT_GENERATION.
 
 When adding a feature:
 
-1. Extend the public surface in `Packages/com.attriax.unity/Runtime/` only when
+1. Extend the public surface in `Runtime/` only when
    the behavior belongs in the user-facing SDK.
 2. Keep orchestration and persistence in focused managers under
    `Runtime/Internal/` instead of growing `AttriaxRuntime` indiscriminately.
@@ -65,8 +65,9 @@ When adding a feature:
 
 ## Useful Notes
 
-- The Unity package is embedded in a minimal Unity project so the same source
-  tree can ship as both a UPM package and a `.unitypackage` export.
+- The Unity package lives at the repository root while the same repository also
+  acts as the minimal Unity project used for validation and `.unitypackage`
+  export.
 - The generated client is intentionally embedded inside the runtime assembly so
   internal runtime code can use generated internal transport types directly.
 - If the Unity editor lives at a non-default path, set `UNITY_EDITOR_PATH`

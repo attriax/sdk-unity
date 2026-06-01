@@ -6,17 +6,17 @@
 behaviorally aligned with Flutter unless a Unity-specific divergence is
 intentional and documented.
 
-It is implemented as an embedded UPM package inside a minimal Unity project so
-the source stays package-friendly while the repository can also export a
+The repository root is the publishable UPM package while also carrying the
+minimal Unity project files needed to validate and export the SDK as a
 traditional `.unitypackage` artifact for teams that still import plugins that
 way.
 
 ## Install From Git
 
-Install the embedded package by pointing Unity at the package subfolder:
+Use the repository URL directly in Unity Package Manager:
 
 ```text
-https://github.com/attriax/sdk-unity.git?path=/Packages/com.attriax.unity
+https://github.com/attriax/sdk-unity.git
 ```
 
 Or add it in a project manifest:
@@ -24,26 +24,26 @@ Or add it in a project manifest:
 ```json
 {
   "dependencies": {
-    "com.attriax.unity": "https://github.com/attriax/sdk-unity.git?path=/Packages/com.attriax.unity#v0.4.1"
+    "com.attriax.unity": "https://github.com/attriax/sdk-unity.git#v0.4.1"
   }
 }
 ```
 
-This repository is a Unity workspace that embeds the publishable package under
-`Packages/com.attriax.unity/`. Using the supported `?path=` Git syntax makes
-Package Manager load that actual package root instead of the workspace wrapper.
+The repo root now contains the actual package manifest and runtime folders, so
+the plain Git URL resolves directly without a `?path=` suffix.
 
 ## Layout
 
-- `Packages/com.attriax.unity/` — source package consumed by Unity projects
-- `Packages/com.attriax.unity/Runtime/Internal/Generated/AttriaxSdkClient/` — generated internal API client embedded into the runtime package
+- `Runtime/` — public runtime APIs, shared managers, and generated client code
+- `Runtime/Internal/Generated/AttriaxSdkClient/` — generated internal API client embedded into the runtime package
 - `Assets/Editor/` — batch export tooling for `.unitypackage` generation
+- `Packages/manifest.json` — local Unity-project wrapper that consumes the root package through `file:..`
 - `dist/` — generated artifacts
 
 ## Platform Support
 
 - Android and iOS include SDK-owned native bridge code under
-  `Packages/com.attriax.unity/Runtime/Plugins/`.
+  `Runtime/Plugins/`.
 - Unity Editor and shared-runtime platforms use the shared C# runtime path for
   queueing, synchronization, deep links, user state, and event tracking.
 - The Unity runtime should stay behaviorally aligned with `sdk-flutter/`
@@ -87,7 +87,7 @@ attriax.Consent.Gdpr.Reset();
 await attriax.Consent.Gdpr.RequestDataErasureAsync();
 ```
 
-See [Packages/com.attriax.unity/Documentation~/gdpr-and-anonymous-analytics.md](Packages/com.attriax.unity/Documentation~/gdpr-and-anonymous-analytics.md) for the full GDPR and anonymous analytics behavior, including how unresolved consent still sends anonymous-capable traffic immediately and how denied analytics is stored without device identity.
+See [Documentation~/gdpr-and-anonymous-analytics.md](Documentation~/gdpr-and-anonymous-analytics.md) for the full GDPR and anonymous analytics behavior, including how unresolved consent still sends anonymous-capable traffic immediately and how denied analytics is stored without device identity.
 
 ## Crash Reporting
 
@@ -125,7 +125,7 @@ The scene-navigation QA app now lives outside the SDK workspace in the sibling
 `../tester-unity/` project.
 
 That separate consumer project depends on the local package at
-`../sdk-unity/Packages/com.attriax.unity` and is the supported place to verify
+`../sdk-unity` and is the supported place to verify
 automatic scene tracking, persistent SDK host lifetime, and queued `page_view`
 payloads from a real package consumer.
 
@@ -152,9 +152,8 @@ The exported artifact is written to `dist/Attriax.Unity.unitypackage`.
 ## License
 
 This repository and the publishable Unity package ship under Apache-2.0.
-The package source under `Packages/com.attriax.unity/` also includes its own
-`LICENSE` file so the license is preserved when the package is consumed
-outside this workspace.
+The package source now lives at the repository root, so the same `LICENSE` file
+is preserved for both workspace development and Package Manager consumers.
 
 The commercial Attriax hosted service and sibling repositories outside this
 repository remain separate from this SDK source release.

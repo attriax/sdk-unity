@@ -2,8 +2,8 @@
 
 ## Overview
 
-`sdk-unity/` is a minimal Unity project that embeds the publishable Attriax
-SDK package and can also export that same source as a traditional
+`sdk-unity/` is the publishable Attriax Unity package and also a minimal Unity
+project wrapper that can export that same source as a traditional
 `.unitypackage` artifact.
 
 ## Repository Layout
@@ -12,31 +12,30 @@ SDK package and can also export that same source as a traditional
 sdk-unity/
 ├── Assets/
 │   └── Editor/                           # Batch export entrypoint for .unitypackage
-├── Packages/
-│   └── com.attriax.unity/
-│       ├── Runtime/                      # Public API, runtime assembly, shared managers
-│       │   ├── Internal/                 # Queueing, synchronization, context, lifecycle, generated gateway
-│       │   │   └── Generated/
-│       │   │       └── AttriaxSdkClient/ # Generated internal transport client
-│       │   └── Plugins/
-│       │       ├── Android/              # Android native bridge
-│       │       └── iOS/                  # iOS native bridge
-│       ├── Samples~/                     # Public samples imported through Package Manager
-│       ├── Tests/
-│       │   └── Editor/                   # EditMode regression tests
-│       ├── README.md
-│       ├── CHANGELOG.md
-│       └── package.json
+├── Runtime/                              # Public API, runtime assembly, shared managers
+│   ├── Internal/                         # Queueing, synchronization, context, lifecycle, generated gateway
+│   │   └── Generated/
+│   │       └── AttriaxSdkClient/         # Generated internal transport client
+│   └── Plugins/
+│       ├── Android/                      # Android native bridge
+│       └── iOS/                          # iOS native bridge
+├── Editor/                               # Editor tooling shipped with the package
+├── Samples~/                             # Public samples imported through Package Manager
+├── Tests/
+│   └── Editor/                           # EditMode regression tests
+├── Packages/manifest.json                # Local Unity-project wrapper consuming the root package
+├── README.md
+├── CHANGELOG.md
+├── package.json
 ├── dist/                                 # Generated .unitypackage and batch test results
 ├── export-unitypackage.ps1               # Supported Unity export wrapper
 ├── SDK_CLIENT_GENERATION.md              # Generated-client workflow
-├── README.md
 └── PUBLISHING.md
 ```
 
 ## Architectural Notes
 
-- `Packages/com.attriax.unity/Runtime/Attriax.cs` is the primary public entry
+- `Runtime/Attriax.cs` is the primary public entry
   point.
 - `AttriaxBehaviour.cs` exposes the MonoBehaviour-owned integration path.
 - `Runtime/Internal/AttriaxRuntime.cs` coordinates queueing, context,

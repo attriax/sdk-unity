@@ -23,4 +23,4 @@
 /dist/*.log
 /dist/unity-editmode-test-results.xml
 /.generated-sdk-client-tmp/
-/Packages/com.attriax.unity/Runtime/Internal/Generated/**/*.meta
+/Runtime/Internal/Generated/**/*.meta

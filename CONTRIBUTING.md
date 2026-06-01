@@ -36,10 +36,10 @@ npm run sdk:unity:generate
   Unity-specific divergence is deliberate and documented.
 - Add EditMode tests for logic changes in `Runtime/Internal/`.
 - Update the public sample when user-visible integration behavior changes.
-- Update both repository and package documentation when setup, release, or
+- Update repository and package documentation when setup, release, or
   behavior expectations change.
 - Keep generated files under
-  `Packages/com.attriax.unity/Runtime/Internal/Generated/AttriaxSdkClient/`
+  `Runtime/Internal/Generated/AttriaxSdkClient/`
   generated; do not hand-edit them unless you are fixing generation tooling.
 
 ## Pull Request Notes
@@ -59,5 +59,5 @@ When filing bugs, include:
 - target platform
 - steps to reproduce
 - relevant console or batch log output
-- whether the issue affects the embedded package, the exported `.unitypackage`,
+- whether the issue affects the Package Manager package, the exported `.unitypackage`,
   or both
