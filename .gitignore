@@ -23,4 +23,3 @@
 /dist/*.log
 /dist/unity-editmode-test-results.xml
 /.generated-sdk-client-tmp/
-/Runtime/Internal/Generated/**/*.meta
