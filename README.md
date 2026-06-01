@@ -13,10 +13,10 @@ way.
 
 ## Install From Git
 
-Use the repository URL directly in Unity Package Manager:
+Install the embedded package by pointing Unity at the package subfolder:
 
 ```text
-https://github.com/attriax/sdk-unity.git
+https://github.com/attriax/sdk-unity.git?path=/Packages/com.attriax.unity
 ```
 
 Or add it in a project manifest:
@@ -24,18 +24,17 @@ Or add it in a project manifest:
 ```json
 {
   "dependencies": {
-    "com.attriax.unity": "https://github.com/attriax/sdk-unity.git#v0.4.1"
+    "com.attriax.unity": "https://github.com/attriax/sdk-unity.git?path=/Packages/com.attriax.unity#v0.4.1"
   }
 }
 ```
 
-The repository root now includes a UPM manifest so Unity can load the SDK from
-the plain Git URL while local development in this workspace continues to use
-the embedded package source under `Packages/com.attriax.unity/`.
+This repository is a Unity workspace that embeds the publishable package under
+`Packages/com.attriax.unity/`. Using the supported `?path=` Git syntax makes
+Package Manager load that actual package root instead of the workspace wrapper.
 
 ## Layout
 
-- `package.json` — repository-root UPM manifest for Git URL installs
 - `Packages/com.attriax.unity/` — source package consumed by Unity projects
 - `Packages/com.attriax.unity/Runtime/Internal/Generated/AttriaxSdkClient/` — generated internal API client embedded into the runtime package
 - `Assets/Editor/` — batch export tooling for `.unitypackage` generation
