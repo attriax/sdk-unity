@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkV1OpenResponseEnvelopeDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkV1OpenResponseEnvelopeDto() { }
+        public SdkV1OpenResponseEnvelopeDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1OpenResponseEnvelopeDto" /> class.
         /// </summary>
@@ -101,3 +101,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

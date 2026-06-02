@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkV1BatchResponseDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkV1BatchResponseDto() { }
+        public SdkV1BatchResponseDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1BatchResponseDto" /> class.
         /// </summary>
@@ -116,3 +116,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

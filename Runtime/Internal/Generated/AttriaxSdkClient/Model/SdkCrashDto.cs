@@ -40,7 +40,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkCrashDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkCrashDto() { }
+        public SdkCrashDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkCrashDto" /> class.
         /// </summary>
@@ -289,3 +289,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

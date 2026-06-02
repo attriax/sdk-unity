@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkV1SkanRuntimeConfigurationDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkV1SkanRuntimeConfigurationDto() { }
+        public SdkV1SkanRuntimeConfigurationDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1SkanRuntimeConfigurationDto" /> class.
         /// </summary>
@@ -93,3 +93,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

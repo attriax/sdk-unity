@@ -83,7 +83,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkRevenueReceiptValidateResponseDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkRevenueReceiptValidateResponseDto() { }
+        public SdkRevenueReceiptValidateResponseDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkRevenueReceiptValidateResponseDto" /> class.
         /// </summary>
@@ -241,3 +241,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

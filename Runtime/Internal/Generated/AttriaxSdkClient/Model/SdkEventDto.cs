@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkEventDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkEventDto() { }
+        public SdkEventDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkEventDto" /> class.
         /// </summary>
@@ -156,3 +156,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

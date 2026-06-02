@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkUnityEditorValidateResponseDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkUnityEditorValidateResponseDto() { }
+        public SdkUnityEditorValidateResponseDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkUnityEditorValidateResponseDto" /> class.
         /// </summary>
@@ -170,3 +170,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

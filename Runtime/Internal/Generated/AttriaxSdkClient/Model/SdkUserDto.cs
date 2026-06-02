@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkUserDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkUserDto() { }
+        public SdkUserDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkUserDto" /> class.
         /// </summary>
@@ -168,3 +168,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

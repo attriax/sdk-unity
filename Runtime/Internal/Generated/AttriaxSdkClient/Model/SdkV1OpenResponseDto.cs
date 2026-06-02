@@ -40,7 +40,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkV1OpenResponseDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkV1OpenResponseDto() { }
+        public SdkV1OpenResponseDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1OpenResponseDto" /> class.
         /// </summary>
@@ -193,3 +193,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

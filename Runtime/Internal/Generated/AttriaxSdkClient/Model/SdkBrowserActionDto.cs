@@ -40,7 +40,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkBrowserActionDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkBrowserActionDto() { }
+        public SdkBrowserActionDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkBrowserActionDto" /> class.
         /// </summary>
@@ -89,3 +89,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

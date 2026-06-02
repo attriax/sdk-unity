@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkV1GdprConsentValuesDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkV1GdprConsentValuesDto() { }
+        public SdkV1GdprConsentValuesDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1GdprConsentValuesDto" /> class.
         /// </summary>
@@ -93,3 +93,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

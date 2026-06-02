@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkV1SkanWindow1GroupDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkV1SkanWindow1GroupDto() { }
+        public SdkV1SkanWindow1GroupDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1SkanWindow1GroupDto" /> class.
         /// </summary>
@@ -121,3 +121,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

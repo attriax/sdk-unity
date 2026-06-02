@@ -40,7 +40,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="UnityReleaseSummaryDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected UnityReleaseSummaryDto() { }
+        public UnityReleaseSummaryDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="UnityReleaseSummaryDto" /> class.
         /// </summary>
@@ -190,3 +190,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

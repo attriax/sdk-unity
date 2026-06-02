@@ -40,7 +40,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkV1DeepLinkResolveResponseDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkV1DeepLinkResolveResponseDto() { }
+        public SdkV1DeepLinkResolveResponseDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1DeepLinkResolveResponseDto" /> class.
         /// </summary>
@@ -152,3 +152,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

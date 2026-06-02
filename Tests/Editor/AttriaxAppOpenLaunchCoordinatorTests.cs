@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using Attriax.Unity.Generated.Client;
@@ -29,6 +30,15 @@ namespace Attriax.Unity.Tests
         }
 
         [Test]
+        public void GeneratedLaunchResponseModelsExposePublicJsonConstructors()
+        {
+            Assert.That(HasPublicParameterlessConstructor(typeof(SdkV1ConfigResponseEnvelopeDto)), Is.True);
+            Assert.That(HasPublicParameterlessConstructor(typeof(SdkV1ConfigResponseDto)), Is.True);
+            Assert.That(HasPublicParameterlessConstructor(typeof(SdkV1OpenResponseEnvelopeDto)), Is.True);
+            Assert.That(HasPublicParameterlessConstructor(typeof(SdkV1OpenResponseDto)), Is.True);
+        }
+
+        [Test]
         public async Task WaitsForRuntimeConfigBeforeSchedulingAppOpen()
         {
             var runtimeConfigSource = new TaskCompletionSource<AttriaxSdkRuntimeConfig>(
@@ -54,6 +64,15 @@ namespace Attriax.Unity.Tests
             await scheduling;
 
             Assert.That(scheduleCount, Is.EqualTo(1));
+        }
+
+        private static bool HasPublicParameterlessConstructor(Type type)
+        {
+            return type.GetConstructor(
+                BindingFlags.Instance | BindingFlags.Public,
+                binder: null,
+                types: Type.EmptyTypes,
+                modifiers: null) != null;
         }
 
         [Test]

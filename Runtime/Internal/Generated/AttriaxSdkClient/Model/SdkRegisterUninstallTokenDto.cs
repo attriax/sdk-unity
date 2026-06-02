@@ -46,7 +46,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkRegisterUninstallTokenDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkRegisterUninstallTokenDto() { }
+        public SdkRegisterUninstallTokenDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkRegisterUninstallTokenDto" /> class.
         /// </summary>
@@ -146,3 +146,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

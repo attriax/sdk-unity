@@ -46,7 +46,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkSessionDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkSessionDto() { }
+        public SdkSessionDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkSessionDto" /> class.
         /// </summary>
@@ -228,3 +228,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

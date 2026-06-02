@@ -40,7 +40,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkV1SkanEventDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkV1SkanEventDto() { }
+        public SdkV1SkanEventDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1SkanEventDto" /> class.
         /// </summary>
@@ -135,3 +135,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

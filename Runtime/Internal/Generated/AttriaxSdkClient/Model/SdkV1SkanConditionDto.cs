@@ -40,7 +40,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkV1SkanConditionDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkV1SkanConditionDto() { }
+        public SdkV1SkanConditionDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1SkanConditionDto" /> class.
         /// </summary>
@@ -113,3 +113,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

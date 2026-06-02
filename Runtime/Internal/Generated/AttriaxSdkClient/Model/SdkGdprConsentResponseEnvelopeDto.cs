@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkGdprConsentResponseEnvelopeDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkGdprConsentResponseEnvelopeDto() { }
+        public SdkGdprConsentResponseEnvelopeDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkGdprConsentResponseEnvelopeDto" /> class.
         /// </summary>
@@ -101,3 +101,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

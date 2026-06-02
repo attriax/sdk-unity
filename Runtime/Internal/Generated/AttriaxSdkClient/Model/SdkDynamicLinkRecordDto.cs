@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkDynamicLinkRecordDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkDynamicLinkRecordDto() { }
+        public SdkDynamicLinkRecordDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkDynamicLinkRecordDto" /> class.
         /// </summary>
@@ -243,3 +243,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

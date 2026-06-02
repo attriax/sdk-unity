@@ -41,7 +41,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkInstallReferrerResultDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkInstallReferrerResultDto() { }
+        public SdkInstallReferrerResultDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkInstallReferrerResultDto" /> class.
         /// </summary>
@@ -233,3 +233,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

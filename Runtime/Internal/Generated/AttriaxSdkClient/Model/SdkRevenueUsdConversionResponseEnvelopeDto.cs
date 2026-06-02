@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkRevenueUsdConversionResponseEnvelopeDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkRevenueUsdConversionResponseEnvelopeDto() { }
+        public SdkRevenueUsdConversionResponseEnvelopeDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkRevenueUsdConversionResponseEnvelopeDto" /> class.
         /// </summary>
@@ -101,3 +101,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

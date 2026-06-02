@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkV1GdprDataEraseDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkV1GdprDataEraseDto() { }
+        public SdkV1GdprDataEraseDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1GdprDataEraseDto" /> class.
         /// </summary>
@@ -102,3 +102,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+

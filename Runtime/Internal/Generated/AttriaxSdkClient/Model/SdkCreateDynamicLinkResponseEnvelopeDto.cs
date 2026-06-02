@@ -34,7 +34,7 @@ namespace Attriax.Unity.Generated.Model
         /// Initializes a new instance of the <see cref="SdkCreateDynamicLinkResponseEnvelopeDto" /> class.
         /// </summary>
         [JsonConstructorAttribute]
-        protected SdkCreateDynamicLinkResponseEnvelopeDto() { }
+        public SdkCreateDynamicLinkResponseEnvelopeDto() { }
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkCreateDynamicLinkResponseEnvelopeDto" /> class.
         /// </summary>
@@ -101,3 +101,4 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
+
