@@ -37,6 +37,34 @@ namespace Attriax.Unity.Tests
             Assert.That(manager.HasSuccessfulResult, Is.False);
         }
 
+        [Test]
+        public async Task FailedAppOpenCanBeScheduledAgain()
+        {
+            var runtimeState = new AttriaxRuntimeState
+            {
+                IsInitialized = true,
+                IsEnabled = true,
+            };
+            var pipeline = new RetryableFakeAppOpenPipeline();
+            var manager = new AttriaxAppOpenManager(runtimeState, pipeline, new AttriaxEventHub());
+
+            await manager.ScheduleAsync();
+
+            Assert.That(manager.DidSchedule, Is.True);
+            Assert.That(pipeline.ScheduleCount, Is.EqualTo(1));
+
+            pipeline.FailFirst(new System.InvalidOperationException("open failed"));
+            await Task.Yield();
+
+            Assert.That(manager.DidSchedule, Is.False);
+            Assert.That(manager.HasSuccessfulResult, Is.False);
+
+            await manager.ScheduleAsync();
+
+            Assert.That(manager.DidSchedule, Is.True);
+            Assert.That(pipeline.ScheduleCount, Is.EqualTo(2));
+        }
+
         private sealed class FakeAppOpenPipeline : IAttriaxAppOpenPipeline
         {
             public Task<AttriaxAppOpenResult> EnqueueOpenAsync(
@@ -44,6 +72,50 @@ namespace Attriax.Unity.Tests
                 IDictionary<string, object>? deviceMetadataOverrides)
             {
                 return new TaskCompletionSource<AttriaxAppOpenResult>().Task;
+            }
+
+            public Task ResolveInstallReferrerFromAppOpenAsync(Task<AttriaxAppOpenResult> openTrackingTask)
+            {
+                return Task.CompletedTask;
+            }
+
+            public AttriaxDeepLinkEvent? BuildDeepLinkEventFromAppOpenResult(AttriaxAppOpenResult result)
+            {
+                return null;
+            }
+
+            public AttriaxAppOpen? ToPublicAppOpen(AttriaxAppOpenResult? result)
+            {
+                return null;
+            }
+        }
+
+        private sealed class RetryableFakeAppOpenPipeline : IAttriaxAppOpenPipeline
+        {
+            private TaskCompletionSource<AttriaxAppOpenResult> _firstOpen =
+                new TaskCompletionSource<AttriaxAppOpenResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public int ScheduleCount { get; private set; }
+
+            public Task<AttriaxAppOpenResult> EnqueueOpenAsync(
+                string? installReferrerOverride,
+                IDictionary<string, object>? deviceMetadataOverrides)
+            {
+                ScheduleCount += 1;
+                if (ScheduleCount == 1)
+                {
+                    return _firstOpen.Task;
+                }
+
+                return Task.FromResult(new AttriaxAppOpenResult
+                {
+                    UserId = "user_retry",
+                });
+            }
+
+            public void FailFirst(System.Exception error)
+            {
+                _firstOpen.TrySetException(error);
             }
 
             public Task ResolveInstallReferrerFromAppOpenAsync(Task<AttriaxAppOpenResult> openTrackingTask)

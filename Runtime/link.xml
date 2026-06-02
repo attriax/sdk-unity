@@ -1,0 +1,6 @@
+<linker>
+  <assembly fullname="Attriax.Runtime">
+    <type fullname="Attriax.Unity.Generated.Client.*" preserve="all" />
+    <type fullname="Attriax.Unity.Generated.Model.*" preserve="all" />
+  </assembly>
+</linker>

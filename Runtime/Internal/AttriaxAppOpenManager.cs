@@ -28,7 +28,7 @@ namespace Attriax.Unity.Internal
 
         public bool HasSuccessfulResult => _lastAppOpenResult != null;
 
-        public bool DidSchedule => _openTrackingTask != null;
+        public bool DidSchedule => _openTrackingTask != null || _lastAppOpenResult != null;
 
         public Task<AttriaxAppOpenResult>? CurrentTask => _openTrackingTask;
 
@@ -51,8 +51,27 @@ namespace Attriax.Unity.Internal
             _openTrackingTask = _pipeline.EnqueueOpenAsync(
                 installReferrerOverride,
                 deviceMetadataOverrides);
+            ObserveCompletion(_openTrackingTask);
             _ = _pipeline.ResolveInstallReferrerFromAppOpenAsync(_openTrackingTask);
             return Task.CompletedTask;
+        }
+
+        private void ObserveCompletion(Task<AttriaxAppOpenResult> openTrackingTask)
+        {
+            _ = openTrackingTask.ContinueWith(
+                completedTask =>
+                {
+                    if (!ReferenceEquals(_openTrackingTask, completedTask))
+                    {
+                        return;
+                    }
+
+                    if (completedTask.IsFaulted || completedTask.IsCanceled)
+                    {
+                        _openTrackingTask = null;
+                    }
+                },
+                TaskContinuationOptions.ExecuteSynchronously);
         }
 
         public async Task<AttriaxAppOpen?> WaitForPublicResultAsync()

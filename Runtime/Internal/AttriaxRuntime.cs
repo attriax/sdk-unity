@@ -1401,6 +1401,11 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
+            if (_shouldGateRequestsOnSuccessfulAppOpen && !_appOpenManager.HasSuccessfulResult)
+            {
+                ScheduleLaunchPreparationIfNeeded();
+            }
+
             if (immediate || _config.EventFlushIntervalMs == 0)
             {
                 SetSynchronizationState(AttriaxSynchronizationState.Synchronizing);
