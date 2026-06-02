@@ -15,7 +15,7 @@ namespace Attriax.Unity.Tests
             var occurredAt = new DateTimeOffset(2026, 5, 8, 13, 15, 0, TimeSpan.Zero);
 
             var request = AttriaxGeneratedRequestFactory.BuildValidateReceiptRequest(
-                appToken: "ax_test",
+                projectToken: "ax_test",
                 deviceId: "device_1",
                 config: new AttriaxConfig
                 {
@@ -43,7 +43,7 @@ namespace Attriax.Unity.Tests
         public void BuildValidateReceiptRequestAllowsMissingDeviceIdentity()
         {
             var request = AttriaxGeneratedRequestFactory.BuildValidateReceiptRequest(
-                appToken: "ax_test",
+                projectToken: "ax_test",
                 deviceId: null,
                 config: new AttriaxConfig(),
                 options: new AttriaxValidateReceiptOptions(),
@@ -56,7 +56,7 @@ namespace Attriax.Unity.Tests
         public void BuildRegisterUninstallTokenRequestReturnsGeneratedDtoWithEnumProvider()
         {
             var request = AttriaxGeneratedRequestFactory.BuildRegisterUninstallTokenRequest(
-                appToken: "ax_test",
+                projectToken: "ax_test",
                 deviceId: "device_1",
                 deviceIdSource: "persistent_storage",
                 platform: AttriaxPlatformType.IOS,
@@ -82,7 +82,7 @@ namespace Attriax.Unity.Tests
         public void BuildRegisterUninstallTokenRequestSupportsApnsProvider()
         {
             var request = AttriaxGeneratedRequestFactory.BuildRegisterUninstallTokenRequest(
-                appToken: "ax_test",
+                projectToken: "ax_test",
                 deviceId: "device_1",
                 deviceIdSource: "persistent_storage",
                 platform: AttriaxPlatformType.IOS,
@@ -98,7 +98,7 @@ namespace Attriax.Unity.Tests
         public void BuildOpenRequestIncludesTypedScreenMetrics()
         {
             var request = AttriaxGeneratedRequestFactory.BuildOpenRequest(
-                appToken: "ax_test",
+                projectToken: "ax_test",
                 deviceIdSource: "windows_machine_guid",
                 snapshot: new AttriaxContextSnapshot
                 {
@@ -141,7 +141,7 @@ namespace Attriax.Unity.Tests
         public void BuildOpenRequestIncludesInstallReferrerContextFields()
         {
             var request = AttriaxGeneratedRequestFactory.BuildOpenRequest(
-                appToken: "ax_test",
+                projectToken: "ax_test",
                 deviceIdSource: "android_ad_id",
                 snapshot: new AttriaxContextSnapshot
                 {
@@ -182,7 +182,7 @@ namespace Attriax.Unity.Tests
         public void BuildOpenRequestAppliesInstallReferrerAndDeviceMetadataOverrides()
         {
             var request = AttriaxGeneratedRequestFactory.BuildOpenRequest(
-                appToken: "ax_test",
+                projectToken: "ax_test",
                 deviceIdSource: "ios_keychain",
                 snapshot: new AttriaxContextSnapshot
                 {
@@ -233,7 +233,7 @@ namespace Attriax.Unity.Tests
         public void BuildOpenRequestPreservesUnityEditorPlatform()
         {
             var request = AttriaxGeneratedRequestFactory.BuildOpenRequest(
-                appToken: "ax_test",
+                projectToken: "ax_test",
                 deviceIdSource: "persistent_storage",
                 snapshot: new AttriaxContextSnapshot
                 {
@@ -267,7 +267,7 @@ namespace Attriax.Unity.Tests
         public void BuildUnityEditorValidateRequestUsesEditorMetadata()
         {
             var request = AttriaxGeneratedRequestFactory.BuildUnityEditorValidateRequest(
-                appToken: "ax_test",
+                projectToken: "ax_test",
                 packageVersion: " 0.4.0 ",
                 unityVersion: " 6000.4.6f1 ",
                 editorHostPlatform: " WindowsEditor ");
@@ -285,7 +285,7 @@ namespace Attriax.Unity.Tests
             var occurredAt = startedAt.AddMilliseconds(1500).AddTicks(9876);
 
             var request = AttriaxGeneratedRequestFactory.BuildTrackSessionRequest(
-                appToken: "ax_test",
+                projectToken: "ax_test",
                 deviceId: "device_1",
                 deviceIdSource: "persistent_storage",
                 session: new AttriaxSessionSnapshot

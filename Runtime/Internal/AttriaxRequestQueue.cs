@@ -392,12 +392,12 @@ namespace Attriax.Unity.Internal
 
         private static bool CanShareBatchEnvelope(AttriaxQueuedRequest left, AttriaxQueuedRequest right)
         {
-            return string.Equals(GetBatchAppToken(left), GetBatchAppToken(right), StringComparison.Ordinal)
+            return string.Equals(GetBatchProjectToken(left), GetBatchProjectToken(right), StringComparison.Ordinal)
                 && string.Equals(GetBatchDeviceId(left), GetBatchDeviceId(right), StringComparison.Ordinal)
                 && string.Equals(GetBatchDeviceIdSource(left), GetBatchDeviceIdSource(right), StringComparison.Ordinal);
         }
 
-        private static string GetBatchAppToken(AttriaxQueuedRequest entry)
+        private static string GetBatchProjectToken(AttriaxQueuedRequest entry)
         {
             switch (entry.Kind)
             {
@@ -694,7 +694,7 @@ namespace Attriax.Unity.Internal
     [Serializable]
     internal sealed class AttriaxCrashRequest
     {
-        public string AppToken { get; set; } = string.Empty;
+        public string ProjectToken { get; set; } = string.Empty;
 
         public string? DeviceId { get; set; }
 

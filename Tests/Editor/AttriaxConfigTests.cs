@@ -6,7 +6,7 @@ namespace Attriax.Unity.Tests
     public sealed class AttriaxConfigTests
     {
         [Test]
-        public void ConstructorRejectsMissingAppToken()
+        public void ConstructorRejectsMissingProjectToken()
         {
             Assert.Throws<System.ArgumentException>(() => new Attriax(new AttriaxConfig()));
         }
@@ -16,7 +16,7 @@ namespace Attriax.Unity.Tests
         {
             var attriax = new Attriax(new AttriaxConfig
             {
-                AppToken = "ax_test",
+                ProjectToken = "ax_test",
                 ApiBaseUrl = "http://localhost:3000",
             });
 
@@ -29,7 +29,7 @@ namespace Attriax.Unity.Tests
         {
             var attriax = new Attriax(new AttriaxConfig
             {
-                AppToken = "ax_test",
+                ProjectToken = "ax_test",
                 ApiBaseUrl = "http://[::1]:3000",
             });
 
@@ -42,7 +42,7 @@ namespace Attriax.Unity.Tests
         {
             Assert.Throws<System.ArgumentException>(() => new Attriax(new AttriaxConfig
             {
-                AppToken = "ax_test",
+                ProjectToken = "ax_test",
                 ApiBaseUrl = "http://example.com",
             }));
         }
@@ -52,7 +52,7 @@ namespace Attriax.Unity.Tests
         {
             var attriax = new Attriax(new AttriaxConfig
             {
-                AppToken = "ax_test",
+                ProjectToken = "ax_test",
             });
 
             Assert.That(attriax.Config.AutomaticBrowserHandling, Is.True);
@@ -68,7 +68,7 @@ namespace Attriax.Unity.Tests
         {
             var attriax = new Attriax(new AttriaxConfig
             {
-                AppToken = "ax_test",
+                ProjectToken = "ax_test",
                 AutomaticCrashReportingEnabled = false,
             });
 
@@ -81,7 +81,7 @@ namespace Attriax.Unity.Tests
         {
             var attriax = new Attriax(new AttriaxConfig
             {
-                AppToken = "ax_test",
+                ProjectToken = "ax_test",
             });
 
             Assert.That(attriax.Config.EventFlushIntervalMs, Is.EqualTo(60000));

@@ -27,7 +27,7 @@ namespace Attriax.Unity.Internal
     internal static class AttriaxGeneratedRequestFactory
     {
         public static SdkV1OpenDto BuildOpenRequest(
-            string appToken,
+            string projectToken,
             string deviceIdSource,
             AttriaxContextSnapshot snapshot,
             AttriaxSessionSnapshot? session,
@@ -39,7 +39,7 @@ namespace Attriax.Unity.Internal
                     buildNumber: snapshot.App.BuildNumber,
                     packageName: snapshot.App.PackageName,
                     version: snapshot.App.Version),
-                projectToken: appToken,
+                projectToken: projectToken,
                 device: new GeneratedDeviceContextDto(
                     advertisingId: snapshot.Device.AdvertisingId,
                     androidId: snapshot.Device.AndroidId,
@@ -122,7 +122,7 @@ namespace Attriax.Unity.Internal
         }
 
         public static SdkEventDto BuildTrackEventRequest(
-            string appToken,
+            string projectToken,
             string? deviceId,
             string? deviceIdSource,
             string eventName,
@@ -131,7 +131,7 @@ namespace Attriax.Unity.Internal
             DateTimeOffset occurredAt)
         {
             return new SdkEventDto(
-                projectToken: appToken,
+                projectToken: projectToken,
                 clientOccurredAt: occurredAt.UtcDateTime,
                 deviceId: deviceId,
                 deviceIdSource: deviceIdSource,
@@ -142,7 +142,7 @@ namespace Attriax.Unity.Internal
         }
 
         public static AttriaxCrashRequest BuildTrackCrashRequest(
-            string appToken,
+            string projectToken,
             string? deviceId,
             string? deviceIdSource,
             AttriaxContextSnapshot snapshot,
@@ -158,7 +158,7 @@ namespace Attriax.Unity.Internal
         {
             return new AttriaxCrashRequest
             {
-                AppToken = appToken,
+                ProjectToken = projectToken,
                 DeviceId = deviceId,
                 DeviceIdSource = deviceIdSource,
                 Platform = MapCrashPlatform(snapshot.Platform),
@@ -183,7 +183,7 @@ namespace Attriax.Unity.Internal
         }
 
         public static SdkSessionDto BuildTrackSessionRequest(
-            string appToken,
+            string projectToken,
             string? deviceId,
             string? deviceIdSource,
             AttriaxSessionSnapshot session,
@@ -194,7 +194,7 @@ namespace Attriax.Unity.Internal
             return new SdkSessionDto(
                 appBuildNumber: session.AppBuildNumber,
                 appPackageName: session.AppPackageName,
-                projectToken: appToken,
+                projectToken: projectToken,
                 appVersion: session.AppVersion,
                 clientOccurredAt: occurredAt.UtcDateTime,
                 deviceId: deviceId,
@@ -211,39 +211,39 @@ namespace Attriax.Unity.Internal
         }
 
         public static SdkUserDto BuildUserRequest(
-            string appToken,
+            string projectToken,
             string deviceId,
             string deviceIdSource,
-            string? externalUserId,
+            string? userId,
             AttriaxSetUserOptions options,
             bool clearExternalUser)
         {
             var sanitizedOptions = AttriaxUserPropertySanitizer.SanitizeSetUserOptions(options);
 
             return new SdkUserDto(
-                projectToken: appToken,
+                projectToken: projectToken,
                 clearAllProperties: sanitizedOptions.ClearAllProperties,
                 clearExternalUser: clearExternalUser,
                 clearPropertyKeys: NormalizeClearPropertyKeys(sanitizedOptions.ClearPropertyKeys),
                 deviceId: deviceId,
                 deviceIdSource: deviceIdSource,
-                externalUserId: string.IsNullOrWhiteSpace(externalUserId)
+                externalUserId: string.IsNullOrWhiteSpace(userId)
                     ? null
-                    : externalUserId,
-                externalUserName: clearExternalUser || string.IsNullOrWhiteSpace(externalUserId) ||
-                    string.IsNullOrWhiteSpace(sanitizedOptions.ExternalUserName)
+                    : userId,
+                externalUserName: clearExternalUser || string.IsNullOrWhiteSpace(userId) ||
+                    string.IsNullOrWhiteSpace(sanitizedOptions.UserName)
                     ? null
-                    : sanitizedOptions.ExternalUserName,
+                    : sanitizedOptions.UserName,
                 properties: AttriaxUserPropertySanitizer.SanitizeProperties(sanitizedOptions.Properties));
         }
 
         public static SdkCreateDynamicLinkDto BuildCreateDynamicLinkRequest(
-            string appToken,
+            string projectToken,
             AttriaxCreateDynamicLinkOptions options)
         {
             return new SdkCreateDynamicLinkDto(
                 androidRedirect: options.AndroidRedirect ?? default,
-                projectToken: appToken,
+                projectToken: projectToken,
                 data: AttriaxObjectNormalizer.NormalizeObjectMap(options.Data),
                 destinationUrl: string.IsNullOrWhiteSpace(options.DestinationUrl)
                     ? null
@@ -276,14 +276,14 @@ namespace Attriax.Unity.Internal
         }
 
         public static SdkV1RevenueReceiptValidateDto BuildValidateReceiptRequest(
-            string appToken,
+            string projectToken,
             string? deviceId,
             AttriaxConfig config,
             AttriaxValidateReceiptOptions options,
             DateTimeOffset occurredAt)
         {
             return new SdkV1RevenueReceiptValidateDto(
-                projectToken: appToken,
+                projectToken: projectToken,
                 clientOccurredAt: occurredAt.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture),
                 deviceId: deviceId,
                 environment: NormalizeOptionalString(options.Environment),
@@ -304,20 +304,20 @@ namespace Attriax.Unity.Internal
         }
 
         public static SdkV1UnityEditorValidateDto BuildUnityEditorValidateRequest(
-            string appToken,
+            string projectToken,
             string packageVersion,
             string unityVersion,
             string editorHostPlatform)
         {
             return new SdkV1UnityEditorValidateDto(
-                projectToken: appToken,
+                projectToken: projectToken,
                 editorHostPlatform: NormalizeOptionalString(editorHostPlatform),
                 packageVersion: NormalizeOptionalString(packageVersion),
                 unityVersion: NormalizeOptionalString(unityVersion));
         }
 
         public static SdkRegisterUninstallTokenDto BuildRegisterUninstallTokenRequest(
-            string appToken,
+            string projectToken,
             string deviceId,
             string deviceIdSource,
             AttriaxPlatformType platform,
@@ -326,7 +326,7 @@ namespace Attriax.Unity.Internal
             IDictionary<string, object>? metadata)
         {
             return new SdkRegisterUninstallTokenDto(
-                projectToken: appToken,
+                projectToken: projectToken,
                 deviceId: deviceId,
                 deviceIdSource: deviceIdSource,
                 metadata: AttriaxObjectNormalizer.NormalizeObjectMap(metadata),
@@ -336,16 +336,16 @@ namespace Attriax.Unity.Internal
         }
 
         public static SdkV1GdprConsentCheckDto BuildGdprConsentCheckRequest(
-            string appToken,
+            string projectToken,
             string consentId)
         {
             return new SdkV1GdprConsentCheckDto(
-                projectToken: appToken,
+                projectToken: projectToken,
                 consentId: consentId);
         }
 
         public static SdkV1GdprConsentWriteDto BuildGdprConsentWriteRequest(
-            string appToken,
+            string projectToken,
             string consentId,
             DateTime clientOccurredAt,
             string? countryCode,
@@ -354,7 +354,7 @@ namespace Attriax.Unity.Internal
             AttriaxGdprConsentValues? values)
         {
             return new SdkV1GdprConsentWriteDto(
-                projectToken: appToken,
+                projectToken: projectToken,
                 clientOccurredAt: clientOccurredAt.ToUniversalTime(),
                 consentId: consentId,
                 countryCode: NormalizeOptionalString(countryCode),
@@ -369,7 +369,7 @@ namespace Attriax.Unity.Internal
         }
 
         public static SdkV1DeepLinkResolveDto BuildResolveDeepLinkRequest(
-            string appToken,
+            string projectToken,
             string? deviceId,
             string? deviceIdSource,
             bool isFirstLaunch,
@@ -377,7 +377,7 @@ namespace Attriax.Unity.Internal
             AttriaxDeepLinkConversionOptions options)
         {
             return new SdkV1DeepLinkResolveDto(
-                projectToken: appToken,
+                projectToken: projectToken,
                 deviceId: deviceId,
                 deviceIdSource: deviceIdSource,
                 isFirstLaunch: isFirstLaunch,

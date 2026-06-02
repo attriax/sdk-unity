@@ -91,8 +91,8 @@ namespace Attriax.Unity.Tests
         [Test]
         public async Task PendingConsentBootstrapKeepsFirstLaunchMarkerAcrossRestartsWithoutDeviceIdentity()
         {
-            var appToken = "ax_test_" + Guid.NewGuid().ToString("N");
-            var firstRuntime = CreateRuntime(appToken, gdprEnabled: true);
+            var projectToken = "ax_test_" + Guid.NewGuid().ToString("N");
+            var firstRuntime = CreateRuntime(projectToken, gdprEnabled: true);
 
             try
             {
@@ -112,7 +112,7 @@ namespace Attriax.Unity.Tests
                 firstRuntime.Dispose();
             }
 
-            var restartedRuntime = CreateRuntime(appToken, gdprEnabled: true);
+            var restartedRuntime = CreateRuntime(projectToken, gdprEnabled: true);
             try
             {
                 await restartedRuntime.InitializeAsync(new AttriaxInitOptions
@@ -131,11 +131,11 @@ namespace Attriax.Unity.Tests
             }
         }
 
-        private static AttriaxRuntime CreateRuntime(string? appToken = null, bool gdprEnabled = false)
+        private static AttriaxRuntime CreateRuntime(string? projectToken = null, bool gdprEnabled = false)
         {
             var runtime = new AttriaxRuntime(new AttriaxConfig
             {
-                AppToken = appToken ?? "ax_test_" + Guid.NewGuid().ToString("N"),
+                ProjectToken = projectToken ?? "ax_test_" + Guid.NewGuid().ToString("N"),
                 GdprEnabled = gdprEnabled,
             });
 

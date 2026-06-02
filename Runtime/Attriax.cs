@@ -167,7 +167,7 @@ namespace Attriax.Unity
         /// <summary>
         /// Queues a custom event for delivery to the Attriax backend.
         /// </summary>
-        internal Task TrackEventAsync(string eventName, AttriaxTrackEventOptions? options = null)
+        internal Task RecordEventAsync(string eventName, AttriaxTrackEventOptions? options = null)
         {
             return _runtime.TrackEventAsync(eventName, options ?? new AttriaxTrackEventOptions());
         }
@@ -232,7 +232,7 @@ namespace Attriax.Unity
 
             AddTrimmed(eventData, "validationId", options.ValidationId);
 
-            return TrackEventAsync("purchase", new AttriaxTrackEventOptions
+            return RecordEventAsync(AttriaxAnalyticsEventKeys.Purchase, new AttriaxTrackEventOptions
             {
                 EventData = eventData,
                 FlushImmediately = options.FlushImmediately ?? true,
@@ -290,7 +290,7 @@ namespace Attriax.Unity
 
             AddTrimmed(eventData, "reason", options.Reason);
 
-            return TrackEventAsync("refund", new AttriaxTrackEventOptions
+            return RecordEventAsync(AttriaxAnalyticsEventKeys.Refund, new AttriaxTrackEventOptions
             {
                 EventData = eventData,
                 FlushImmediately = options.FlushImmediately ?? true,
@@ -313,7 +313,7 @@ namespace Attriax.Unity
         /// Attriax currently supports this flow on Android and iOS. On Apple platforms,
         /// Firebase must already map the APNs device token to the FCM registration token.
         /// </summary>
-        public Task RegisterFirebaseMessagingTokenAsync(
+        internal Task RegisterFirebaseMessagingTokenAsync(
             string? token,
             IDictionary<string, object>? metadata = null)
         {
@@ -326,7 +326,7 @@ namespace Attriax.Unity
         /// Pass <c>null</c> or whitespace to clear the currently registered APNs uninstall token for this device.
         /// Attriax currently supports this flow on Apple platforms only.
         /// </summary>
-        public Task RegisterApplePushTokenAsync(
+        internal Task RegisterApplePushTokenAsync(
             string? token,
             IDictionary<string, object>? metadata = null)
         {
@@ -361,7 +361,7 @@ namespace Attriax.Unity
                 eventData["test"] = options.Test.Value;
             }
 
-            return TrackEventAsync("ad_revenue", new AttriaxTrackEventOptions
+            return RecordEventAsync(AttriaxAnalyticsEventKeys.AdRevenue, new AttriaxTrackEventOptions
             {
                 EventData = eventData,
                 FlushImmediately = options.FlushImmediately ?? true,
@@ -402,7 +402,7 @@ namespace Attriax.Unity
                 eventData["test"] = options.Test.Value;
             }
 
-            return TrackEventAsync(MapAdEventName(type), new AttriaxTrackEventOptions
+            return RecordEventAsync(MapAdEventName(type), new AttriaxTrackEventOptions
             {
                 EventData = eventData,
                 FlushImmediately = options.FlushImmediately ?? true,
@@ -420,26 +420,26 @@ namespace Attriax.Unity
         /// <summary>
         /// Tracks a standardized page-view event.
         /// </summary>
-        internal Task TrackPageViewAsync(string pageName, AttriaxPageViewOptions? options = null)
+        internal Task RecordPageViewAsync(string pageName, AttriaxPageViewOptions? options = null)
         {
             return _runtime.TrackPageViewAsync(pageName, options ?? new AttriaxPageViewOptions());
         }
 
         /// <summary>
-        /// Applies an external user id and default user metadata to future tracked events.
-        /// Passing null clears the currently associated external user id.
+        /// Applies a user id and default user metadata to future tracked events.
+        /// Passing null clears the currently associated user id.
         /// </summary>
-        internal Task SetUserAsync(string? externalUserId, AttriaxSetUserOptions? options = null)
+        internal Task SetUserAsync(string? userId, AttriaxSetUserOptions? options = null)
         {
-            return _runtime.SetUserAsync(externalUserId, options ?? new AttriaxSetUserOptions());
+            return _runtime.SetUserAsync(userId, options ?? new AttriaxSetUserOptions());
         }
 
         /// <summary>
         /// Backward-compatible alias for <see cref="SetUserAsync"/>.
         /// </summary>
-        internal Task IdentifyAsync(string? externalUserId, AttriaxIdentifyOptions? options = null)
+        internal Task IdentifyAsync(string? userId, AttriaxIdentifyOptions? options = null)
         {
-            return SetUserAsync(externalUserId, options ?? new AttriaxIdentifyOptions());
+            return SetUserAsync(userId, options ?? new AttriaxIdentifyOptions());
         }
 
         /// <summary>

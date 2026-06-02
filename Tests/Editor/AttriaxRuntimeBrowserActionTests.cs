@@ -19,7 +19,7 @@ namespace Attriax.Unity.Tests
             var runtime = new AttriaxRuntime(
                 new AttriaxConfig
                 {
-                    AppToken = "ax_test",
+                    ProjectToken = "ax_test",
                     AutomaticBrowserHandling = true,
                 },
                 (platform, url, openMode) =>
@@ -72,7 +72,7 @@ namespace Attriax.Unity.Tests
             var runtime = new AttriaxRuntime(
                 new AttriaxConfig
                 {
-                    AppToken = "ax_test",
+                    ProjectToken = "ax_test",
                     AutomaticBrowserHandling = false,
                 },
                 (_, _, _) =>
@@ -120,7 +120,7 @@ namespace Attriax.Unity.Tests
             var runtime = new AttriaxRuntime(
                 new AttriaxConfig
                 {
-                    AppToken = "ax_test",
+                    ProjectToken = "ax_test",
                 });
 
             try

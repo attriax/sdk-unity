@@ -38,9 +38,9 @@ namespace Attriax.Unity
         /// <summary>
         /// Queues a custom event for delivery to the Attriax backend.
         /// </summary>
-        public Task TrackEventAsync(string eventName, AttriaxTrackEventOptions? options = null)
+        public Task RecordEventAsync(string eventName, AttriaxTrackEventOptions? options = null)
         {
-            return _attriax.TrackEventAsync(eventName, options ?? new AttriaxTrackEventOptions());
+            return _attriax.RecordEventAsync(eventName, options ?? new AttriaxTrackEventOptions());
         }
 
         /// <summary>
@@ -86,27 +86,54 @@ namespace Attriax.Unity
         /// <summary>
         /// Tracks a standardized page-view event.
         /// </summary>
-        public Task TrackPageViewAsync(string pageName, AttriaxPageViewOptions? options = null)
+        public Task RecordPageViewAsync(string pageName, AttriaxPageViewOptions? options = null)
         {
-            return _attriax.TrackPageViewAsync(pageName, options ?? new AttriaxPageViewOptions());
+            return _attriax.RecordPageViewAsync(pageName, options ?? new AttriaxPageViewOptions());
         }
 
         /// <summary>
-        /// Applies an external user id and default user metadata to future tracked events.
-        /// Passing null clears the currently associated external user id.
+        /// Registers the current Firebase Cloud Messaging token for uninstall tracking.
+        /// Call this after your app receives an FCM token and again whenever Firebase rotates it.
+        /// Pass <c>null</c> or whitespace to clear the currently registered FCM uninstall token for this device.
+        /// Attriax currently supports this flow on Android and iOS. On Apple platforms,
+        /// Firebase must already map the APNs device token to the FCM registration token.
         /// </summary>
-        public Task SetUserAsync(string? externalUserId, AttriaxSetUserOptions? options = null)
+        public Task RegisterFirebaseMessagingTokenAsync(
+            string? token,
+            IDictionary<string, object>? metadata = null)
         {
-            return _attriax.SetUserAsync(externalUserId, options ?? new AttriaxSetUserOptions());
+            return _attriax.RegisterFirebaseMessagingTokenAsync(token, metadata);
+        }
+
+        /// <summary>
+        /// Registers the current Apple Push Notification service token for uninstall tracking.
+        /// Call this after your app receives an APNs device token and again whenever Apple rotates it.
+        /// Pass <c>null</c> or whitespace to clear the currently registered APNs uninstall token for this device.
+        /// Attriax currently supports this flow on Apple platforms only.
+        /// </summary>
+        public Task RegisterApplePushTokenAsync(
+            string? token,
+            IDictionary<string, object>? metadata = null)
+        {
+            return _attriax.RegisterApplePushTokenAsync(token, metadata);
+        }
+
+        /// <summary>
+        /// Applies a user id and default user metadata to future tracked events.
+        /// Passing null clears the currently associated user id.
+        /// </summary>
+        public Task SetUserAsync(string? userId, AttriaxSetUserOptions? options = null)
+        {
+            return _attriax.SetUserAsync(userId, options ?? new AttriaxSetUserOptions());
         }
 
         /// <summary>
         /// Backward-compatible alias for <see cref="SetUserAsync"/> kept on the tracking facade.
         /// </summary>
         [Obsolete("Use Tracking.SetUserAsync(...) instead.")]
-        public Task IdentifyAsync(string? externalUserId, AttriaxIdentifyOptions? options = null)
+        public Task IdentifyAsync(string? userId, AttriaxIdentifyOptions? options = null)
         {
-            return _attriax.IdentifyAsync(externalUserId, options ?? new AttriaxIdentifyOptions());
+            return _attriax.IdentifyAsync(userId, options ?? new AttriaxIdentifyOptions());
         }
 
         /// <summary>

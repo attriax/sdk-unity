@@ -69,7 +69,7 @@ namespace Attriax.Unity.Internal
         {
             return new AttriaxSetUserOptions
             {
-                ExternalUserName = options.ExternalUserName,
+                UserName = options.UserName,
                 Properties = SanitizeProperties(options.Properties),
                 ClearPropertyKeys = NormalizePropertyKeys(options.ClearPropertyKeys),
                 ClearAllProperties = options.ClearAllProperties,

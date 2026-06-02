@@ -392,13 +392,6 @@ namespace Attriax.Unity
         /// </summary>
         public string ProjectToken { get; set; } = string.Empty;
 
-        [Obsolete("Use ProjectToken instead.")]
-        public string AppToken
-        {
-            get => ProjectToken;
-            set => ProjectToken = value;
-        }
-
         /// <summary>
         /// Enables GDPR-aware dispatch gating and local persistence for this SDK instance.
         /// When enabled, anonymous-capable analytics activity still sends while consent is
@@ -961,7 +954,7 @@ namespace Attriax.Unity
     /// </summary>
     public class AttriaxSetUserOptions
     {
-        public string? ExternalUserName { get; set; }
+        public string? UserName { get; set; }
 
         public IDictionary<string, object>? Properties { get; set; }
 

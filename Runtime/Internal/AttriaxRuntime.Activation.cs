@@ -104,7 +104,7 @@ namespace Attriax.Unity.Internal
         {
             return _generatedGateway.SendValidateUnityEditorAsync(
                 AttriaxGeneratedRequestFactory.BuildUnityEditorValidateRequest(
-                    _config.AppToken,
+                    _config.ProjectToken,
                     SdkPackageVersion,
                     Application.unityVersion,
                     DetectEditorHostPlatform()));

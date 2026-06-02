@@ -19,7 +19,7 @@ namespace Attriax.Unity.Tests
         {
             using var attriax = new Attriax(new AttriaxConfig
             {
-                AppToken = "ax_test",
+                ProjectToken = "ax_test",
             });
 
             Assert.That(attriax.Consent, Is.Not.Null);
@@ -324,7 +324,7 @@ namespace Attriax.Unity.Tests
                 new AttriaxPlayerPrefsConsentStore(
                     storageKey ?? NewStorageKey(),
                     (_, _) => { }),
-                appToken: "ax_test",
+                projectToken: "ax_test",
                 gdprEnabled: gdprEnabled,
                 anonymousTracking: anonymousTracking,
                 ensureConsentIdentity: () => new AttriaxConsentIdentity("consent-1"),

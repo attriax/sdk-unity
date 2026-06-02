@@ -18,7 +18,7 @@ namespace Attriax.Unity.Tests
             var manager = CreateManager(
                 new AttriaxConfig
                 {
-                    AppToken = "ax_test",
+                    ProjectToken = "ax_test",
                     CollectAdvertisingId = false,
                 },
                 bridge);
@@ -42,7 +42,7 @@ namespace Attriax.Unity.Tests
             var manager = CreateManager(
                 new AttriaxConfig
                 {
-                    AppToken = "ax_test",
+                    ProjectToken = "ax_test",
                     CollectAdvertisingId = false,
                 },
                 bridge);
@@ -60,7 +60,7 @@ namespace Attriax.Unity.Tests
             var manager = CreateManager(
                 new AttriaxConfig
                 {
-                    AppToken = "ax_test",
+                    ProjectToken = "ax_test",
                     RequestTrackingAuthorizationOnInit = true,
                 },
                 bridge);
@@ -89,7 +89,7 @@ namespace Attriax.Unity.Tests
                         AttriaxTrackingAuthorizationStatus.Authorized,
                     }),
             };
-            var manager = CreateManager(new AttriaxConfig { AppToken = "ax_test" }, bridge);
+            var manager = CreateManager(new AttriaxConfig { ProjectToken = "ax_test" }, bridge);
 
             var status = await manager.RequestTrackingAuthorizationAsync();
 
@@ -106,7 +106,7 @@ namespace Attriax.Unity.Tests
                 RequestTrackingAuthorizationStatus = AttriaxTrackingAuthorizationStatus.NotDetermined,
                 TrackingAuthorizationStatus = AttriaxTrackingAuthorizationStatus.NotDetermined,
             };
-            var manager = CreateManager(new AttriaxConfig { AppToken = "ax_test" }, bridge);
+            var manager = CreateManager(new AttriaxConfig { ProjectToken = "ax_test" }, bridge);
 
             var status = await manager.RequestTrackingAuthorizationAsync(timeoutMs: 35);
 
@@ -129,7 +129,7 @@ namespace Attriax.Unity.Tests
             var manager = CreateManager(
                 new AttriaxConfig
                 {
-                    AppToken = "ax_test",
+                    ProjectToken = "ax_test",
                     TrackingAuthorizationStatusTimeoutMs = 200,
                 },
                 bridge,

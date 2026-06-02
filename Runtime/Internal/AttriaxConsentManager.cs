@@ -95,7 +95,7 @@ namespace Attriax.Unity.Internal
     internal sealed class AttriaxConsentManager : IAttriaxConsentReadView
     {
         private readonly IAttriaxConsentStore _store;
-        private readonly string _appToken;
+        private readonly string _projectToken;
         private readonly bool _gdprEnabled;
         private bool _anonymousTrackingEnabled;
         private readonly Func<AttriaxConsentIdentity> _ensureConsentIdentity;
@@ -116,7 +116,7 @@ namespace Attriax.Unity.Internal
 
         public AttriaxConsentManager(
             IAttriaxConsentStore store,
-            string appToken,
+            string projectToken,
             bool gdprEnabled,
             bool anonymousTracking,
             Func<AttriaxConsentIdentity> ensureConsentIdentity,
@@ -126,7 +126,7 @@ namespace Attriax.Unity.Internal
             Action<string, string?> debugLog)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
-            _appToken = appToken;
+            _projectToken = projectToken;
             _gdprEnabled = gdprEnabled;
             _anonymousTrackingEnabled = anonymousTracking;
             _ensureConsentIdentity = ensureConsentIdentity;
@@ -363,7 +363,7 @@ namespace Attriax.Unity.Internal
                     var identity = _ensureConsentIdentity();
                     var status = await _gateway.CheckGdprConsentAsync(
                             AttriaxGeneratedRequestFactory.BuildGdprConsentCheckRequest(
-                                _appToken,
+                                _projectToken,
                                 identity.ConsentId))
                         .ConfigureAwait(false);
                     ApplyRemoteStatus(status, false);
@@ -485,7 +485,7 @@ namespace Attriax.Unity.Internal
                 var identity = _ensureConsentIdentity();
                 var status = await _gateway.UpsertGdprConsentAsync(
                         AttriaxGeneratedRequestFactory.BuildGdprConsentWriteRequest(
-                            _appToken,
+                            _projectToken,
                             identity.ConsentId,
                             _checkedAt ?? DateTime.UtcNow,
                             _countryCode,

@@ -198,7 +198,7 @@ namespace Attriax.Unity.Internal
         }
 
         public Task<long?> ConvertRevenueToUsdMicrosAsync(
-            string appToken,
+            string projectToken,
             long amountMicros,
             string currency,
             DateTimeOffset clientOccurredAt)
@@ -207,7 +207,7 @@ namespace Attriax.Unity.Internal
             {
                 Data = new Dictionary<string, object>
                 {
-                    ["projectToken"] = appToken,
+                    ["projectToken"] = projectToken,
                     ["currency"] = currency,
                     ["amountMicros"] = amountMicros.ToString(CultureInfo.InvariantCulture),
                     ["clientOccurredAt"] = clientOccurredAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
@@ -958,7 +958,7 @@ namespace Attriax.Unity.Internal
             return new SdkCrashDto(
                 appBuildNumber: request.AppBuildNumber,
                 appPackageName: request.AppPackageName,
-                projectToken: request.AppToken,
+                projectToken: request.ProjectToken,
                 appVersion: request.AppVersion,
                 clientOccurredAt: request.ClientOccurredAt.UtcDateTime,
                 deviceId: request.DeviceId,

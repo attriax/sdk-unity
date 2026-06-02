@@ -8,7 +8,7 @@ namespace Attriax.Unity.Internal
 {
     internal sealed class AttriaxTrackingManager
     {
-        private readonly string _appToken;
+        private readonly string _projectToken;
         private readonly bool _flushEventsImmediatelyOnFirstLaunch;
         private readonly bool _sessionTrackingEnabled;
         private readonly IAttriaxConsentReadView _consent;
@@ -21,7 +21,7 @@ namespace Attriax.Unity.Internal
         private readonly Action<string, string?> _debugLog;
 
         public AttriaxTrackingManager(
-            string appToken,
+            string projectToken,
             bool flushEventsImmediatelyOnFirstLaunch,
             bool sessionTrackingEnabled,
             IAttriaxConsentReadView consent,
@@ -33,7 +33,7 @@ namespace Attriax.Unity.Internal
             Action<bool> requestFlush,
             Action<string, string?> debugLog)
         {
-            _appToken = appToken;
+            _projectToken = projectToken;
             _flushEventsImmediatelyOnFirstLaunch = flushEventsImmediatelyOnFirstLaunch;
             _sessionTrackingEnabled = sessionTrackingEnabled;
             _consent = consent;
@@ -78,7 +78,7 @@ namespace Attriax.Unity.Internal
             await _requestQueue.Enqueue(
                     AttriaxQueuedRequest.CreateEvent(
                         AttriaxGeneratedRequestFactory.BuildTrackEventRequest(
-                            _appToken,
+                            _projectToken,
                             decision.AttachDeviceIdentity ? _runtimeState.DeviceId : null,
                             decision.AttachDeviceIdentity ? _runtimeState.DeviceIdSource : null,
                             eventName,
@@ -141,7 +141,7 @@ namespace Attriax.Unity.Internal
             await _requestQueue.Enqueue(
                     AttriaxQueuedRequest.CreateCrash(
                         AttriaxGeneratedRequestFactory.BuildTrackCrashRequest(
-                            _appToken,
+                            _projectToken,
                             decision.AttachDeviceIdentity ? _runtimeState.DeviceId : null,
                             decision.AttachDeviceIdentity ? _runtimeState.DeviceIdSource : null,
                             snapshot,
@@ -194,17 +194,17 @@ namespace Attriax.Unity.Internal
             });
         }
 
-        public Task IdentifyAsync(string? externalUserId, AttriaxIdentifyOptions options)
+        public Task IdentifyAsync(string? userId, AttriaxIdentifyOptions options)
         {
-            return SetUserAsync(externalUserId, options);
+            return SetUserAsync(userId, options);
         }
 
-        public Task SetUserAsync(string? externalUserId, AttriaxSetUserOptions options)
+        public Task SetUserAsync(string? userId, AttriaxSetUserOptions options)
         {
             return QueueUserUpdateAsync(
-                externalUserId,
+                userId,
                 AttriaxUserPropertySanitizer.SanitizeSetUserOptions(options),
-                clearExternalUser: string.IsNullOrWhiteSpace(externalUserId));
+                clearExternalUser: string.IsNullOrWhiteSpace(userId));
         }
 
         public Task SetUserPropertyAsync(string name, object? value)
@@ -262,7 +262,7 @@ namespace Attriax.Unity.Internal
         }
 
         private async Task QueueUserUpdateAsync(
-            string? externalUserId,
+            string? userId,
             AttriaxSetUserOptions options,
             bool clearExternalUser)
         {
@@ -276,13 +276,13 @@ namespace Attriax.Unity.Internal
             {
                 _debugLog(
                     "Skipping user update because Unity Editor validation mode does not dispatch analytics.",
-                    externalUserId);
+                    userId);
                 return;
             }
 
             if (!TrackingDecisionFor(AttriaxTrackingSignal.Attribution).Capture)
             {
-                _debugLog("Skipping user update because GDPR consent blocked capture.", externalUserId);
+                _debugLog("Skipping user update because GDPR consent blocked capture.", userId);
                 return;
             }
 
@@ -294,10 +294,10 @@ namespace Attriax.Unity.Internal
             await _requestQueue.Enqueue(
                     AttriaxQueuedRequest.CreateUser(
                         AttriaxGeneratedRequestFactory.BuildUserRequest(
-                            _appToken,
+                            _projectToken,
                             _runtimeState.DeviceId,
                             _runtimeState.DeviceIdSource,
-                            externalUserId,
+                            userId,
                             options,
                             clearExternalUser)))
                 .ConfigureAwait(false);

@@ -143,7 +143,7 @@ namespace Attriax.Unity.Internal
                 this,
                 _eventHub);
             _generatedGateway = new AttriaxGeneratedGateway(_config.ApiBaseUrl, _config.RequestTimeoutMs);
-            _storageNamespace = BuildStorageNamespace(_config.AppToken);
+            _storageNamespace = BuildStorageNamespace(_config.ProjectToken);
             _installReferrerStore = new AttriaxRuntimeInstallReferrerStore(this);
             _runtimeSettingsStore = new AttriaxRuntimeSettingsStore(
                 Key("deviceId"),
@@ -174,7 +174,7 @@ namespace Attriax.Unity.Internal
                 new AttriaxPlayerPrefsConsentStore(
                     Key(GdprConsentStorageKey),
                     (message, detail) => DebugLog(message, detail)),
-                _config.AppToken,
+                _config.ProjectToken,
                 _config.GdprEnabled,
                 _config.AnonymousTracking,
                 EnsureConsentDeviceIdentity,
@@ -204,7 +204,7 @@ namespace Attriax.Unity.Internal
                 },
                 (message, detail) => DebugLog(message, detail),
                 (amountMicros, currency, occurredAt) => _generatedGateway.ConvertRevenueToUsdMicrosAsync(
-                    _config.AppToken,
+                    _config.ProjectToken,
                     amountMicros,
                     currency,
                     occurredAt));
@@ -246,7 +246,7 @@ namespace Attriax.Unity.Internal
                         allowsAttributionTracking),
                 SchedulePreparedAppOpenAsync);
             _trackingManager = new AttriaxTrackingManager(
-                _config.AppToken,
+                _config.ProjectToken,
                 _config.FlushEventsImmediatelyOnFirstLaunch,
                 _config.SessionTrackingEnabled,
                 _consentManager,
@@ -375,7 +375,7 @@ namespace Attriax.Unity.Internal
 
             await _generatedGateway.EraseGdprDataAsync(
                     new global::Attriax.Unity.Generated.Model.SdkV1GdprDataEraseDto(
-                        _config.AppToken,
+                        _config.ProjectToken,
                         _deviceId))
                 .ConfigureAwait(false);
 
@@ -445,16 +445,16 @@ namespace Attriax.Unity.Internal
             return _skanManager.UpdateConversionValueAsync(fineValue, coarseValue, lockWindow);
         }
 
-        public Task IdentifyAsync(string? externalUserId, AttriaxIdentifyOptions options)
+        public Task IdentifyAsync(string? userId, AttriaxIdentifyOptions options)
         {
             AssertInitialized();
-            return _trackingManager.IdentifyAsync(externalUserId, options);
+            return _trackingManager.IdentifyAsync(userId, options);
         }
 
-        public Task SetUserAsync(string? externalUserId, AttriaxSetUserOptions options)
+        public Task SetUserAsync(string? userId, AttriaxSetUserOptions options)
         {
             AssertInitialized();
-            return _trackingManager.SetUserAsync(externalUserId, options);
+            return _trackingManager.SetUserAsync(userId, options);
         }
 
         public Task SetUserPropertyAsync(string name, object? value)
@@ -480,7 +480,7 @@ namespace Attriax.Unity.Internal
             AssertInitialized();
 
                 return await _generatedGateway.SendCreateDynamicLinkAsync(
-                    AttriaxGeneratedRequestFactory.BuildCreateDynamicLinkRequest(_config.AppToken, options))
+                    AttriaxGeneratedRequestFactory.BuildCreateDynamicLinkRequest(_config.ProjectToken, options))
                 .ConfigureAwait(false);
         }
 
@@ -491,7 +491,7 @@ namespace Attriax.Unity.Internal
 
             return await _generatedGateway.SendValidateReceiptAsync(
                     AttriaxGeneratedRequestFactory.BuildValidateReceiptRequest(
-                        _config.AppToken,
+                        _config.ProjectToken,
                     string.IsNullOrWhiteSpace(_deviceId) ? null : _deviceId,
                         _config.ToPublic(),
                         options,
@@ -564,7 +564,7 @@ namespace Attriax.Unity.Internal
             }
 
             var request = AttriaxGeneratedRequestFactory.BuildRegisterUninstallTokenRequest(
-                _config.AppToken,
+                _config.ProjectToken,
                 _deviceId,
                 RequireDeviceIdSource(),
                 GetCurrentPlatform(),
@@ -589,7 +589,7 @@ namespace Attriax.Unity.Internal
 
             var decision = TrackingDecisionFor(AttriaxTrackingSignal.DeepLink);
             var request = AttriaxGeneratedRequestFactory.BuildResolveDeepLinkRequest(
-                _config.AppToken,
+                _config.ProjectToken,
                 decision.AttachDeviceIdentity ? _deviceId : null,
                 decision.AttachDeviceIdentity ? RequireDeviceIdSource() : null,
                 _isFirstLaunch,
@@ -909,7 +909,7 @@ namespace Attriax.Unity.Internal
 
             return _generatedGateway.FetchSdkRuntimeConfigAsync(
                 AttriaxSdkRuntimeConfigRequestBuilder.Build(
-                    _config.AppToken,
+                    _config.ProjectToken,
                     _contextManager.Snapshot));
         }
 
@@ -950,7 +950,7 @@ namespace Attriax.Unity.Internal
             var queued = _requestQueue.Enqueue(
                     AttriaxQueuedRequest.CreateOpen(
                         AttriaxGeneratedRequestFactory.BuildOpenRequest(
-                            _config.AppToken,
+                            _config.ProjectToken,
                             RequireDeviceIdSource(),
                             snapshot,
                             _sessionManager.CurrentSession,
@@ -1370,7 +1370,7 @@ namespace Attriax.Unity.Internal
                 _requestQueue.Enqueue(
                     AttriaxQueuedRequest.CreateSession(
                         AttriaxGeneratedRequestFactory.BuildTrackSessionRequest(
-                            _config.AppToken,
+                            _config.ProjectToken,
                             SessionTrackingDecision.AttachDeviceIdentity ? _deviceId : null,
                             SessionTrackingDecision.AttachDeviceIdentity ? RequireDeviceIdSource() : null,
                             session,
@@ -1806,7 +1806,7 @@ namespace Attriax.Unity.Internal
             }
 
             var keepAliveRequest = AttriaxGeneratedRequestFactory.BuildTrackSessionRequest(
-                _config.AppToken,
+                _config.ProjectToken,
                 SessionTrackingDecision.AttachDeviceIdentity ? currentSession.DeviceId : null,
                 SessionTrackingDecision.AttachDeviceIdentity ? RequireDeviceIdSource() : null,
                 currentSession,
@@ -3187,11 +3187,11 @@ namespace Attriax.Unity.Internal
             return string.Format(CultureInfo.InvariantCulture, "{0}:{1}:{2}", _config.StorageKeyPrefix, _storageNamespace, name);
         }
 
-        private static string BuildStorageNamespace(string appToken)
+        private static string BuildStorageNamespace(string projectToken)
         {
             using (var sha = SHA256.Create())
             {
-                var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(appToken));
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(projectToken));
                 var builder = new StringBuilder(16);
                 for (var index = 0; index < 8; index += 1)
                 {
@@ -3247,7 +3247,7 @@ namespace Attriax.Unity.Internal
 
             return new NormalizedConfig
             {
-                AppToken = config.ProjectToken.Trim(),
+                ProjectToken = config.ProjectToken.Trim(),
                 ApiBaseUrl = apiBaseUrl,
                 SdkBaseUrl = BuildSdkBaseUrl(apiBaseUrl),
                 AppVersion = config.AppVersion,
@@ -3913,7 +3913,7 @@ namespace Attriax.Unity.Internal
 
         private sealed class NormalizedConfig
         {
-            public string AppToken;
+            public string ProjectToken;
             public string ApiBaseUrl;
             public string SdkBaseUrl;
             public string AppVersion;
@@ -3943,7 +3943,7 @@ namespace Attriax.Unity.Internal
             {
                 return new AttriaxConfig
                 {
-                    AppToken = AppToken,
+                    ProjectToken = ProjectToken,
                     ApiBaseUrl = ApiBaseUrl,
                     AppVersion = AppVersion,
                     AppBuildNumber = AppBuildNumber,

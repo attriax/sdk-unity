@@ -40,9 +40,6 @@ namespace Attriax.Unity
         /// </summary>
         public string ProjectToken => _projectToken;
 
-        [System.Obsolete("Use ProjectToken instead.")]
-        public string AppToken => ProjectToken;
-
         /// <summary>
         /// Optional API base URL. Leave blank to use the hosted production API.
         /// </summary>

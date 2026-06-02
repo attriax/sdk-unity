@@ -124,11 +124,11 @@ namespace Attriax.Unity.Internal
 
     internal static class AttriaxSdkRuntimeConfigRequestBuilder
     {
-        public static SdkV1ConfigDto Build(string appToken, AttriaxContextSnapshot context)
+        public static SdkV1ConfigDto Build(string projectToken, AttriaxContextSnapshot context)
         {
-            if (appToken == null)
+            if (projectToken == null)
             {
-                throw new ArgumentNullException(nameof(appToken));
+                throw new ArgumentNullException(nameof(projectToken));
             }
 
             if (context == null)
@@ -137,7 +137,7 @@ namespace Attriax.Unity.Internal
             }
 
             return new SdkV1ConfigDto(
-                projectToken: appToken,
+                projectToken: projectToken,
                 packageName: TrimOrNull(context.App.PackageName),
                 platform: MapGeneratedPlatform(context.Platform),
                 signatureHashes: context.Platform == AttriaxPlatformType.Android
