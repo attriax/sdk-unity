@@ -135,7 +135,7 @@ namespace Attriax.Unity.Generated.Client
                     try
                     {
                         // Deserialize as a model
-                        return JsonConvert.DeserializeObject(text, type, _serializerSettings);
+                        return DeserializeJson(text, type);
                     }
                     catch (Exception e)
                     {
@@ -155,6 +155,55 @@ namespace Attriax.Unity.Generated.Client
 
             return null;
 
+        }
+
+        internal object DeserializeJson(string text, Type type)
+        {
+            try
+            {
+                return JsonConvert.DeserializeObject(text, type, _serializerSettings);
+            }
+            catch (JsonException)
+            {
+                var instance = TryCreateNonPublicInstance(type);
+                if (instance == null)
+                {
+                    throw;
+                }
+
+                using (var stringReader = new StringReader(text))
+                using (var jsonReader = new JsonTextReader(stringReader))
+                {
+                    JsonSerializer.Create(_serializerSettings).Populate(jsonReader, instance);
+                }
+
+                return instance;
+            }
+        }
+
+        private static object TryCreateNonPublicInstance(Type type)
+        {
+            if (type.IsAbstract || type.IsInterface || type.IsValueType)
+            {
+                return null;
+            }
+
+            try
+            {
+                return Activator.CreateInstance(type, true);
+            }
+            catch (MissingMethodException)
+            {
+                return null;
+            }
+            catch (MemberAccessException)
+            {
+                return null;
+            }
+            catch (TargetInvocationException)
+            {
+                return null;
+            }
         }
 
         public string RootElement { get; set; }

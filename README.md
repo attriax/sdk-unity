@@ -93,7 +93,7 @@ See [Documentation~/gdpr-and-anonymous-analytics.md](Documentation~/gdpr-and-ano
 
 The Unity runtime supports both manual and automatic crash reporting.
 
-- Call `attriax.Tracking.RecordErrorAsync(...)` when you want to report a handled
+- Call `attriax.Tracking.RecordError(...)` when you want to report a handled
   exception with extra metadata.
 - Unhandled Unity exceptions observed through `Application.logMessageReceivedThreaded`
   are captured automatically and queued for delivery when possible.

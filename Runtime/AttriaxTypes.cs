@@ -1327,6 +1327,67 @@ namespace Attriax.Unity
     }
 
     /// <summary>
+    /// Session-scoped deep-link referrer details derived from handled deep-link events.
+    /// </summary>
+    public sealed class AttriaxDeepLinkReferrerDetails
+    {
+        /// <summary>
+        /// Canonical deep-link URL returned by Attriax, or the incoming URL.
+        /// </summary>
+        public Uri Uri { get; set; } = new Uri("https://attriax.invalid/");
+
+        /// <summary>
+        /// Local timestamp when the SDK first observed the deep-link input.
+        /// </summary>
+        public DateTimeOffset ReceivedAt { get; set; }
+
+        /// <summary>
+        /// Best-known timestamp for when the originating click happened.
+        /// </summary>
+        public DateTimeOffset ClickedAt { get; set; }
+
+        /// <summary>
+        /// Timestamp recorded when Attriax processed the deep-link event.
+        /// </summary>
+        public DateTimeOffset ConsumedAt { get; set; }
+
+        /// <summary>
+        /// Describes how this deep-link event entered the SDK runtime.
+        /// </summary>
+        public AttriaxDeepLinkTrigger Trigger { get; set; }
+
+        /// <summary>
+        /// Whether the resolved URL belongs to an Attriax-managed subdomain.
+        /// </summary>
+        public bool IsAttriaxDomain { get; set; }
+
+        /// <summary>
+        /// Whether Attriax matched this event to a registered link.
+        /// </summary>
+        public bool Found { get; set; }
+
+        /// <summary>
+        /// Dashboard-configured payload returned for matched links.
+        /// </summary>
+        public IDictionary<string, object>? Data { get; set; }
+
+        /// <summary>
+        /// Resolved UTM parameters associated with the matched link.
+        /// </summary>
+        public AttriaxUtmParameters? Utm { get; set; }
+
+        /// <summary>
+        /// Browser destination returned by Attriax for SDK-managed handling.
+        /// </summary>
+        public AttriaxResolvedUrlAction? BrowserAction { get; set; }
+
+        /// <summary>
+        /// Whether the SDK already handled the link by opening a browser.
+        /// </summary>
+        public bool HandledBySdk { get; set; }
+    }
+
+    /// <summary>
     /// Browser destination returned by Attriax for SDK-managed handling.
     /// </summary>
     public sealed class AttriaxResolvedUrlAction

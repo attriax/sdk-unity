@@ -28,7 +28,7 @@ namespace Attriax.Unity.Samples
             await _attriax.InitializeAsync();
             var tracking = _attriax.Tracking!;
 
-            await tracking.TrackEventAsync("unity_sample_started", new AttriaxTrackEventOptions
+            tracking.RecordEvent("unity_sample_started", new AttriaxTrackEventOptions
             {
                 EventData = new Dictionary<string, object>
                 {
@@ -36,11 +36,11 @@ namespace Attriax.Unity.Samples
                     ["timestamp"] = DateTimeOffset.UtcNow.ToString("o"),
                 },
             });
-            await tracking.SetUserAsync(_externalUserId, new AttriaxSetUserOptions
+            tracking.SetUser(_externalUserId, new AttriaxSetUserOptions
             {
                 ExternalUserName = "Unity Sample User",
             });
-            await tracking.SetUserPropertiesAsync(new Dictionary<string, object?>
+            tracking.SetUserProperties(new Dictionary<string, object?>
             {
                 ["sampleGroup"] = "unity",
                 ["flowVersion"] = 1,

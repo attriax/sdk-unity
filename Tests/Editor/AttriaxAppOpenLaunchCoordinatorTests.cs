@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using Attriax.Unity.Generated.Client;
 using Attriax.Unity.Generated.Model;
 using Attriax.Unity.Internal;
 
@@ -10,6 +11,23 @@ namespace Attriax.Unity.Tests
 {
     public sealed class AttriaxAppOpenLaunchCoordinatorTests
     {
+        [Test]
+        public void GeneratedLaunchResponseEnvelopesDeserializeWithUnityClientSerializerSettings()
+        {
+            var codec = new CustomJsonCodec(new Configuration());
+            var configEnvelope = (SdkV1ConfigResponseEnvelopeDto)codec.DeserializeJson(
+                "{\"success\":true,\"timestamp\":\"2026-06-02T12:24:26.680Z\",\"data\":{\"clipboardAttributionEnabled\":true}}",
+                typeof(SdkV1ConfigResponseEnvelopeDto));
+            var openEnvelope = (SdkV1OpenResponseEnvelopeDto)codec.DeserializeJson(
+                "{\"success\":true,\"timestamp\":\"2026-06-02T12:24:26.680Z\",\"data\":{\"attributionType\":\"organic\"}}",
+                typeof(SdkV1OpenResponseEnvelopeDto));
+
+            Assert.That(configEnvelope, Is.Not.Null);
+            Assert.That(configEnvelope!.data.clipboardAttributionEnabled, Is.True);
+            Assert.That(openEnvelope, Is.Not.Null);
+            Assert.That(openEnvelope!.success, Is.True);
+        }
+
         [Test]
         public async Task WaitsForRuntimeConfigBeforeSchedulingAppOpen()
         {

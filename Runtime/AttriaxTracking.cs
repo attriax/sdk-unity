@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace Attriax.Unity
 {
@@ -38,57 +39,57 @@ namespace Attriax.Unity
         /// <summary>
         /// Queues a custom event for delivery to the Attriax backend.
         /// </summary>
-        public Task RecordEventAsync(string eventName, AttriaxTrackEventOptions? options = null)
+        public void RecordEvent(string eventName, AttriaxTrackEventOptions? options = null)
         {
-            return _attriax.RecordEventAsync(eventName, options ?? new AttriaxTrackEventOptions());
+            FireAndForget(_attriax.RecordEventAsync(eventName, options ?? new AttriaxTrackEventOptions()));
         }
 
         /// <summary>
         /// Queues a standardized purchase revenue event for delivery to Attriax.
         /// </summary>
-        public Task RecordPurchaseAsync(double revenue, AttriaxRecordPurchaseOptions? options = null)
+        public void RecordPurchase(double revenue, AttriaxRecordPurchaseOptions? options = null)
         {
-            return _attriax.RecordPurchaseAsync(revenue, options ?? new AttriaxRecordPurchaseOptions());
+            FireAndForget(_attriax.RecordPurchaseAsync(revenue, options ?? new AttriaxRecordPurchaseOptions()));
         }
 
         /// <summary>
         /// Queues a standardized refund revenue event for delivery to Attriax.
         /// </summary>
-        public Task RecordRefundAsync(double revenue, AttriaxRecordRefundOptions? options = null)
+        public void RecordRefund(double revenue, AttriaxRecordRefundOptions? options = null)
         {
-            return _attriax.RecordRefundAsync(revenue, options ?? new AttriaxRecordRefundOptions());
+            FireAndForget(_attriax.RecordRefundAsync(revenue, options ?? new AttriaxRecordRefundOptions()));
         }
 
         /// <summary>
         /// Queues a standardized ad revenue event for delivery to Attriax.
         /// </summary>
-        public Task RecordAdRevenueAsync(double revenue, AttriaxRecordAdRevenueOptions? options = null)
+        public void RecordAdRevenue(double revenue, AttriaxRecordAdRevenueOptions? options = null)
         {
-            return _attriax.RecordAdRevenueAsync(revenue, options ?? new AttriaxRecordAdRevenueOptions());
+            FireAndForget(_attriax.RecordAdRevenueAsync(revenue, options ?? new AttriaxRecordAdRevenueOptions()));
         }
 
         /// <summary>
         /// Queues a canonical ad lifecycle event for delivery to Attriax.
         /// </summary>
-        public Task RecordAdEventAsync(AttriaxAdEventType type, AttriaxRecordAdEventOptions? options = null)
+        public void RecordAdEvent(AttriaxAdEventType type, AttriaxRecordAdEventOptions? options = null)
         {
-            return _attriax.RecordAdEventAsync(type, options ?? new AttriaxRecordAdEventOptions());
+            FireAndForget(_attriax.RecordAdEventAsync(type, options ?? new AttriaxRecordAdEventOptions()));
         }
 
         /// <summary>
         /// Records an exception or crash payload for later delivery to the Attriax backend.
         /// </summary>
-        public Task RecordErrorAsync(Exception error, AttriaxRecordErrorOptions? options = null)
+        public void RecordError(Exception error, AttriaxRecordErrorOptions? options = null)
         {
-            return _attriax.RecordErrorAsync(error, options ?? new AttriaxRecordErrorOptions());
+            FireAndForget(_attriax.RecordErrorAsync(error, options ?? new AttriaxRecordErrorOptions()));
         }
 
         /// <summary>
         /// Tracks a standardized page-view event.
         /// </summary>
-        public Task RecordPageViewAsync(string pageName, AttriaxPageViewOptions? options = null)
+        public void RecordPageView(string pageName, AttriaxPageViewOptions? options = null)
         {
-            return _attriax.RecordPageViewAsync(pageName, options ?? new AttriaxPageViewOptions());
+            FireAndForget(_attriax.RecordPageViewAsync(pageName, options ?? new AttriaxPageViewOptions()));
         }
 
         /// <summary>
@@ -122,43 +123,55 @@ namespace Attriax.Unity
         /// Applies a user id and default user metadata to future tracked events.
         /// Passing null clears the currently associated user id.
         /// </summary>
-        public Task SetUserAsync(string? userId, AttriaxSetUserOptions? options = null)
+        public void SetUser(string? userId, AttriaxSetUserOptions? options = null)
         {
-            return _attriax.SetUserAsync(userId, options ?? new AttriaxSetUserOptions());
+            FireAndForget(_attriax.SetUserAsync(userId, options ?? new AttriaxSetUserOptions()));
         }
 
         /// <summary>
-        /// Backward-compatible alias for <see cref="SetUserAsync"/> kept on the tracking facade.
+        /// Backward-compatible alias for <see cref="SetUser"/> kept on the tracking facade.
         /// </summary>
-        [Obsolete("Use Tracking.SetUserAsync(...) instead.")]
-        public Task IdentifyAsync(string? userId, AttriaxIdentifyOptions? options = null)
+        [Obsolete("Use Tracking.SetUser(...) instead.")]
+        public void Identify(string? userId, AttriaxIdentifyOptions? options = null)
         {
-            return _attriax.IdentifyAsync(userId, options ?? new AttriaxIdentifyOptions());
+            FireAndForget(_attriax.IdentifyAsync(userId, options ?? new AttriaxIdentifyOptions()));
         }
 
         /// <summary>
         /// Sets or clears a single default user property for future tracked events.
         /// </summary>
-        public Task SetUserPropertyAsync(string name, object? value)
+        public void SetUserProperty(string name, object? value)
         {
-            return _attriax.SetUserPropertyAsync(name, value);
+            FireAndForget(_attriax.SetUserPropertyAsync(name, value));
         }
 
         /// <summary>
         /// Merges multiple default user properties for future tracked events.
         /// Null values clear individual property keys.
         /// </summary>
-        public Task SetUserPropertiesAsync(IDictionary<string, object?> properties)
+        public void SetUserProperties(IDictionary<string, object?> properties)
         {
-            return _attriax.SetUserPropertiesAsync(properties);
+            FireAndForget(_attriax.SetUserPropertiesAsync(properties));
         }
 
         /// <summary>
         /// Clears all default user properties or only the requested property names.
         /// </summary>
-        public Task ClearUserPropertiesAsync(IReadOnlyCollection<string>? propertyNames = null)
+        public void ClearUserProperties(IReadOnlyCollection<string>? propertyNames = null)
         {
-            return _attriax.ClearUserPropertiesAsync(propertyNames);
+            FireAndForget(_attriax.ClearUserPropertiesAsync(propertyNames));
+        }
+
+        private static async void FireAndForget(Task task)
+        {
+            try
+            {
+                await task.ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
         }
     }
 }

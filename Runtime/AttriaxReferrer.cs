@@ -30,5 +30,30 @@ namespace Attriax.Unity
         {
             return _runtime.ReinstallReferrer;
         }
+
+        /// <summary>
+        /// Deep-link referrer that opened the current session.
+        /// </summary>
+        /// <remarks>
+        /// This waits for the startup deep-link flow to settle. It resolves to a
+        /// cold-start or deferred deep-link referrer, or null when the current
+        /// session started without one.
+        /// </remarks>
+        public Task<AttriaxDeepLinkReferrerDetails?> GetSessionReferrerAsync()
+        {
+            return _runtime.GetSessionReferrerAsync();
+        }
+
+        /// <summary>
+        /// Most recent deep-link referrer observed in the current session.
+        /// </summary>
+        /// <remarks>
+        /// If no deep link has been received yet, this waits for the next handled
+        /// deep-link event.
+        /// </remarks>
+        public Task<AttriaxDeepLinkReferrerDetails?> GetLatestDeepLinkReferrerAsync()
+        {
+            return _runtime.GetLatestDeepLinkReferrerAsync();
+        }
     }
 }

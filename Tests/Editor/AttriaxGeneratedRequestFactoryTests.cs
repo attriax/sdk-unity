@@ -279,6 +279,84 @@ namespace Attriax.Unity.Tests
         }
 
         [Test]
+        public void BuildTrackEventRequestDoesNotDuplicateSessionAppMetadata()
+        {
+            var startedAt = new DateTimeOffset(2026, 5, 21, 12, 0, 0, TimeSpan.Zero);
+            var occurredAt = startedAt.AddSeconds(7);
+
+            var request = AttriaxGeneratedRequestFactory.BuildTrackEventRequest(
+                projectToken: "ax_test",
+                deviceId: "device_1",
+                deviceIdSource: "persistent_storage",
+                eventName: "checkout_started",
+                options: new AttriaxTrackEventOptions
+                {
+                    EventData = new Dictionary<string, object>
+                    {
+                        ["step"] = "paywall",
+                    },
+                },
+                session: new AttriaxSessionSnapshot
+                {
+                    Id = "session_1",
+                    DeviceId = "device_1",
+                    Platform = AttriaxPlatformType.Android,
+                    Locale = "en-US",
+                    IsFirstLaunch = false,
+                    StartedAt = startedAt,
+                    LastActivityAt = occurredAt,
+                    HeartbeatIntervalMs = 5000,
+                    AppVersion = "1.0.0",
+                    AppBuildNumber = "42",
+                    AppPackageName = "com.attriax.test",
+                    SdkPackageVersion = "0.4.0",
+                },
+                occurredAt: occurredAt);
+
+            Assert.That(request.platform, Is.EqualTo(default(Platform)));
+            Assert.That(request.appVersion, Is.Null);
+            Assert.That(request.appBuildNumber, Is.Null);
+            Assert.That(request.appPackageName, Is.Null);
+            Assert.That(request.sessionRelativeTimeMs, Is.EqualTo(7000m));
+        }
+
+        [Test]
+        public void BuildTrackSessionRequestIncludesPlatformAndAppMetadata()
+        {
+            var startedAt = new DateTimeOffset(2026, 5, 21, 12, 0, 0, TimeSpan.Zero);
+            var occurredAt = startedAt.AddSeconds(7);
+
+            var request = AttriaxGeneratedRequestFactory.BuildTrackSessionRequest(
+                projectToken: "ax_test",
+                deviceId: "device_1",
+                deviceIdSource: "persistent_storage",
+                session: new AttriaxSessionSnapshot
+                {
+                    Id = "session_1",
+                    DeviceId = "device_1",
+                    Platform = AttriaxPlatformType.Android,
+                    Locale = "en-US",
+                    IsFirstLaunch = false,
+                    StartedAt = startedAt,
+                    LastActivityAt = occurredAt,
+                    HeartbeatIntervalMs = 5000,
+                    AppVersion = "1.0.0",
+                    AppBuildNumber = "42",
+                    AppPackageName = "com.attriax.test",
+                    SdkPackageVersion = "0.4.0",
+                },
+                kind: SdkSessionLifecycleKind.Heartbeat,
+                occurredAt: occurredAt,
+                metadata: null);
+
+            Assert.That(request.platform, Is.EqualTo(Platform.Android));
+            Assert.That(request.appVersion, Is.EqualTo("1.0.0"));
+            Assert.That(request.appBuildNumber, Is.EqualTo("42"));
+            Assert.That(request.appPackageName, Is.EqualTo("com.attriax.test"));
+            Assert.That(request.sessionRelativeTimeMs, Is.EqualTo(7000m));
+        }
+
+        [Test]
         public void BuildTrackSessionRequestRoundsSessionRelativeTimeDownToWholeMilliseconds()
         {
             var startedAt = new DateTimeOffset(2026, 5, 21, 12, 0, 0, TimeSpan.Zero).AddTicks(1234);

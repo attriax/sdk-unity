@@ -3280,7 +3280,7 @@ namespace Attriax.Unity.Internal
         private bool ShouldTrackSessionActivity =>
             ShouldDispatchAnalyticsInCurrentMode() &&
             _config.SessionTrackingEnabled &&
-            (_consentManager.CanCaptureAnalytics || _consentManager.CanCaptureAdEvents);
+            SessionTrackingDecision.Capture;
 
         private bool ShouldMaterializeIdentifiedContext
         {

@@ -322,7 +322,7 @@ namespace Attriax.Unity.Internal
         private bool ShouldTrackSessionActivity =>
             ShouldDispatchAnalytics &&
             _sessionTrackingEnabled &&
-            (_consent.CanCaptureAnalytics || _consent.CanCaptureAdEvents);
+            TrackingDecisionFor(AttriaxTrackingSignal.Session).Capture;
 
         private bool ShouldDispatchAnalytics => _shouldDispatchAnalytics();
 

@@ -33,19 +33,30 @@ namespace Attriax.Unity.Tests
         {
             Assert.That(typeof(AttriaxTracking).GetProperty("Enabled", PublicInstanceDeclaredOnly), Is.Not.Null);
             Assert.That(typeof(AttriaxTracking).GetProperty("AnonymousTrackingEnabled", PublicInstanceDeclaredOnly), Is.Not.Null);
-            Assert.That(typeof(AttriaxTracking).GetMethod("RecordEventAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
-            Assert.That(typeof(AttriaxTracking).GetMethod("RecordPurchaseAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
-            Assert.That(typeof(AttriaxTracking).GetMethod("RecordRefundAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
-            Assert.That(typeof(AttriaxTracking).GetMethod("RecordAdRevenueAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
-            Assert.That(typeof(AttriaxTracking).GetMethod("RecordAdEventAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
-            Assert.That(typeof(AttriaxTracking).GetMethod("RecordErrorAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
-            Assert.That(typeof(AttriaxTracking).GetMethod("RecordPageViewAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordEvent", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordPurchase", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordRefund", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordAdRevenue", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordAdEvent", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordError", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordPageView", PublicInstanceDeclaredOnly), Is.Not.Null);
             Assert.That(typeof(AttriaxTracking).GetMethod("RegisterFirebaseMessagingTokenAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
             Assert.That(typeof(AttriaxTracking).GetMethod("RegisterApplePushTokenAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
-            Assert.That(typeof(AttriaxTracking).GetMethod("SetUserAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
-            Assert.That(typeof(AttriaxTracking).GetMethod("SetUserPropertyAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
-            Assert.That(typeof(AttriaxTracking).GetMethod("SetUserPropertiesAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
-            Assert.That(typeof(AttriaxTracking).GetMethod("ClearUserPropertiesAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("SetUser", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("SetUserProperty", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("SetUserProperties", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("ClearUserProperties", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordEventAsync", PublicInstanceDeclaredOnly), Is.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordPurchaseAsync", PublicInstanceDeclaredOnly), Is.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordRefundAsync", PublicInstanceDeclaredOnly), Is.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordAdRevenueAsync", PublicInstanceDeclaredOnly), Is.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordAdEventAsync", PublicInstanceDeclaredOnly), Is.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordErrorAsync", PublicInstanceDeclaredOnly), Is.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordPageViewAsync", PublicInstanceDeclaredOnly), Is.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("SetUserAsync", PublicInstanceDeclaredOnly), Is.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("SetUserPropertyAsync", PublicInstanceDeclaredOnly), Is.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("SetUserPropertiesAsync", PublicInstanceDeclaredOnly), Is.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("ClearUserPropertiesAsync", PublicInstanceDeclaredOnly), Is.Null);
         }
 
         [Test]
