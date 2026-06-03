@@ -2194,12 +2194,14 @@ namespace Attriax.Unity.Internal
                                 ?? "empty",
                         }),
                 };
+            }
 
             return await AttriaxNativeBridge.CollectInstallReferrerAsync(platform);
         }
 
         private AttriaxDeviceSnapshot CollectDeviceSnapshot(
             AttriaxPlatformType platform,
+            AttriaxNativeContextPayload nativeContext,
             AttriaxInstallReferrerContextPayload installReferrerContext)
         {
             var metadata = new Dictionary<string, object>
