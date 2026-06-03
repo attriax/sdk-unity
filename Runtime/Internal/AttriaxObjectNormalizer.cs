@@ -48,9 +48,36 @@ namespace Attriax.Unity.Internal
                 return null!;
             }
 
+            if (value is JValue jsonValue)
+            {
+                return NormalizeObjectValue(jsonValue.Value);
+            }
+
+            if (value is JObject jsonObject)
+            {
+                var output = new Dictionary<string, object>(jsonObject.Count);
+                foreach (var property in jsonObject.Properties())
+                {
+                    output[property.Name] = NormalizeObjectValue(property.Value);
+                }
+
+                return output;
+            }
+
+            if (value is JArray jsonArray)
+            {
+                var array = new List<object>(jsonArray.Count);
+                foreach (var item in jsonArray)
+                {
+                    array.Add(NormalizeObjectValue(item));
+                }
+
+                return array;
+            }
+
             if (value is JToken token)
             {
-                return NormalizeObjectValue(token.ToObject<object>());
+                return token.ToString();
             }
 
             if (value is string || value is bool || value is byte || value is sbyte ||
