@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkEventDto
     /// </summary>
     [DataContract(Name = "SdkEventDto")]
-    internal partial class SdkEventDto
+    public partial class SdkEventDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkEventDto" /> class.
@@ -156,4 +156,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

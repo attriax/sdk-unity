@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1SkanEventDto
     /// </summary>
     [DataContract(Name = "SdkV1SkanEventDto")]
-    internal partial class SdkV1SkanEventDto
+    public partial class SdkV1SkanEventDto
     {
 
         /// <summary>
@@ -135,4 +135,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

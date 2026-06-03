@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// Defines DeepLinkResolutionStatus
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    internal enum DeepLinkResolutionStatus
+    public enum DeepLinkResolutionStatus
     {
         /// <summary>
         /// Enum Matched for value: matched

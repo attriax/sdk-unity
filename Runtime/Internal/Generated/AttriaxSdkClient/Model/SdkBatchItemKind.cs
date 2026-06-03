@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// Defines SdkBatchItemKind
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    internal enum SdkBatchItemKind
+    public enum SdkBatchItemKind
     {
         /// <summary>
         /// Enum Event for value: event

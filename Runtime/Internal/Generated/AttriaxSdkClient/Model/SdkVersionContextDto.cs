@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkVersionContextDto
     /// </summary>
     [DataContract(Name = "SdkVersionContextDto")]
-    internal partial class SdkVersionContextDto
+    public partial class SdkVersionContextDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkVersionContextDto" /> class.
@@ -103,4 +103,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

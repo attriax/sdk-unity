@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkLatestUnityReleaseResponseEnvelopeDto
     /// </summary>
     [DataContract(Name = "SdkLatestUnityReleaseResponseEnvelopeDto")]
-    internal partial class SdkLatestUnityReleaseResponseEnvelopeDto
+    public partial class SdkLatestUnityReleaseResponseEnvelopeDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkLatestUnityReleaseResponseEnvelopeDto" /> class.
@@ -101,4 +101,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

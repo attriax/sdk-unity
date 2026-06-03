@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkCreateDynamicLinkResponseEnvelopeDto
     /// </summary>
     [DataContract(Name = "SdkCreateDynamicLinkResponseEnvelopeDto")]
-    internal partial class SdkCreateDynamicLinkResponseEnvelopeDto
+    public partial class SdkCreateDynamicLinkResponseEnvelopeDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkCreateDynamicLinkResponseEnvelopeDto" /> class.
@@ -101,4 +101,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

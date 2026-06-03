@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkSessionDto
     /// </summary>
     [DataContract(Name = "SdkSessionDto")]
-    internal partial class SdkSessionDto
+    public partial class SdkSessionDto
     {
 
         /// <summary>
@@ -228,4 +228,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

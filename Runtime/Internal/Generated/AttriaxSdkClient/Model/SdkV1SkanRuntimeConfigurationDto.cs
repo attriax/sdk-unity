@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1SkanRuntimeConfigurationDto
     /// </summary>
     [DataContract(Name = "SdkV1SkanRuntimeConfigurationDto")]
-    internal partial class SdkV1SkanRuntimeConfigurationDto
+    public partial class SdkV1SkanRuntimeConfigurationDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1SkanRuntimeConfigurationDto" /> class.
@@ -93,4 +93,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// AppVersionContextDto
     /// </summary>
     [DataContract(Name = "AppVersionContextDto")]
-    internal partial class AppVersionContextDto
+    public partial class AppVersionContextDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="AppVersionContextDto" /> class.

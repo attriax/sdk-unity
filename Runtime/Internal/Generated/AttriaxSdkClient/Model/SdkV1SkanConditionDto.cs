@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1SkanConditionDto
     /// </summary>
     [DataContract(Name = "SdkV1SkanConditionDto")]
-    internal partial class SdkV1SkanConditionDto
+    public partial class SdkV1SkanConditionDto
     {
 
         /// <summary>
@@ -113,4 +113,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

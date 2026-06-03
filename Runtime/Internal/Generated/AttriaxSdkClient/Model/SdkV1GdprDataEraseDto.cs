@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1GdprDataEraseDto
     /// </summary>
     [DataContract(Name = "SdkV1GdprDataEraseDto")]
-    internal partial class SdkV1GdprDataEraseDto
+    public partial class SdkV1GdprDataEraseDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1GdprDataEraseDto" /> class.
@@ -102,4 +102,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

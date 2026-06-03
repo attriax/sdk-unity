@@ -101,4 +101,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

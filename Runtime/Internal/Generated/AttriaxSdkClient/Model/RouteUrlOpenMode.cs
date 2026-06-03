@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// Defines RouteUrlOpenMode
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    internal enum RouteUrlOpenMode
+    public enum RouteUrlOpenMode
     {
         /// <summary>
         /// Enum InApp for value: in_app

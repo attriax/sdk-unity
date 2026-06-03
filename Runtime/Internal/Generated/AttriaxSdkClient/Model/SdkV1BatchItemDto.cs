@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1BatchItemDto
     /// </summary>
     [DataContract(Name = "SdkV1BatchItemDto")]
-    internal partial class SdkV1BatchItemDto
+    public partial class SdkV1BatchItemDto
     {
 
         /// <summary>
@@ -90,4 +90,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

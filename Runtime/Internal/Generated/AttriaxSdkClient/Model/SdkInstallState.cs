@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// Defines SdkInstallState
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    internal enum SdkInstallState
+    public enum SdkInstallState
     {
         /// <summary>
         /// Enum Existing for value: existing

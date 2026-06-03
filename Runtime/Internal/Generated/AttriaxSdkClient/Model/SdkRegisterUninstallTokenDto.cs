@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkRegisterUninstallTokenDto
     /// </summary>
     [DataContract(Name = "SdkRegisterUninstallTokenDto")]
-    internal partial class SdkRegisterUninstallTokenDto
+    public partial class SdkRegisterUninstallTokenDto
     {
 
         /// <summary>
@@ -146,4 +146,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

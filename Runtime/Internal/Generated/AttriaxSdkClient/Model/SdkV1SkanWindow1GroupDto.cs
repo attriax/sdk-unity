@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1SkanWindow1GroupDto
     /// </summary>
     [DataContract(Name = "SdkV1SkanWindow1GroupDto")]
-    internal partial class SdkV1SkanWindow1GroupDto
+    public partial class SdkV1SkanWindow1GroupDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1SkanWindow1GroupDto" /> class.
@@ -121,4 +121,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

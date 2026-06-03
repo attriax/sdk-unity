@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1DeepLinkResolveDto
     /// </summary>
     [DataContract(Name = "SdkV1DeepLinkResolveDto")]
-    internal partial class SdkV1DeepLinkResolveDto
+    public partial class SdkV1DeepLinkResolveDto
     {
 
         /// <summary>
@@ -178,4 +178,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

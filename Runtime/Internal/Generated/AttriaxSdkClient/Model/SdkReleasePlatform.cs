@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// Defines SdkReleasePlatform
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    internal enum SdkReleasePlatform
+    public enum SdkReleasePlatform
     {
         /// <summary>
         /// Enum Unity for value: unity

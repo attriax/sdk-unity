@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1BatchResponseDto
     /// </summary>
     [DataContract(Name = "SdkV1BatchResponseDto")]
-    internal partial class SdkV1BatchResponseDto
+    public partial class SdkV1BatchResponseDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1BatchResponseDto" /> class.
@@ -116,4 +116,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

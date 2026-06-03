@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1RevenueReceiptValidateDto
     /// </summary>
     [DataContract(Name = "SdkV1RevenueReceiptValidateDto")]
-    internal partial class SdkV1RevenueReceiptValidateDto
+    public partial class SdkV1RevenueReceiptValidateDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1RevenueReceiptValidateDto" /> class.

@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1OpenDto
     /// </summary>
     [DataContract(Name = "SdkV1OpenDto")]
-    internal partial class SdkV1OpenDto
+    public partial class SdkV1OpenDto
     {
 
         /// <summary>
@@ -224,4 +224,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

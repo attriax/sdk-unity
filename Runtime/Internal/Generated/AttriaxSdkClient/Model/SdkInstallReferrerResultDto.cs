@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkInstallReferrerResultDto
     /// </summary>
     [DataContract(Name = "SdkInstallReferrerResultDto")]
-    internal partial class SdkInstallReferrerResultDto
+    public partial class SdkInstallReferrerResultDto
     {
 
         /// <summary>
@@ -233,4 +233,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

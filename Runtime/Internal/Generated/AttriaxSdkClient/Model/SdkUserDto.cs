@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkUserDto
     /// </summary>
     [DataContract(Name = "SdkUserDto")]
-    internal partial class SdkUserDto
+    public partial class SdkUserDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkUserDto" /> class.
@@ -168,4 +168,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

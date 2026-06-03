@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// UnityReleaseSummaryDto
     /// </summary>
     [DataContract(Name = "UnityReleaseSummaryDto")]
-    internal partial class UnityReleaseSummaryDto
+    public partial class UnityReleaseSummaryDto
     {
 
         /// <summary>
@@ -190,4 +190,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

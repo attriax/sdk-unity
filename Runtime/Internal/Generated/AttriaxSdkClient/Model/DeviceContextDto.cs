@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// DeviceContextDto
     /// </summary>
     [DataContract(Name = "DeviceContextDto")]
-    internal partial class DeviceContextDto
+    public partial class DeviceContextDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="DeviceContextDto" /> class.

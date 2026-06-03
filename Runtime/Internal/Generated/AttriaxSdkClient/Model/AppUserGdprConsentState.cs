@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// Defines AppUserGdprConsentState
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    internal enum AppUserGdprConsentState
+    public enum AppUserGdprConsentState
     {
         /// <summary>
         /// Enum Unknown for value: unknown

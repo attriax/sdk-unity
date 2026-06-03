@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// Defines SdkV1SkanCoarseValue
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    internal enum SdkV1SkanCoarseValue
+    public enum SdkV1SkanCoarseValue
     {
         /// <summary>
         /// Enum Low for value: low

@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkBrowserActionDto
     /// </summary>
     [DataContract(Name = "SdkBrowserActionDto")]
-    internal partial class SdkBrowserActionDto
+    public partial class SdkBrowserActionDto
     {
 
         /// <summary>
@@ -89,4 +89,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

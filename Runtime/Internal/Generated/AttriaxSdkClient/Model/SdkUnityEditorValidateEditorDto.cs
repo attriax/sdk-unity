@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkUnityEditorValidateEditorDto
     /// </summary>
     [DataContract(Name = "SdkUnityEditorValidateEditorDto")]
-    internal partial class SdkUnityEditorValidateEditorDto
+    public partial class SdkUnityEditorValidateEditorDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkUnityEditorValidateEditorDto" /> class.

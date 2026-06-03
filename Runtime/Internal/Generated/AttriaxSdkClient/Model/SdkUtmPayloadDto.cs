@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkUtmPayloadDto
     /// </summary>
     [DataContract(Name = "SdkUtmPayloadDto")]
-    internal partial class SdkUtmPayloadDto
+    public partial class SdkUtmPayloadDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkUtmPayloadDto" /> class.

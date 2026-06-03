@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// Defines SdkSessionLifecycleKind
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    internal enum SdkSessionLifecycleKind
+    public enum SdkSessionLifecycleKind
     {
         /// <summary>
         /// Enum Start for value: start

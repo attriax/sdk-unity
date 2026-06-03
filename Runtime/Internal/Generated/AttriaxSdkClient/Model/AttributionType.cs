@@ -29,7 +29,7 @@ namespace Attriax.Unity.Generated.Model
     /// </summary>
     /// <value>Attribution source classification for the startup referrer payload.</value>
     [JsonConverter(typeof(StringEnumConverter))]
-    internal enum AttributionType
+    public enum AttributionType
     {
         /// <summary>
         /// Enum Referrer for value: referrer

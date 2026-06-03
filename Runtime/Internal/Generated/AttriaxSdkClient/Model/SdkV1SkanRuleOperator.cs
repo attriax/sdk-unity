@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// Defines SdkV1SkanRuleOperator
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    internal enum SdkV1SkanRuleOperator
+    public enum SdkV1SkanRuleOperator
     {
         /// <summary>
         /// Enum Exists for value: exists

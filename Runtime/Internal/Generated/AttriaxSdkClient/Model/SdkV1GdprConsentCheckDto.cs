@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1GdprConsentCheckDto
     /// </summary>
     [DataContract(Name = "SdkV1GdprConsentCheckDto")]
-    internal partial class SdkV1GdprConsentCheckDto
+    public partial class SdkV1GdprConsentCheckDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1GdprConsentCheckDto" /> class.

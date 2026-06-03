@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// Defines Platform
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    internal enum Platform
+    public enum Platform
     {
         /// <summary>
         /// Enum Ios for value: ios

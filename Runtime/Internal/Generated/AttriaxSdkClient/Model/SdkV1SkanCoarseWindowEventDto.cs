@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1SkanCoarseWindowEventDto
     /// </summary>
     [DataContract(Name = "SdkV1SkanCoarseWindowEventDto")]
-    internal partial class SdkV1SkanCoarseWindowEventDto
+    public partial class SdkV1SkanCoarseWindowEventDto
     {
 
         /// <summary>
@@ -135,4 +135,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

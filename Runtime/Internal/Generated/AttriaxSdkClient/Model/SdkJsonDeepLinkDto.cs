@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkJsonDeepLinkDto
     /// </summary>
     [DataContract(Name = "SdkJsonDeepLinkDto")]
-    internal partial class SdkJsonDeepLinkDto
+    public partial class SdkJsonDeepLinkDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkJsonDeepLinkDto" /> class.
@@ -107,4 +107,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

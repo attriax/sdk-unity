@@ -28,13 +28,13 @@ namespace Attriax.Unity.Generated.Model
     /// SdkRevenueReceiptValidateResponseDto
     /// </summary>
     [DataContract(Name = "SdkRevenueReceiptValidateResponseDto")]
-    internal partial class SdkRevenueReceiptValidateResponseDto
+    public partial class SdkRevenueReceiptValidateResponseDto
     {
         /// <summary>
         /// Defines status
         /// </summary>
         [JsonConverter(typeof(StringEnumConverter))]
-        internal enum StatusEnum
+        public enum StatusEnum
         {
             /// <summary>
             /// Enum Verified for value: verified
@@ -241,4 +241,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

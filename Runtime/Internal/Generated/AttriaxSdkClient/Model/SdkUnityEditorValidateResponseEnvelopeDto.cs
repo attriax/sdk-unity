@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkUnityEditorValidateResponseEnvelopeDto
     /// </summary>
     [DataContract(Name = "SdkUnityEditorValidateResponseEnvelopeDto")]
-    internal partial class SdkUnityEditorValidateResponseEnvelopeDto
+    public partial class SdkUnityEditorValidateResponseEnvelopeDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkUnityEditorValidateResponseEnvelopeDto" /> class.
@@ -101,4 +101,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

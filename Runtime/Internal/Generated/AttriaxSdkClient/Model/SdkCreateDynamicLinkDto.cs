@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkCreateDynamicLinkDto
     /// </summary>
     [DataContract(Name = "SdkCreateDynamicLinkDto")]
-    internal partial class SdkCreateDynamicLinkDto
+    public partial class SdkCreateDynamicLinkDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkCreateDynamicLinkDto" /> class.

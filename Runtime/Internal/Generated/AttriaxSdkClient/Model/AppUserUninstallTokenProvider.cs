@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// Defines AppUserUninstallTokenProvider
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    internal enum AppUserUninstallTokenProvider
+    public enum AppUserUninstallTokenProvider
     {
         /// <summary>
         /// Enum Fcm for value: fcm

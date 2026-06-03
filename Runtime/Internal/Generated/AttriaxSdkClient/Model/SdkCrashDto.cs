@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkCrashDto
     /// </summary>
     [DataContract(Name = "SdkCrashDto")]
-    internal partial class SdkCrashDto
+    public partial class SdkCrashDto
     {
 
         /// <summary>
@@ -289,4 +289,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1DeepLinkResolveResponseEnvelopeDto
     /// </summary>
     [DataContract(Name = "SdkV1DeepLinkResolveResponseEnvelopeDto")]
-    internal partial class SdkV1DeepLinkResolveResponseEnvelopeDto
+    public partial class SdkV1DeepLinkResolveResponseEnvelopeDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1DeepLinkResolveResponseEnvelopeDto" /> class.
@@ -101,4 +101,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

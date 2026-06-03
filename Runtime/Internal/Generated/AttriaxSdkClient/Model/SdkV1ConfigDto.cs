@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1ConfigDto
     /// </summary>
     [DataContract(Name = "SdkV1ConfigDto")]
-    internal partial class SdkV1ConfigDto
+    public partial class SdkV1ConfigDto
     {
 
         /// <summary>
@@ -114,4 +114,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-

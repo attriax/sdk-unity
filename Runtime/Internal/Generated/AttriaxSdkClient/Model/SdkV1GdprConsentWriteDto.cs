@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1GdprConsentWriteDto
     /// </summary>
     [DataContract(Name = "SdkV1GdprConsentWriteDto")]
-    internal partial class SdkV1GdprConsentWriteDto
+    public partial class SdkV1GdprConsentWriteDto
     {
 
         /// <summary>
@@ -141,4 +141,3 @@ namespace Attriax.Unity.Generated.Model
     }
 
 }
-
