@@ -84,9 +84,13 @@ namespace Attriax.Unity.Internal
 
         public Task<AttriaxAppOpenResult> SendOpenAsync(SdkV1OpenDto request)
         {
+            var requestOptions = BuildRequestOptions(request);
             return ExecuteMappedAsync(
-                () => _sdkApi.SdkControllerOpenV1Async(request),
-                envelope => MapAppOpenResult(envelope.data));
+                () => _sdkApi.AsynchronousClient.PostAsync<JObject>(
+                    "/api/sdk/v1/open",
+                    requestOptions,
+                    _sdkApi.Configuration),
+                response => MapAppOpenResultEnvelope(response.Data));
         }
 
         public Task SendTrackEventAsync(SdkEventDto request)
@@ -166,10 +170,13 @@ namespace Attriax.Unity.Internal
 
         public Task<AttriaxSdkRuntimeConfig> FetchSdkRuntimeConfigAsync(SdkV1ConfigDto request)
         {
+            var requestOptions = BuildRequestOptions(request);
             return ExecuteMappedAsync(
-                () => _sdkApi.SdkControllerConfigV1Async(request),
-                envelope => new AttriaxSdkRuntimeConfig(
-                    clipboardAttributionEnabled: envelope.data.clipboardAttributionEnabled));
+                () => _sdkApi.AsynchronousClient.PostAsync<JObject>(
+                    "/api/sdk/v1/config",
+                    requestOptions,
+                    _sdkApi.Configuration),
+                response => MapRuntimeConfigEnvelope(response.Data));
         }
 
         public Task<SdkGdprConsentStatusDto> UpsertGdprConsentAsync(SdkV1GdprConsentWriteDto request)
@@ -246,6 +253,14 @@ namespace Attriax.Unity.Internal
             var serializedRequest = JsonConvert.SerializeObject(request, BatchSerializerSettings);
             var requestBytes = Encoding.UTF8.GetByteCount(serializedRequest);
             return entries.Count <= maxItemCount && requestBytes <= maxBodyBytes;
+        }
+
+        private static RequestOptions BuildRequestOptions(object request)
+        {
+            return new RequestOptions
+            {
+                Data = request,
+            };
         }
 
         private static SdkV1BatchDto BuildBatchRequest(IReadOnlyList<AttriaxQueuedRequest> entries)
@@ -615,6 +630,51 @@ namespace Attriax.Unity.Internal
             };
         }
 
+        internal static AttriaxSdkRuntimeConfig MapRuntimeConfigEnvelope(JObject? envelope)
+        {
+            var data = RequireEnvelopeData(envelope);
+            return new AttriaxSdkRuntimeConfig(
+                clipboardAttributionEnabled: data.Value<bool?>("clipboardAttributionEnabled") ?? false);
+        }
+
+        internal static AttriaxAppOpenResult MapAppOpenResultEnvelope(JObject? envelope)
+        {
+            var data = RequireEnvelopeData(envelope);
+            var originalInstallReferrer = MapInstallReferrerDetails(data["originalInstallReferrer"])
+                ?? MapInstallReferrerDetails(data["installReferrer"]);
+
+            return new AttriaxAppOpenResult
+            {
+                UserId = data.Value<string>("userId") ?? string.Empty,
+                IsNewUser = data.Value<bool?>("isNewUser") ?? false,
+                IsFirstLaunch = data.Value<bool?>("isFirstLaunch") ?? false,
+                InstallState = MapInstallState(data["installState"]),
+                RequestVersion = data.Value<string>("requestVersion"),
+                AcceptedAt = ToOptionalDateTimeOffset(data["acceptedAt"]),
+                DeepLink = MapDeepLink(data["deepLink"]),
+                DeepLinkClickedAt = ToOptionalDateTimeOffset(data["deepLinkClickedAt"]),
+                DeepLinkConsumedAt = ToOptionalDateTimeOffset(data["deepLinkConsumedAt"]),
+                OriginalInstallReferrer = originalInstallReferrer,
+                ReinstallReferrer = MapInstallReferrerDetails(data["reinstallReferrer"]),
+                Skan = MapSkanRuntimeConfiguration(data["skan"]),
+            };
+        }
+
+        private static JObject RequireEnvelopeData(JObject? envelope)
+        {
+            var data = envelope?["data"] as JObject;
+            if (data != null)
+            {
+                return data;
+            }
+
+            throw new AttriaxApiError(
+                "Attriax API returned an unexpected response.",
+                null,
+                false,
+                true);
+        }
+
         private static AttriaxAppOpenResult MapAppOpenResult(SdkV1OpenResponseDto response)
         {
             var originalInstallReferrer = MapInstallReferrerDetails(response.originalInstallReferrer)
@@ -656,6 +716,21 @@ namespace Attriax.Unity.Internal
             };
         }
 
+        private static AttriaxSkanRuntimeConfiguration? MapSkanRuntimeConfiguration(JToken? response)
+        {
+            var payload = response as JObject;
+            if (payload == null)
+            {
+                return null;
+            }
+
+            return new AttriaxSkanRuntimeConfiguration
+            {
+                Enabled = payload.Value<bool?>("enabled") ?? false,
+                Schema = MapSkanSchema(payload["schema"]),
+            };
+        }
+
         private static AttriaxSkanSchema? MapSkanSchema(
             Generated.Model.SdkV1SkanSchemaDto response)
         {
@@ -674,6 +749,24 @@ namespace Attriax.Unity.Internal
             };
         }
 
+        private static AttriaxSkanSchema? MapSkanSchema(JToken? response)
+        {
+            var payload = response as JObject;
+            if (payload == null)
+            {
+                return null;
+            }
+
+            return new AttriaxSkanSchema
+            {
+                Version = payload.Value<int?>("version") ?? 0,
+                UpdatedAt = ToOptionalDateTimeOffset(payload["updatedAt"]),
+                Window1 = MapSkanWindow1(payload["window1"]) ?? new AttriaxSkanWindow1(),
+                Window2 = MapSkanCoarseWindow(payload["window2"]) ?? new AttriaxSkanCoarseWindow(),
+                Window3 = MapSkanCoarseWindow(payload["window3"]) ?? new AttriaxSkanCoarseWindow(),
+            };
+        }
+
         private static AttriaxSkanWindow1? MapSkanWindow1(Generated.Model.SdkV1SkanWindow1Dto response)
         {
             if (response == null)
@@ -689,6 +782,21 @@ namespace Attriax.Unity.Internal
             };
         }
 
+        private static AttriaxSkanWindow1? MapSkanWindow1(JToken? response)
+        {
+            var payload = response as JObject;
+            if (payload == null)
+            {
+                return null;
+            }
+
+            return new AttriaxSkanWindow1
+            {
+                Groups = (payload["groups"] as JArray)?.OfType<JObject>().Select(MapSkanWindow1Group).ToList()
+                    ?? new List<AttriaxSkanWindow1Group>(),
+            };
+        }
+
         private static AttriaxSkanWindow1Group MapSkanWindow1Group(Generated.Model.SdkV1SkanWindow1GroupDto response)
         {
             return new AttriaxSkanWindow1Group
@@ -700,6 +808,19 @@ namespace Attriax.Unity.Internal
                 Events = response?.events != null
                     ? response.events.Select(MapSkanEvent).ToList()
                     : new List<AttriaxSkanEvent>(),
+            };
+        }
+
+        private static AttriaxSkanWindow1Group MapSkanWindow1Group(JObject? response)
+        {
+            return new AttriaxSkanWindow1Group
+            {
+                Id = response?.Value<string>("id") ?? string.Empty,
+                DisplayName = ToOptionalString(response?["displayName"]),
+                StartBit = response?.Value<int?>("startBit") ?? 0,
+                BitCount = response?.Value<int?>("bitCount") ?? 0,
+                Events = (response?["events"] as JArray)?.OfType<JObject>().Select(MapSkanEvent).ToList()
+                    ?? new List<AttriaxSkanEvent>(),
             };
         }
 
@@ -718,6 +839,20 @@ namespace Attriax.Unity.Internal
             };
         }
 
+        private static AttriaxSkanEvent MapSkanEvent(JObject? response)
+        {
+            return new AttriaxSkanEvent
+            {
+                Id = response?.Value<string>("id") ?? string.Empty,
+                EventName = response?.Value<string>("eventName") ?? string.Empty,
+                DisplayName = ToOptionalString(response?["displayName"]),
+                CoarseValue = ParseSkanCoarseValue(response?["coarseValue"]),
+                LockWindow = response?.Value<bool?>("lockWindow") ?? false,
+                Conditions = (response?["conditions"] as JArray)?.OfType<JObject>().Select(MapSkanCondition).ToList()
+                    ?? new List<AttriaxSkanCondition>(),
+            };
+        }
+
         private static AttriaxSkanCoarseWindow? MapSkanCoarseWindow(Generated.Model.SdkV1SkanCoarseWindowDto response)
         {
             if (response == null)
@@ -730,6 +865,21 @@ namespace Attriax.Unity.Internal
                 Events = response.events != null
                     ? response.events.Select(MapSkanCoarseWindowEvent).ToList()
                     : new List<AttriaxSkanCoarseWindowEvent>(),
+            };
+        }
+
+        private static AttriaxSkanCoarseWindow? MapSkanCoarseWindow(JToken? response)
+        {
+            var payload = response as JObject;
+            if (payload == null)
+            {
+                return null;
+            }
+
+            return new AttriaxSkanCoarseWindow
+            {
+                Events = (payload["events"] as JArray)?.OfType<JObject>().Select(MapSkanCoarseWindowEvent).ToList()
+                    ?? new List<AttriaxSkanCoarseWindowEvent>(),
             };
         }
 
@@ -749,6 +899,20 @@ namespace Attriax.Unity.Internal
             };
         }
 
+        private static AttriaxSkanCoarseWindowEvent MapSkanCoarseWindowEvent(JObject? response)
+        {
+            return new AttriaxSkanCoarseWindowEvent
+            {
+                Id = response?.Value<string>("id") ?? string.Empty,
+                EventName = response?.Value<string>("eventName") ?? string.Empty,
+                DisplayName = ToOptionalString(response?["displayName"]),
+                LockWindow = response?.Value<bool?>("lockWindow") ?? false,
+                Conditions = (response?["conditions"] as JArray)?.OfType<JObject>().Select(MapSkanCondition).ToList()
+                    ?? new List<AttriaxSkanCondition>(),
+                CoarseValue = ParseSkanCoarseValue(response?["coarseValue"]) ?? AttriaxSkanCoarseValue.Low,
+            };
+        }
+
         private static AttriaxSkanCondition MapSkanCondition(Generated.Model.SdkV1SkanConditionDto response)
         {
             return new AttriaxSkanCondition
@@ -757,6 +921,17 @@ namespace Attriax.Unity.Internal
                 ParamKey = response?.paramKey ?? string.Empty,
                 Operator = ParseSkanRuleOperator(response?.VarOperator.ToString()),
                 Value = NormalizeArbitraryValue(response?.value),
+            };
+        }
+
+        private static AttriaxSkanCondition MapSkanCondition(JObject? response)
+        {
+            return new AttriaxSkanCondition
+            {
+                Id = response?.Value<string>("id") ?? string.Empty,
+                ParamKey = response?.Value<string>("paramKey") ?? string.Empty,
+                Operator = ParseSkanRuleOperator(response?["operator"]?.ToString()),
+                Value = NormalizeArbitraryValue(response?["value"]),
             };
         }
 
@@ -804,6 +979,16 @@ namespace Attriax.Unity.Internal
         private static AttriaxSkanCoarseValue? ParseSkanCoarseValue(Generated.Model.SdkV1SkanCoarseValue? value)
         {
             return value.HasValue ? ParseSkanCoarseValue(value.Value.ToString()) : null;
+        }
+
+        private static AttriaxSkanCoarseValue? ParseSkanCoarseValue(JToken? value)
+        {
+            if (value == null || value.Type == JTokenType.Null)
+            {
+                return null;
+            }
+
+            return ParseSkanCoarseValue(value.ToString());
         }
 
         private static string? ToOptionalString(object? value)
@@ -995,6 +1180,23 @@ namespace Attriax.Unity.Internal
             };
         }
 
+        private static AttriaxDeepLink? MapDeepLink(JToken? deepLink)
+        {
+            var payload = deepLink as JObject;
+            if (payload == null)
+            {
+                return null;
+            }
+
+            return new AttriaxDeepLink
+            {
+                Path = payload.Value<string>("path"),
+                Data = ToNormalizedObjectMap(payload["data"]),
+                Uri = TryCreateAbsoluteUri(payload.Value<string>("uri")),
+                Utm = MapUtmParameters(payload["utm"]),
+            };
+        }
+
         private static AttriaxUtmParameters? MapUtmParameters(
             global::Attriax.Unity.Generated.Model.SdkUtmPayloadDto utm)
         {
@@ -1010,6 +1212,24 @@ namespace Attriax.Unity.Internal
                 Campaign = utm.campaign,
                 Term = utm.term,
                 Content = utm.content,
+            };
+        }
+
+        private static AttriaxUtmParameters? MapUtmParameters(JToken? utm)
+        {
+            var payload = utm as JObject;
+            if (payload == null)
+            {
+                return null;
+            }
+
+            return new AttriaxUtmParameters
+            {
+                Source = payload.Value<string>("source"),
+                Medium = payload.Value<string>("medium"),
+                Campaign = payload.Value<string>("campaign"),
+                Term = payload.Value<string>("term"),
+                Content = payload.Value<string>("content"),
             };
         }
 
@@ -1055,6 +1275,37 @@ namespace Attriax.Unity.Internal
             };
         }
 
+        private static AttriaxInstallReferrerDetails? MapInstallReferrerDetails(JToken? installReferrer)
+        {
+            var payload = installReferrer as JObject;
+            if (payload == null)
+            {
+                return null;
+            }
+
+            return new AttriaxInstallReferrerDetails
+            {
+                RawPlatformInstallReferrer = payload.Value<string>("rawPlatformInstallReferrer"),
+                Source = payload.Value<string>("source"),
+                Medium = payload.Value<string>("medium"),
+                Campaign = payload.Value<string>("campaign"),
+                Term = payload.Value<string>("term"),
+                Content = payload.Value<string>("content"),
+                AdNetwork = payload.Value<string>("adNetwork"),
+                AdClickId = payload.Value<string>("adClickId"),
+                AttributionType = MapAttributionType(payload["attributionType"]),
+                DeepLinkUri = string.IsNullOrWhiteSpace(payload.Value<string>("deepLinkUri"))
+                    ? payload.Value<string>("deepLinkUrl")
+                    : payload.Value<string>("deepLinkUri"),
+                DeepLinkData = ToNormalizedObjectMap(payload["deepLinkData"]),
+                RegisteredAt = ToOptionalDateTimeOffset(payload["registeredAt"]),
+                InstallBeginTimestampSeconds = ToNullableLong(payload["installBeginTimestampSeconds"]),
+                ReferrerClickTimestampSeconds = ToNullableLong(payload["referrerClickTimestampSeconds"]),
+                GooglePlayInstantParam = payload.Value<bool?>("googlePlayInstantParam") ?? false,
+                Precision = payload.Value<double?>("precision") ?? 0d,
+            };
+        }
+
         private static AttriaxInstallState MapInstallState(GeneratedInstallState installState)
         {
             switch (installState)
@@ -1066,6 +1317,22 @@ namespace Attriax.Unity.Internal
                 case GeneratedInstallState.AppDataClear:
                     return AttriaxInstallState.AppDataClear;
                 case GeneratedInstallState.Existing:
+                default:
+                    return AttriaxInstallState.Existing;
+            }
+        }
+
+        private static AttriaxInstallState MapInstallState(JToken? installState)
+        {
+            switch ((installState?.ToString() ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "new_install":
+                    return AttriaxInstallState.NewInstall;
+                case "reinstall":
+                    return AttriaxInstallState.Reinstall;
+                case "app_data_clear":
+                    return AttriaxInstallState.AppDataClear;
+                case "existing":
                 default:
                     return AttriaxInstallState.Existing;
             }
@@ -1119,6 +1386,22 @@ namespace Attriax.Unity.Internal
                     return AttributionType.Fingerprint;
                 case GeneratedAttributionType.External:
                     return AttributionType.External;
+                default:
+                    return AttributionType.Organic;
+            }
+        }
+
+        private static AttributionType MapAttributionType(JToken? attributionType)
+        {
+            switch ((attributionType?.ToString() ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "referrer":
+                    return AttributionType.Referrer;
+                case "fingerprint":
+                    return AttributionType.Fingerprint;
+                case "external":
+                    return AttributionType.External;
+                case "organic":
                 default:
                     return AttributionType.Organic;
             }
@@ -1196,9 +1479,36 @@ namespace Attriax.Unity.Internal
             return value == default ? null : ToDateTimeOffset(value);
         }
 
+        private static DateTimeOffset? ToOptionalDateTimeOffset(JToken? value)
+        {
+            return ToOptionalDateTimeOffset((object?)value);
+        }
+
         private static long? ToNullableLong(decimal value)
         {
             return value == default ? null : decimal.ToInt64(value);
+        }
+
+        private static long? ToNullableLong(JToken? value)
+        {
+            if (value == null || value.Type == JTokenType.Null)
+            {
+                return null;
+            }
+
+            if (value.Type == JTokenType.Integer)
+            {
+                return value.Value<long>();
+            }
+
+            if (value.Type == JTokenType.Float)
+            {
+                return decimal.ToInt64(value.Value<decimal>());
+            }
+
+            return long.TryParse(value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+                ? parsed
+                : null;
         }
 
         private static Dictionary<string, object>? ToNormalizedObjectMap(JToken? token)

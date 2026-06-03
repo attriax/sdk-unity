@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using Newtonsoft.Json.Linq;
 using Attriax.Unity.Generated.Model;
 using Attriax.Unity.Internal;
 using SdkSessionLifecycleKind = Attriax.Unity.Generated.Model.SdkSessionLifecycleKind;
@@ -75,6 +76,66 @@ namespace Attriax.Unity.Tests
             Assert.That(executeTask.Exception, Is.Null);
             Assert.That(executeTask.Result, Is.EqualTo(mainThreadId));
         }
+
+                [Test]
+                public void MapRuntimeConfigEnvelopeParsesRawJsonWithoutGeneratedEnvelopeTypes()
+                {
+                        var config = AttriaxGeneratedGateway.MapRuntimeConfigEnvelope(JObject.Parse(@"""
+                                {
+                                    "success": true,
+                                    "timestamp": "2026-06-03T08:20:00.000Z",
+                                    "data": {
+                                        "clipboardAttributionEnabled": true
+                                    }
+                                }
+                                """));
+
+                        Assert.That(config.ClipboardAttributionEnabled, Is.True);
+                }
+
+                [Test]
+                public void MapAppOpenResultEnvelopeParsesRawJsonWithoutGeneratedEnvelopeTypes()
+                {
+                        var result = AttriaxGeneratedGateway.MapAppOpenResultEnvelope(JObject.Parse(@"""
+                                {
+                                    "success": true,
+                                    "timestamp": "2026-06-03T08:20:00.000Z",
+                                    "data": {
+                                        "acceptedAt": "2026-06-03T08:20:00.000Z",
+                                        "installState": "new_install",
+                                        "isFirstLaunch": true,
+                                        "isNewUser": true,
+                                        "requestVersion": "v1",
+                                        "userId": "user_123",
+                                        "deepLink": {
+                                            "path": "/promo",
+                                            "uri": "https://example.com/promo",
+                                            "data": {
+                                                "code": "summer"
+                                            },
+                                            "utm": {
+                                                "source": "newsletter"
+                                            }
+                                        },
+                                        "originalInstallReferrer": {
+                                            "attributionType": "referrer",
+                                            "precision": 0.9,
+                                            "rawPlatformInstallReferrer": "utm_source=newsletter",
+                                            "source": "newsletter"
+                                        }
+                                    }
+                                }
+                                """));
+
+                        Assert.That(result.UserId, Is.EqualTo("user_123"));
+                        Assert.That(result.IsFirstLaunch, Is.True);
+                        Assert.That(result.IsNewUser, Is.True);
+                        Assert.That(result.InstallState, Is.EqualTo(AttriaxInstallState.NewInstall));
+                        Assert.That(result.DeepLink?.Path, Is.EqualTo("/promo"));
+                        Assert.That(result.DeepLink?.Utm?.Source, Is.EqualTo("newsletter"));
+                        Assert.That(result.OriginalInstallReferrer?.Source, Is.EqualTo("newsletter"));
+                        Assert.That(result.OriginalInstallReferrer?.AttributionType, Is.EqualTo(AttributionType.Referrer));
+                }
 
         private static List<AttriaxQueuedRequest> CreateEventEntries(int count)
         {

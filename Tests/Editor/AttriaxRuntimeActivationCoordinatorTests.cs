@@ -147,8 +147,7 @@ namespace Attriax.Unity.Tests
                     queueCount: () => QueueCount,
                     requestImmediateQueueFlush: () => Calls.Add("requestImmediateQueueFlush"),
                     setSynchronizationState: state => Calls.Add("setSynchronizationState:" + state),
-                    isInitialized: () => IsInitialized,
-                    isEditorValidationMode: () => IsEditorValidationMode);
+                        isInitialized: () => IsInitialized);
             }
 
             public List<string> Calls { get; } = new List<string>();
@@ -158,8 +157,6 @@ namespace Attriax.Unity.Tests
             public int QueueCount { get; set; }
 
             public bool IsInitialized { get; set; } = true;
-
-            public bool IsEditorValidationMode { get; set; }
         }
     }
 }

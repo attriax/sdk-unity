@@ -107,12 +107,9 @@ namespace Attriax.Unity.Internal
                     }
                 }
 
-                if (!_runtime.IsUnityEditorValidationMode)
-                {
-                    _runtime.RequestQueueFlush(true);
-                }
+                _runtime.RequestQueueFlush(true);
 
-                if (_runtime.IsUnityEditorValidationMode || _runtime._requestQueue.Count == 0)
+                if (_runtime._requestQueue.Count == 0)
                 {
                     _runtime.SetSynchronizationState(AttriaxSynchronizationState.Synchronized);
                 }

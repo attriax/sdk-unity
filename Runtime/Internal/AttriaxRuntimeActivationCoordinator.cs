@@ -38,7 +38,6 @@ namespace Attriax.Unity.Internal
         private readonly Action _requestImmediateQueueFlush;
         private readonly Action<AttriaxSynchronizationState> _setSynchronizationState;
         private readonly Func<bool> _isInitialized;
-        private readonly Func<bool> _isEditorValidationMode;
 
         public AttriaxRuntimeActivationCoordinator(
             Action<bool> persistEnabled,
@@ -54,8 +53,7 @@ namespace Attriax.Unity.Internal
             Func<int> queueCount,
             Action requestImmediateQueueFlush,
             Action<AttriaxSynchronizationState> setSynchronizationState,
-            Func<bool> isInitialized,
-            Func<bool> isEditorValidationMode)
+            Func<bool> isInitialized)
         {
             _persistEnabled = persistEnabled ?? throw new ArgumentNullException(nameof(persistEnabled));
             _refreshAppOpenDispatchGate = refreshAppOpenDispatchGate ?? throw new ArgumentNullException(nameof(refreshAppOpenDispatchGate));
@@ -71,7 +69,6 @@ namespace Attriax.Unity.Internal
             _requestImmediateQueueFlush = requestImmediateQueueFlush ?? throw new ArgumentNullException(nameof(requestImmediateQueueFlush));
             _setSynchronizationState = setSynchronizationState ?? throw new ArgumentNullException(nameof(setSynchronizationState));
             _isInitialized = isInitialized ?? throw new ArgumentNullException(nameof(isInitialized));
-            _isEditorValidationMode = isEditorValidationMode ?? throw new ArgumentNullException(nameof(isEditorValidationMode));
         }
 
         public void SetEnabled(bool enabled, AttriaxRuntimeActivationState state)
@@ -90,12 +87,6 @@ namespace Attriax.Unity.Internal
             _handleSdkEnabled();
             _prepareReferrerTasksForEnabledState();
             _scheduleLaunchPreparationIfNeeded();
-
-            if (_isEditorValidationMode())
-            {
-                _setSynchronizationState(AttriaxSynchronizationState.Synchronized);
-                return;
-            }
 
             if (state.ShouldDeferNetworkDispatch)
             {
@@ -143,12 +134,6 @@ namespace Attriax.Unity.Internal
             }
 
             _scheduleLaunchPreparationIfNeeded();
-
-            if (_isEditorValidationMode())
-            {
-                _setSynchronizationState(AttriaxSynchronizationState.Synchronized);
-                return;
-            }
 
             if (state.ShouldDeferNetworkDispatch)
             {

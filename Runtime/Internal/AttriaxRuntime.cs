@@ -81,7 +81,6 @@ namespace Attriax.Unity.Internal
         private bool _disposed;
         private int _backgroundTaskGeneration;
         private bool _shouldGateRequestsOnSuccessfulAppOpen;
-        private Task? _unityEditorValidationTask;
         private Task? _identifiedConsentTransitionTask;
         private AttriaxPlatformType _resolvedPlatform = AttriaxPlatformType.Unknown;
 
@@ -271,8 +270,7 @@ namespace Attriax.Unity.Internal
                 () => _requestQueue.Count,
                 RequestImmediateQueueFlush,
                 SetSynchronizationState,
-                () => _initialized,
-                () => IsUnityEditorValidationMode);
+                () => _initialized);
             _shouldGateRequestsOnSuccessfulAppOpen = ShouldGateRequestsOnSuccessfulAppOpen;
         }
 
@@ -503,14 +501,6 @@ namespace Attriax.Unity.Internal
         {
             AssertInitialized();
 
-            if (IsUnityEditorValidationMode)
-            {
-                DebugLog(
-                    "Skipping deep-link conversion because Unity Editor validation mode does not dispatch analytics.",
-                    string.IsNullOrWhiteSpace(options.Uri) ? options.LinkPath : options.Uri);
-                return Task.FromResult<AttriaxDeepLinkEvent?>(null);
-            }
-
             return _deepLinkManager.RecordConversionAsync(options);
         }
 
@@ -546,14 +536,6 @@ namespace Attriax.Unity.Internal
             if (!_enabled)
             {
                 DebugLog("Skipping uninstall token because SDK is disabled.", provider.ToString());
-                return;
-            }
-
-            if (IsUnityEditorValidationMode)
-            {
-                DebugLog(
-                    "Skipping uninstall token because Unity Editor validation mode does not dispatch runtime registration.",
-                    provider.ToString());
                 return;
             }
 
@@ -719,7 +701,6 @@ namespace Attriax.Unity.Internal
             _runtimeState.Reset();
             _initializationTask = null;
             _flushTask = null;
-            _unityEditorValidationTask = null;
             _identifiedConsentTransitionTask = null;
             _resolvedPlatform = AttriaxPlatformType.Unknown;
         }
@@ -750,7 +731,6 @@ namespace Attriax.Unity.Internal
             _disposed = true;
             _backgroundTaskGeneration += 1;
             _deferredFlushDueAt = null;
-            _unityEditorValidationTask = null;
             _identifiedConsentTransitionTask = null;
             _resolvedPlatform = AttriaxPlatformType.Unknown;
             _originalInstallReferrerState.Complete(null);
@@ -1348,10 +1328,7 @@ namespace Attriax.Unity.Internal
 
             if (_enabled)
             {
-                if (!IsUnityEditorValidationMode)
-                {
-                    RequestQueueFlush(true);
-                }
+                RequestQueueFlush(true);
             }
         }
 
@@ -1383,12 +1360,6 @@ namespace Attriax.Unity.Internal
 
         private void RequestQueueFlush(bool immediate)
         {
-            if (IsUnityEditorValidationMode)
-            {
-                SetSynchronizationState(AttriaxSynchronizationState.Synchronized);
-                return;
-            }
-
             if (_requestQueue.Count == 0)
             {
                 return;
@@ -3310,15 +3281,11 @@ namespace Attriax.Unity.Internal
         }
 
         private bool ShouldGateRequestsOnSuccessfulAppOpen =>
-            _enabled && _consentManager.AllowsAttributionTracking && !IsUnityEditorValidationMode;
-
-        private bool IsUnityEditorValidationMode =>
-            (_resolvedPlatform != AttriaxPlatformType.Unknown ? _resolvedPlatform : GetCurrentPlatform()) ==
-            AttriaxPlatformType.UnityEditor;
+            _enabled && _consentManager.AllowsAttributionTracking;
 
         private bool ShouldDispatchAnalyticsInCurrentMode()
         {
-            return !IsUnityEditorValidationMode;
+            return true;
         }
 
         private static bool IsAdEventName(string eventName)

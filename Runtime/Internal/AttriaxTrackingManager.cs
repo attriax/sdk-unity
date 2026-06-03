@@ -57,7 +57,7 @@ namespace Attriax.Unity.Internal
             if (!ShouldDispatchAnalytics)
             {
                 _debugLog(
-                    "Queueing event locally because Unity Editor validation mode does not dispatch analytics.",
+                    "Queueing event locally because analytics dispatch is currently disabled.",
                     eventName);
             }
 
@@ -120,7 +120,7 @@ namespace Attriax.Unity.Internal
             if (!ShouldDispatchAnalytics)
             {
                 _debugLog(
-                    "Skipping crash report because Unity Editor validation mode does not dispatch analytics.",
+                    "Skipping crash report because analytics dispatch is currently disabled.",
                     exceptionType);
                 return;
             }
@@ -275,7 +275,7 @@ namespace Attriax.Unity.Internal
             if (!ShouldDispatchAnalytics)
             {
                 _debugLog(
-                    "Skipping user update because Unity Editor validation mode does not dispatch analytics.",
+                    "Skipping user update because analytics dispatch is currently disabled.",
                     userId);
                 return;
             }

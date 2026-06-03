@@ -1,8 +1,5 @@
 #nullable enable
 using System;
-using System.Threading.Tasks;
-using UnityEngine;
-
 namespace Attriax.Unity.Internal
 {
     internal sealed partial class AttriaxRuntime
@@ -39,12 +36,6 @@ namespace Attriax.Unity.Internal
 
         private void ScheduleLaunchPreparationIfNeeded()
         {
-            if (IsUnityEditorValidationMode)
-            {
-                ScheduleUnityEditorValidationIfNeeded();
-                return;
-            }
-
             if (_consentManager.ShouldDeferNetworkDispatch || !_consentManager.AllowsAttributionTracking)
             {
                 return;
@@ -69,45 +60,6 @@ namespace Attriax.Unity.Internal
         private void RequestImmediateQueueFlush()
         {
             RequestQueueFlush(true);
-        }
-
-        private void ScheduleUnityEditorValidationIfNeeded()
-        {
-            if (_unityEditorValidationTask != null)
-            {
-                return;
-            }
-
-            var validationTask = ValidateUnityEditorAsync();
-            _unityEditorValidationTask = validationTask;
-            ObserveBackgroundTask(
-                AwaitUnityEditorValidationAsync(validationTask),
-                "Unity Editor validation failed.");
-        }
-
-        private async Task AwaitUnityEditorValidationAsync(Task validationTask)
-        {
-            try
-            {
-                await validationTask.ConfigureAwait(false);
-            }
-            finally
-            {
-                if (ReferenceEquals(_unityEditorValidationTask, validationTask))
-                {
-                    _unityEditorValidationTask = null;
-                }
-            }
-        }
-
-        private Task ValidateUnityEditorAsync()
-        {
-            return _generatedGateway.SendValidateUnityEditorAsync(
-                AttriaxGeneratedRequestFactory.BuildUnityEditorValidateRequest(
-                    _config.ProjectToken,
-                    SdkPackageVersion,
-                    Application.unityVersion,
-                    DetectEditorHostPlatform()));
         }
     }
 }
