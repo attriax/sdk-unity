@@ -875,9 +875,15 @@ namespace Attriax.Unity.Internal
                 "installReferrerOverridePresent=" + (!string.IsNullOrWhiteSpace(installReferrerOverride))
                 + ", metadataCount=" + deviceMetadataOverrides.Count);
 
-            return _appOpenManager.ScheduleAsync(
-                installReferrerOverride,
-                deviceMetadataOverrides);
+            return AttriaxLifecycleDispatcher.InvokeOnMainThread(() =>
+            {
+                DebugLog(
+                    "Running prepared app-open scheduling on the Unity main thread.",
+                    "thread=" + System.Threading.Thread.CurrentThread.ManagedThreadId);
+                return _appOpenManager.ScheduleAsync(
+                    installReferrerOverride,
+                    deviceMetadataOverrides);
+            });
         }
 
         private Task HandleSdkRuntimeConfigLoadedAsync(AttriaxSdkRuntimeConfig runtimeConfig)
