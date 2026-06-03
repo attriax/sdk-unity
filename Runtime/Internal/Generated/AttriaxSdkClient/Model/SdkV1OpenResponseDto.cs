@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1OpenResponseDto
     /// </summary>
     [DataContract(Name = "SdkV1OpenResponseDto")]
-    internal partial class SdkV1OpenResponseDto
+    public partial class SdkV1OpenResponseDto
     {
 
         /// <summary>

@@ -28,7 +28,7 @@ namespace Attriax.Unity.Generated.Model
     /// SdkV1ConfigResponseDto
     /// </summary>
     [DataContract(Name = "SdkV1ConfigResponseDto")]
-    internal partial class SdkV1ConfigResponseDto
+    public partial class SdkV1ConfigResponseDto
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SdkV1ConfigResponseDto" /> class.

@@ -32,6 +32,10 @@ namespace Attriax.Unity.Tests
         [Test]
         public void GeneratedLaunchResponseModelsExposePublicJsonConstructors()
         {
+            Assert.That(typeof(SdkV1ConfigResponseEnvelopeDto).IsPublic, Is.True);
+            Assert.That(typeof(SdkV1ConfigResponseDto).IsPublic, Is.True);
+            Assert.That(typeof(SdkV1OpenResponseEnvelopeDto).IsPublic, Is.True);
+            Assert.That(typeof(SdkV1OpenResponseDto).IsPublic, Is.True);
             Assert.That(HasPublicParameterlessConstructor(typeof(SdkV1ConfigResponseEnvelopeDto)), Is.True);
             Assert.That(HasPublicParameterlessConstructor(typeof(SdkV1ConfigResponseDto)), Is.True);
             Assert.That(HasPublicParameterlessConstructor(typeof(SdkV1OpenResponseEnvelopeDto)), Is.True);
