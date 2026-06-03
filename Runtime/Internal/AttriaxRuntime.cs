@@ -25,6 +25,8 @@ namespace Attriax.Unity.Internal
         IAttriaxAppOpenPipeline,
         IAttriaxSessionLifecycleQueue
     {
+        private static readonly Action<string, string?> NoopDebugLog = static (_, _) => { };
+
         private const string DefaultApiBaseUrl = "https://api.attriax.com";
         private const string DefaultStorageKeyPrefix = "attriax:unity";
         private const int DefaultRequestTimeoutMs = 12000;
@@ -171,7 +173,7 @@ namespace Attriax.Unity.Internal
             _consentManager = new AttriaxConsentManager(
                 new AttriaxPlayerPrefsConsentStore(
                     Key(GdprConsentStorageKey),
-                    (message, detail) => DebugLog(message, detail)),
+                    NoopDebugLog),
                 _config.ProjectToken,
                 _config.GdprEnabled,
                 _config.AnonymousTracking,
@@ -179,7 +181,7 @@ namespace Attriax.Unity.Internal
                 ResolveCurrentTimezone,
                 _generatedGateway,
                 HandleConsentStateChanged,
-                (message, detail) => DebugLog(message, detail));
+                NoopDebugLog);
             _skanManager = new AttriaxSkanManager(
                 _config.Skan ?? new AttriaxSkanConfig(),
                 platform,
@@ -200,7 +202,7 @@ namespace Attriax.Unity.Internal
 
                     AttriaxPlayerPrefs.Save();
                 },
-                (message, detail) => DebugLog(message, detail),
+                NoopDebugLog,
                 (amountMicros, currency, occurredAt) => _generatedGateway.ConvertRevenueToUsdMicrosAsync(
                     _config.ProjectToken,
                     amountMicros,
@@ -220,9 +222,9 @@ namespace Attriax.Unity.Internal
                 _config.SessionHeartbeatIntervalMs,
                 new AttriaxPlayerPrefsSessionStore(
                     Key(SessionStorageKey),
-                    (message, detail) => DebugLog(message, detail)),
+                    NoopDebugLog),
                 this,
-                (message, detail) => DebugLog(message, detail));
+                NoopDebugLog);
             _appOpenManager = new AttriaxAppOpenManager(
                 _runtimeState,
                 this,
@@ -253,7 +255,7 @@ namespace Attriax.Unity.Internal
                 _requestQueue,
                 _skanManager,
                 RequestQueueFlush,
-                (message, detail) => DebugLog(message, detail));
+                NoopDebugLog);
             _activationCoordinator = new AttriaxRuntimeActivationCoordinator(
                 PersistEnabledState,
                 RefreshAppOpenDispatchGate,
@@ -533,13 +535,11 @@ namespace Attriax.Unity.Internal
 
             if (!_enabled)
             {
-                DebugLog("Skipping uninstall token because SDK is disabled.", provider.ToString());
                 return;
             }
 
             if (!_consentManager.CanCaptureUninstallTracking)
             {
-                DebugLog("Skipping uninstall token because GDPR consent blocked capture.", provider.ToString());
                 return;
             }
 
@@ -1430,10 +1430,6 @@ namespace Attriax.Unity.Internal
                         return;
                     }
 
-                    if (continuation.Exception?.InnerException != null)
-                    {
-                        DebugLog(message, continuation.Exception.InnerException);
-                    }
                 },
                 TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
         }
@@ -1654,14 +1650,12 @@ namespace Attriax.Unity.Internal
                                 ResolveRetryDelayMs()));
                     }
 
-                    DebugLog("Retryable SDK batch error; deferring queued payload.", normalizedError.Message);
                     return new BatchFlushResult(false, entries.Count);
                 }
 
                 if (entries.Count > 1)
                 {
                     var splitIndex = entries.Count / 2;
-                    DebugLog("SDK batch failed; splitting queued payload.", normalizedError.Message);
 
                     var firstResult = await FlushBatchEntriesAsync(entries.Take(splitIndex).ToList(), startIndex)
                         .ConfigureAwait(false);
@@ -3167,7 +3161,6 @@ namespace Attriax.Unity.Internal
             }
             catch (JsonException exception)
             {
-                DebugLog("Failed to parse stored GDPR consent while resolving runtime persistence mode.", exception.Message);
             }
 
             return AttriaxPlayerPrefsPersistenceMode.ConsentOnly;
@@ -3442,10 +3435,6 @@ namespace Attriax.Unity.Internal
                 GetCurrentPlatform(),
                 browserAction.Url,
                 browserAction.OpenMode).ConfigureAwait(false);
-            if (!opened)
-            {
-                DebugLog("SDK could not open the resolved browser URL.", browserAction.Url);
-            }
 
             return opened;
         }
