@@ -875,15 +875,9 @@ namespace Attriax.Unity.Internal
                 "installReferrerOverridePresent=" + (!string.IsNullOrWhiteSpace(installReferrerOverride))
                 + ", metadataCount=" + deviceMetadataOverrides.Count);
 
-            return AttriaxLifecycleDispatcher.InvokeOnMainThread(() =>
-            {
-                DebugLog(
-                    "Running prepared app-open scheduling on the Unity main thread.",
-                    "thread=" + System.Threading.Thread.CurrentThread.ManagedThreadId);
-                return _appOpenManager.ScheduleAsync(
-                    installReferrerOverride,
-                    deviceMetadataOverrides);
-            });
+            return _appOpenManager.ScheduleAsync(
+                installReferrerOverride,
+                deviceMetadataOverrides);
         }
 
         private Task HandleSdkRuntimeConfigLoadedAsync(AttriaxSdkRuntimeConfig runtimeConfig)
@@ -972,7 +966,8 @@ namespace Attriax.Unity.Internal
                     "Created queued app-open request envelope.",
                     "requestId=" + queuedRequest.Id);
 
-                queued = _requestQueue.Enqueue(queuedRequest);
+                queued = AttriaxLifecycleDispatcher.InvokeOnMainThread(
+                    () => _requestQueue.Enqueue(queuedRequest));
             }
             catch (Exception exception)
             {
