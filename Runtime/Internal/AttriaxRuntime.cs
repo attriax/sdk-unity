@@ -2751,6 +2751,36 @@ namespace Attriax.Unity.Internal
             return rawValue.ToString();
         }
 
+        private static long? ReadInt64(IDictionary<string, object> source, string key)
+        {
+            if (source == null || !source.TryGetValue(key, out var rawValue) || rawValue == null)
+            {
+                return null;
+            }
+
+            if (rawValue is long longValue)
+            {
+                return longValue;
+            }
+
+            if (rawValue is int intValue)
+            {
+                return intValue;
+            }
+
+            if (rawValue is JValue jValue)
+            {
+                return jValue.ToObject<long?>();
+            }
+
+            if (long.TryParse(rawValue.ToString(), out var parsed))
+            {
+                return parsed;
+            }
+
+            return null;
+        }
+
         private static T? DeepClone<T>(T? value)
             where T : class
         {
@@ -3990,7 +4020,7 @@ namespace Attriax.Unity.Internal
             var metadata = context.Metadata;
             return "hasReferrer=" + (!string.IsNullOrWhiteSpace(context.InstallReferrer))
                 + ", status=" + (ReadString(metadata, "installReferrerStatus") ?? "null")
-                + ", attempts=" + (ReadLong(metadata, "installReferrerAttempts")?.ToString() ?? "null")
+                + ", attempts=" + (ReadInt64(metadata, "installReferrerAttempts")?.ToString() ?? "null")
                 + ", clickTs=" + (context.ReferrerClickTimestampSeconds?.ToString() ?? "null")
                 + ", installTs=" + (context.InstallBeginTimestampSeconds?.ToString() ?? "null");
         }
