@@ -66,9 +66,20 @@ namespace Attriax.Unity.Internal
                 "Scheduling app-open task.",
                 "installReferrerOverridePresent=" + (!string.IsNullOrWhiteSpace(installReferrerOverride))
                 + ", metadataCount=" + (deviceMetadataOverrides != null ? deviceMetadataOverrides.Count : 0));
-            _openTrackingTask = _pipeline.EnqueueOpenAsync(
-                installReferrerOverride,
-                deviceMetadataOverrides);
+            try
+            {
+                _openTrackingTask = _pipeline.EnqueueOpenAsync(
+                    installReferrerOverride,
+                    deviceMetadataOverrides);
+            }
+            catch (Exception exception)
+            {
+                _debugLog(
+                    "App-open scheduling threw before the app-open task could be created.",
+                    exception.Message);
+                throw;
+            }
+
             _debugLog(
                 "App-open task created.",
                 "taskStatus=" + DescribeTaskStatus(_openTrackingTask));

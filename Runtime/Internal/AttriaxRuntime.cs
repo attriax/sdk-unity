@@ -945,16 +945,35 @@ namespace Attriax.Unity.Internal
                 + ", hasInstallReferrer=" + (!string.IsNullOrWhiteSpace(snapshot.RawPlatformInstallReferrer))
                 + ", sessionId=" + _sessionManager.CurrentSession.Id);
 
-            var queued = _requestQueue.Enqueue(
-                    AttriaxQueuedRequest.CreateOpen(
-                        AttriaxGeneratedRequestFactory.BuildOpenRequest(
-                            _config.ProjectToken,
-                            RequireDeviceIdSource(),
-                            snapshot,
-                            _sessionManager.CurrentSession,
-                            installReferrerOverride,
-                            deviceMetadataOverrides)))
-                ;
+            Task<object> queued;
+            try
+            {
+                var openRequest = AttriaxGeneratedRequestFactory.BuildOpenRequest(
+                    _config.ProjectToken,
+                    RequireDeviceIdSource(),
+                    snapshot,
+                    _sessionManager.CurrentSession,
+                    installReferrerOverride,
+                    deviceMetadataOverrides);
+                DebugLog(
+                    "Built app-open request payload.",
+                    "deviceId=" + openRequest.deviceId
+                    + ", installReferrerPresent=" + (!string.IsNullOrWhiteSpace(openRequest.installReferrer))
+                    + ", sessionId=" + (openRequest.sessionId ?? "null"));
+
+                var queuedRequest = AttriaxQueuedRequest.CreateOpen(openRequest);
+                DebugLog(
+                    "Created queued app-open request envelope.",
+                    "requestId=" + queuedRequest.Id);
+
+                queued = _requestQueue.Enqueue(queuedRequest);
+            }
+            catch (Exception exception)
+            {
+                DebugLog("Failed before the app-open request could be enqueued.", exception);
+                throw;
+            }
+
             DebugLog(
                 "App-open request was enqueued.",
                 "queueCount=" + _requestQueue.Count);
