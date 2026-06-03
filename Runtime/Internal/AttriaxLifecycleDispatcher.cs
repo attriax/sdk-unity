@@ -213,17 +213,20 @@ namespace Attriax.Unity.Internal
         private void Update()
         {
             BindToCurrentThread();
+            AttriaxPlayerPrefs.FlushPendingSave();
             Tick?.Invoke(Time.unscaledDeltaTime);
         }
 
         private void OnApplicationPause(bool pauseStatus)
         {
             ApplicationPaused?.Invoke(pauseStatus);
+            AttriaxPlayerPrefs.FlushPendingSave();
         }
 
         private void OnApplicationFocus(bool hasFocus)
         {
             ApplicationFocusChanged?.Invoke(hasFocus);
+            AttriaxPlayerPrefs.FlushPendingSave();
         }
 
         private static void HandleDeepLinkActivated(string url)
@@ -234,6 +237,7 @@ namespace Attriax.Unity.Internal
         private static void HandleApplicationQuit()
         {
             Quitting?.Invoke();
+            AttriaxPlayerPrefs.FlushPendingSave();
         }
 
         private static void HandleLogMessageReceived(string condition, string stackTrace, LogType type)
@@ -265,6 +269,7 @@ namespace Attriax.Unity.Internal
             new Dictionary<string, AttriaxPlayerPrefsPersistenceMode>(StringComparer.Ordinal);
         private static readonly Dictionary<string, object> MemoryValues =
             new Dictionary<string, object>(StringComparer.Ordinal);
+        private static int _pendingSaveRequested;
 
         public static void SetRuntimePersistenceMode(
             IEnumerable<string> runtimeKeys,
@@ -405,7 +410,17 @@ namespace Attriax.Unity.Internal
 
         public static void Save()
         {
-            AttriaxLifecycleDispatcher.InvokeOnMainThread(PlayerPrefs.Save);
+            Interlocked.Exchange(ref _pendingSaveRequested, 1);
+        }
+
+        internal static void FlushPendingSave()
+        {
+            if (Interlocked.Exchange(ref _pendingSaveRequested, 0) == 0)
+            {
+                return;
+            }
+
+            PlayerPrefs.Save();
         }
 
         private static bool TrackWriteAndCheckPersistence(string key, object value)

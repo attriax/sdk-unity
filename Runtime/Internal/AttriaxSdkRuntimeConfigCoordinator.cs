@@ -21,8 +21,8 @@ namespace Attriax.Unity.Internal
     internal sealed class AttriaxSdkRuntimeConfigCoordinator
     {
         private readonly Func<Task<AttriaxSdkRuntimeConfig>> _loadRuntimeConfigAsync;
-        private readonly Action<string, string?> _debugLog;
         private readonly Func<AttriaxSdkRuntimeConfig, Task>? _onLoadedAsync;
+        private readonly object _gate = new object();
 
         private Task<AttriaxSdkRuntimeConfig>? _inFlight;
         private AttriaxSdkRuntimeConfig _current = new AttriaxSdkRuntimeConfig();
@@ -30,28 +30,46 @@ namespace Attriax.Unity.Internal
 
         public AttriaxSdkRuntimeConfigCoordinator(
             Func<Task<AttriaxSdkRuntimeConfig>> loadRuntimeConfigAsync,
-            Action<string, string?> debugLog,
             Func<AttriaxSdkRuntimeConfig, Task>? onLoadedAsync = null)
         {
             _loadRuntimeConfigAsync = loadRuntimeConfigAsync ?? throw new ArgumentNullException(nameof(loadRuntimeConfigAsync));
-            _debugLog = debugLog ?? throw new ArgumentNullException(nameof(debugLog));
             _onLoadedAsync = onLoadedAsync;
         }
 
-        public AttriaxSdkRuntimeConfig Current => _current;
+        public AttriaxSdkRuntimeConfig Current
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _current;
+                }
+            }
+        }
 
         public void Reset()
         {
-            _inFlight = null;
-            _current = new AttriaxSdkRuntimeConfig();
-            _didResolve = false;
+            lock (_gate)
+            {
+                _inFlight = null;
+                _current = new AttriaxSdkRuntimeConfig();
+                _didResolve = false;
+            }
         }
 
         public void PrimeForLaunch(bool isInitialized, bool isEnabled)
         {
-            if (!isInitialized || !isEnabled || _didResolve || _inFlight != null)
+            if (!isInitialized || !isEnabled)
             {
                 return;
+            }
+
+            lock (_gate)
+            {
+                if (_didResolve || _inFlight != null)
+                {
+                    return;
+                }
             }
 
             _ = EnsureLoadedAsync();
@@ -59,22 +77,24 @@ namespace Attriax.Unity.Internal
 
         public Task<AttriaxSdkRuntimeConfig> EnsureLoadedAsync()
         {
-            var inFlight = _inFlight;
-            if (inFlight != null)
+            lock (_gate)
             {
-                return inFlight;
-            }
+                if (_inFlight != null)
+                {
+                    return _inFlight;
+                }
 
-            if (_didResolve)
-            {
-                return Task.FromResult(_current);
-            }
+                if (_didResolve)
+                {
+                    return Task.FromResult(_current);
+                }
 
-            var loading = LoadAsync();
-            Task<AttriaxSdkRuntimeConfig> trackedLoading = null!;
-            trackedLoading = TrackInFlightAsync(loading, () => trackedLoading);
-            _inFlight = trackedLoading;
-            return trackedLoading;
+                var loading = LoadAsync();
+                Task<AttriaxSdkRuntimeConfig> trackedLoading = null!;
+                trackedLoading = TrackInFlightAsync(loading, () => trackedLoading);
+                _inFlight = trackedLoading;
+                return trackedLoading;
+            }
         }
 
         private async Task<AttriaxSdkRuntimeConfig> TrackInFlightAsync(
@@ -87,9 +107,12 @@ namespace Attriax.Unity.Internal
             }
             finally
             {
-                if (ReferenceEquals(_inFlight, currentTask()))
+                lock (_gate)
                 {
-                    _inFlight = null;
+                    if (ReferenceEquals(_inFlight, currentTask()))
+                    {
+                        _inFlight = null;
+                    }
                 }
             }
         }
@@ -102,16 +125,16 @@ namespace Attriax.Unity.Internal
                 runtimeConfig = await _loadRuntimeConfigAsync().ConfigureAwait(false)
                     ?? new AttriaxSdkRuntimeConfig();
             }
-            catch (Exception error)
+            catch (Exception)
             {
-                _debugLog(
-                    "Attriax SDK runtime config load failed. Using in-memory defaults for this launch.",
-                    error.ToString());
                 runtimeConfig = new AttriaxSdkRuntimeConfig();
             }
 
-            _current = runtimeConfig;
-            _didResolve = true;
+            lock (_gate)
+            {
+                _current = runtimeConfig;
+                _didResolve = true;
+            }
 
             if (_onLoadedAsync != null)
             {

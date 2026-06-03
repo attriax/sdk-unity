@@ -19,121 +19,146 @@ namespace Attriax.Unity.Internal
 
         private readonly string _storageKey;
         private readonly int _maxQueueSize;
-        private readonly Action<string, string?> _debugLog;
+        private readonly object _gate = new object();
         private readonly List<AttriaxQueuedRequest> _entries;
         private readonly Dictionary<string, PendingRequest> _pendingRequests = new Dictionary<string, PendingRequest>();
 
-        public AttriaxRequestQueue(string storageKey, int maxQueueSize, Action<string, string?> debugLog)
+        public AttriaxRequestQueue(string storageKey, int maxQueueSize)
         {
             _storageKey = storageKey;
             _maxQueueSize = maxQueueSize;
-            _debugLog = debugLog;
             _entries = ReadQueue();
         }
 
-        public int Count => _entries.Count;
+        public int Count
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _entries.Count;
+                }
+            }
+        }
 
         public Task<object> Enqueue(AttriaxQueuedRequest request)
         {
-            _debugLog(
-                "Enqueuing request.",
-                DescribeRequest(request) + ", queueCountBefore=" + _entries.Count);
-            _entries.Add(request);
-            while (_entries.Count > _maxQueueSize)
+            if (request == null)
             {
-                var dropped = _entries[0];
-                _entries.RemoveAt(0);
-                Reject(dropped.Id, new AttriaxApiError(
-                    "Attriax queue entry was dropped because the queue reached capacity.",
-                    null,
-                    false,
-                    true));
+                throw new ArgumentNullException(nameof(request));
             }
 
-            WriteQueue();
-
             var pending = new PendingRequest();
-            _pendingRequests[request.Id] = pending;
-            _debugLog(
-                "Enqueued request.",
-                DescribeRequest(request) + ", queueCountAfter=" + _entries.Count);
+            List<PendingRequest>? droppedPendings = null;
+            lock (_gate)
+            {
+                _entries.Add(request);
+                while (_entries.Count > _maxQueueSize)
+                {
+                    var dropped = _entries[0];
+                    _entries.RemoveAt(0);
+                    if (_pendingRequests.TryGetValue(dropped.Id, out var droppedPending))
+                    {
+                        _pendingRequests.Remove(dropped.Id);
+                        droppedPendings ??= new List<PendingRequest>();
+                        droppedPendings.Add(droppedPending);
+                    }
+                }
+
+                WriteQueueUnderLock();
+                _pendingRequests[request.Id] = pending;
+            }
+
+            if (droppedPendings != null)
+            {
+                foreach (var droppedPending in droppedPendings)
+                {
+                    droppedPending.Reject(new AttriaxApiError(
+                        "Attriax queue entry was dropped because the queue reached capacity.",
+                        null,
+                        false,
+                        true));
+                }
+            }
+
             return pending.Task;
         }
 
         public AttriaxQueuedRequest Peek()
         {
-            if (_entries.Count == 0)
+            lock (_gate)
             {
-                throw new InvalidOperationException("The Attriax queue is empty.");
-            }
+                if (_entries.Count == 0)
+                {
+                    throw new InvalidOperationException("The Attriax queue is empty.");
+                }
 
-            return _entries[0];
+                return _entries[0];
+            }
         }
 
         public AttriaxQueuedRequest PeekAt(int index)
         {
-            if (index < 0 || index >= _entries.Count)
+            lock (_gate)
             {
-                throw new ArgumentOutOfRangeException(nameof(index));
-            }
+                if (index < 0 || index >= _entries.Count)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
 
-            return _entries[index];
+                return _entries[index];
+            }
         }
 
         public bool HasPendingOpen()
         {
-            return _entries.Exists(entry => entry.Kind == AttriaxQueuedRequestKind.Open);
+            lock (_gate)
+            {
+                return _entries.Exists(entry => entry.Kind == AttriaxQueuedRequestKind.Open);
+            }
         }
 
         public void PrioritizeOpenRequests()
         {
-            if (_entries.Count < 2)
+            lock (_gate)
             {
-                return;
-            }
-
-            var openEntries = new List<AttriaxQueuedRequest>();
-            var otherEntries = new List<AttriaxQueuedRequest>();
-
-            foreach (var entry in _entries)
-            {
-                if (entry.Kind == AttriaxQueuedRequestKind.Open)
+                if (_entries.Count < 2)
                 {
-                    openEntries.Add(entry);
+                    return;
                 }
-                else
+
+                var openEntries = new List<AttriaxQueuedRequest>();
+                var otherEntries = new List<AttriaxQueuedRequest>();
+
+                foreach (var entry in _entries)
                 {
-                    otherEntries.Add(entry);
+                    if (entry.Kind == AttriaxQueuedRequestKind.Open)
+                    {
+                        openEntries.Add(entry);
+                    }
+                    else
+                    {
+                        otherEntries.Add(entry);
+                    }
                 }
-            }
 
-            if (openEntries.Count == 0 || otherEntries.Count == 0)
-            {
-                return;
-            }
-
-            var changed = false;
-            for (var index = 0; index < openEntries.Count; index += 1)
-            {
-                if (!string.Equals(_entries[index].Id, openEntries[index].Id, StringComparison.Ordinal))
+                if (openEntries.Count == 0 || otherEntries.Count == 0)
                 {
-                    changed = true;
-                    break;
+                    return;
+                }
+
+                for (var index = 0; index < openEntries.Count; index += 1)
+                {
+                    if (!string.Equals(_entries[index].Id, openEntries[index].Id, StringComparison.Ordinal))
+                    {
+                        _entries.Clear();
+                        _entries.AddRange(openEntries);
+                        _entries.AddRange(otherEntries);
+                        WriteQueueUnderLock();
+                        return;
+                    }
                 }
             }
-
-            if (!changed)
-            {
-                return;
-            }
-
-            _entries.Clear();
-            _entries.AddRange(openEntries);
-            _entries.AddRange(otherEntries);
-            WriteQueue();
-            _debugLog(
-                "Reordered queue to prioritize open requests.",
-                "openCount=" + openEntries.Count + ", otherCount=" + otherEntries.Count);
         }
 
         public List<AttriaxQueuedRequest> PeekBatchablePrefix()
@@ -143,27 +168,30 @@ namespace Attriax.Unity.Internal
 
         public List<AttriaxQueuedRequest> PeekBatchablePrefix(int startIndex)
         {
-            var entries = new List<AttriaxQueuedRequest>();
-            AttriaxQueuedRequest? batchIdentityEntry = null;
-            for (var index = startIndex; index < _entries.Count; index += 1)
+            lock (_gate)
             {
-                var entry = _entries[index];
-                if (!IsBatchable(entry))
+                var entries = new List<AttriaxQueuedRequest>();
+                AttriaxQueuedRequest? batchIdentityEntry = null;
+                for (var index = startIndex; index < _entries.Count; index += 1)
                 {
-                    break;
+                    var entry = _entries[index];
+                    if (!IsBatchable(entry))
+                    {
+                        break;
+                    }
+
+                    if (batchIdentityEntry != null && !CanShareBatchEnvelope(batchIdentityEntry, entry))
+                    {
+                        break;
+                    }
+
+                    batchIdentityEntry ??= entry;
+
+                    entries.Add(entry);
                 }
 
-                if (batchIdentityEntry != null && !CanShareBatchEnvelope(batchIdentityEntry, entry))
-                {
-                    break;
-                }
-
-                batchIdentityEntry ??= entry;
-
-                entries.Add(entry);
+                return entries;
             }
-
-            return entries;
         }
 
         public void RemoveFirst()
@@ -183,22 +211,22 @@ namespace Attriax.Unity.Internal
 
         public void RemoveRange(int index, int count)
         {
-            if (_entries.Count == 0 || count <= 0)
+            lock (_gate)
             {
-                return;
-            }
+                if (_entries.Count == 0 || count <= 0)
+                {
+                    return;
+                }
 
-            if (index < 0 || index >= _entries.Count)
-            {
-                throw new ArgumentOutOfRangeException(nameof(index));
-            }
+                if (index < 0 || index >= _entries.Count)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
 
-            var removeCount = Math.Min(count, _entries.Count - index);
-            _debugLog(
-                "Removing queued request range.",
-                "index=" + index + ", count=" + removeCount + ", queueCountBefore=" + _entries.Count);
-            _entries.RemoveRange(index, removeCount);
-            WriteQueue();
+                var removeCount = Math.Min(count, _entries.Count - index);
+                _entries.RemoveRange(index, removeCount);
+                WriteQueueUnderLock();
+            }
         }
 
         public void ReplaceAt(int index, AttriaxQueuedRequest entry)
@@ -208,129 +236,173 @@ namespace Attriax.Unity.Internal
                 throw new ArgumentNullException(nameof(entry));
             }
 
-            if (index < 0 || index >= _entries.Count)
+            lock (_gate)
             {
-                throw new ArgumentOutOfRangeException(nameof(index));
-            }
+                if (index < 0 || index >= _entries.Count)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
 
-            _debugLog(
-                "Replacing queued request entry.",
-                "index=" + index + ", request=" + DescribeRequest(entry));
-            _entries[index] = entry;
-            WriteQueue();
+                _entries[index] = entry;
+                WriteQueueUnderLock();
+            }
         }
 
         public DateTimeOffset? PeekEarliestRetryAt()
         {
-            DateTimeOffset? earliestRetryAt = null;
-            foreach (var entry in _entries)
+            lock (_gate)
             {
-                if (!entry.NextRetryAt.HasValue)
+                DateTimeOffset? earliestRetryAt = null;
+                foreach (var entry in _entries)
                 {
-                    continue;
+                    if (!entry.NextRetryAt.HasValue)
+                    {
+                        continue;
+                    }
+
+                    if (!earliestRetryAt.HasValue || entry.NextRetryAt.Value < earliestRetryAt.Value)
+                    {
+                        earliestRetryAt = entry.NextRetryAt.Value;
+                    }
                 }
 
-                if (!earliestRetryAt.HasValue || entry.NextRetryAt.Value < earliestRetryAt.Value)
-                {
-                    earliestRetryAt = entry.NextRetryAt.Value;
-                }
+                return earliestRetryAt;
             }
-
-            return earliestRetryAt;
         }
 
         public void Complete(string id, object value)
         {
-            if (!_pendingRequests.TryGetValue(id, out var pending))
+            PendingRequest? pending;
+            lock (_gate)
             {
-                _debugLog("Skipping queue completion because no pending request was found.", "id=" + id);
-                return;
+                if (!_pendingRequests.TryGetValue(id, out pending))
+                {
+                    return;
+                }
+
+                _pendingRequests.Remove(id);
             }
 
-            _pendingRequests.Remove(id);
-            _debugLog("Completing queued request.", "id=" + id);
             pending.Resolve(value);
         }
 
         public void Reject(string id, Exception error)
         {
-            if (!_pendingRequests.TryGetValue(id, out var pending))
+            PendingRequest? pending;
+            lock (_gate)
             {
-                _debugLog("Skipping queue rejection because no pending request was found.", "id=" + id);
-                return;
+                if (!_pendingRequests.TryGetValue(id, out pending))
+                {
+                    return;
+                }
+
+                _pendingRequests.Remove(id);
             }
 
-            _pendingRequests.Remove(id);
-            _debugLog(
-                "Rejecting queued request.",
-                "id=" + id + ", error=" + error.Message);
             pending.Reject(error);
         }
 
         public void RejectAll(Exception error)
         {
-            foreach (var pending in _pendingRequests.Values)
+            List<PendingRequest> pendingRequests;
+            lock (_gate)
+            {
+                pendingRequests = new List<PendingRequest>(_pendingRequests.Values);
+                _pendingRequests.Clear();
+            }
+
+            foreach (var pending in pendingRequests)
             {
                 pending.Reject(error);
             }
-
-            _pendingRequests.Clear();
         }
 
         public void Clear(Exception error)
         {
-            RejectAll(error);
-            _entries.Clear();
+            List<PendingRequest> pendingRequests;
+            lock (_gate)
+            {
+                pendingRequests = new List<PendingRequest>(_pendingRequests.Values);
+                _pendingRequests.Clear();
+                _entries.Clear();
+            }
+
+            foreach (var pending in pendingRequests)
+            {
+                pending.Reject(error);
+            }
+
             AttriaxPlayerPrefs.DeleteKey(_storageKey);
             AttriaxPlayerPrefs.Save();
         }
 
         public void DiscardWhere(Predicate<AttriaxQueuedRequest> predicate, Exception error)
         {
+            List<PendingRequest>? rejectedPendings = null;
             var changed = false;
-            for (var index = _entries.Count - 1; index >= 0; index -= 1)
+            lock (_gate)
             {
-                var entry = _entries[index];
-                if (!predicate(entry))
+                for (var index = _entries.Count - 1; index >= 0; index -= 1)
                 {
-                    continue;
+                    var entry = _entries[index];
+                    if (!predicate(entry))
+                    {
+                        continue;
+                    }
+
+                    _entries.RemoveAt(index);
+                    if (_pendingRequests.TryGetValue(entry.Id, out var pending))
+                    {
+                        _pendingRequests.Remove(entry.Id);
+                        rejectedPendings ??= new List<PendingRequest>();
+                        rejectedPendings.Add(pending);
+                    }
+
+                    changed = true;
                 }
 
-                _entries.RemoveAt(index);
-                Reject(entry.Id, error);
-                changed = true;
+                if (changed)
+                {
+                    WriteQueueUnderLock();
+                }
             }
 
-            if (!changed)
+            if (rejectedPendings == null)
             {
                 return;
             }
 
-            WriteQueue();
+            foreach (var pending in rejectedPendings)
+            {
+                pending.Reject(error);
+            }
         }
 
         public int RewriteWhere(
             Predicate<AttriaxQueuedRequest> predicate,
             Action<AttriaxQueuedRequest> rewrite)
         {
-            var changed = 0;
-            foreach (var entry in _entries)
+            lock (_gate)
             {
-                if (!predicate(entry))
+                var changed = 0;
+                foreach (var entry in _entries)
                 {
-                    continue;
+                    if (!predicate(entry))
+                    {
+                        continue;
+                    }
+
+                    rewrite(entry);
+                    changed += 1;
                 }
 
-                rewrite(entry);
-                changed += 1;
-            }
+                if (changed > 0)
+                {
+                    WriteQueueUnderLock();
+                }
 
-            if (changed > 0)
-            {
-                WriteQueue();
+                return changed;
             }
-
-            return changed;
         }
 
         private List<AttriaxQueuedRequest> ReadQueue()
@@ -346,7 +418,6 @@ namespace Attriax.Unity.Internal
                 var envelope = JsonConvert.DeserializeObject<QueueEnvelope>(raw);
                 if (envelope == null || envelope.Version != QueueSchemaVersion || envelope.Entries == null)
                 {
-                    _debugLog("Discarding queue payload with unsupported schema version.", null);
                     return new List<AttriaxQueuedRequest>();
                 }
 
@@ -354,12 +425,11 @@ namespace Attriax.Unity.Internal
             }
             catch (Exception error)
             {
-                _debugLog("Failed to parse queue from storage. Resetting the persisted queue.", error.Message);
                 return new List<AttriaxQueuedRequest>();
             }
         }
 
-        private void WriteQueue()
+        private void WriteQueueUnderLock()
         {
             var serialized = JsonConvert.SerializeObject(new QueueEnvelope
             {
@@ -368,14 +438,6 @@ namespace Attriax.Unity.Internal
             });
             AttriaxPlayerPrefs.SetString(_storageKey, serialized);
             AttriaxPlayerPrefs.Save();
-        }
-
-        private static string DescribeRequest(AttriaxQueuedRequest request)
-        {
-            return "id=" + request.Id
-                + ", kind=" + request.Kind
-                + ", attempt=" + request.AttemptCount
-                + ", nextRetryAt=" + (request.NextRetryAt.HasValue ? request.NextRetryAt.Value.ToString("O") : "null");
         }
 
         [Serializable]

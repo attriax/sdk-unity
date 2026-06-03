@@ -48,11 +48,8 @@ namespace Attriax.Unity.Internal
                 {
                     return JsonConvert.DeserializeObject<AttriaxInstallReferrerDetails>(serialized);
                 }
-                catch (JsonException exception)
+                catch (JsonException)
                 {
-                    _runtime.DebugLog(
-                        "Failed to parse persisted install-referrer details. Discarding the cached payload.",
-                        exception);
                     return null;
                 }
             }

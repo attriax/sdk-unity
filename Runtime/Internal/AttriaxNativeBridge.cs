@@ -50,24 +50,13 @@ namespace Attriax.Unity.Internal
         internal static Task<AttriaxInstallReferrerContextPayload> CollectInstallReferrerAsync(
             AttriaxPlatformType platform)
         {
-            NativeDebugLog("CollectInstallReferrerAsync invoked.", "platform=" + platform);
             switch (platform)
             {
                 case AttriaxPlatformType.Android:
-                    var androidPayload = CallAndroidBridge("collectInstallReferrerJson");
-                    NativeDebugLog(
-                        "Android install referrer bridge call completed.",
-                        "payloadLength=" + (androidPayload != null ? androidPayload.Length.ToString() : "null"));
-                    return Task.FromResult(
-                        ParseInstallReferrerContext(androidPayload));
+                    return Task.FromResult(ParseInstallReferrerContext(CallAndroidBridge("collectInstallReferrerJson")));
                 case AttriaxPlatformType.IOS:
-                    var iosPayload = CallIosInstallReferrer();
-                    NativeDebugLog(
-                        "iOS install referrer bridge call completed.",
-                        "payloadLength=" + (iosPayload != null ? iosPayload.Length.ToString() : "null"));
-                    return Task.FromResult(ParseInstallReferrerContext(iosPayload));
+                    return Task.FromResult(ParseInstallReferrerContext(CallIosInstallReferrer()));
                 default:
-                    NativeDebugLog("Install referrer bridge is not supported on this platform.", "platform=" + platform);
                     return Task.FromResult(new AttriaxInstallReferrerContextPayload());
             }
         }
@@ -209,7 +198,6 @@ namespace Attriax.Unity.Internal
         {
             if (string.IsNullOrWhiteSpace(payload))
             {
-                NativeDebugLog("Install referrer payload was empty.", (string?)null);
                 return new AttriaxInstallReferrerContextPayload();
             }
 
@@ -224,15 +212,10 @@ namespace Attriax.Unity.Internal
                     GooglePlayInstantParam = json.Value<bool?>("googlePlayInstantParam"),
                     Metadata = ReadMetadata(json),
                 };
-                NativeDebugLog(
-                    "Parsed install referrer payload.",
-                    "hasReferrer=" + (!string.IsNullOrWhiteSpace(context.InstallReferrer))
-                    + ", status=" + ReadMetadataValue(context.Metadata, "installReferrerStatus"));
                 return context;
             }
             catch (Exception error)
             {
-                NativeDebugLog("Failed to parse install referrer payload.", error.Message);
                 return new AttriaxInstallReferrerContextPayload
                 {
                     Metadata = new Dictionary<string, object>
@@ -433,27 +416,6 @@ namespace Attriax.Unity.Internal
             return openMode == AttriaxResolvedUrlOpenMode.External
             ? "external"
             : "in_app";
-        }
-
-        private static void NativeDebugLog(string message, string? detail)
-        {
-            if (string.IsNullOrWhiteSpace(detail))
-            {
-                UnityEngine.Debug.Log("[Attriax Native] " + message);
-                return;
-            }
-
-            UnityEngine.Debug.Log("[Attriax Native] " + message + " " + detail);
-        }
-
-        private static string ReadMetadataValue(IDictionary<string, object> metadata, string key)
-        {
-            if (!metadata.TryGetValue(key, out var value) || value == null)
-            {
-                return "null";
-            }
-
-            return value.ToString() ?? "null";
         }
 
         private static string? NormalizeSkanCoarseValue(AttriaxSkanCoarseValue? coarseValue)

@@ -22,7 +22,7 @@ namespace Attriax.Unity.Internal
     internal sealed class AttriaxContextManager
     {
         private readonly IAttriaxContextRefreshProvider _refreshProvider;
-        private readonly Action<string, string?> _debugLog;
+        private readonly object _gate = new object();
 
         private Task<AttriaxContextSnapshot>? _resolvedContextTask;
         private bool _resolvedContextIncludesInstallReferrer;
@@ -30,90 +30,76 @@ namespace Attriax.Unity.Internal
         private int _generation;
 
         public AttriaxContextManager(
-            IAttriaxContextRefreshProvider refreshProvider,
-            Action<string, string?> debugLog)
+            IAttriaxContextRefreshProvider refreshProvider)
         {
             _refreshProvider = refreshProvider;
-            _debugLog = debugLog;
         }
 
         public AttriaxContextSnapshot Snapshot =>
-            _snapshot ?? throw new InvalidOperationException("Attriax context has not been initialized.");
+            GetSnapshotOrThrow();
 
         public void SetPreparedContext(
             AttriaxPreparedContextRefresh preparedContext,
             bool includesInstallReferrer)
         {
-            var generation = _generation;
-            _snapshot = preparedContext.InitialSnapshot;
-            _resolvedContextTask = ResolveContextSnapshotSafelyAsync(
-                preparedContext.ResolvedSnapshotTask,
-                generation);
-            _resolvedContextIncludesInstallReferrer = includesInstallReferrer;
-            _debugLog(
-                "Stored prepared context snapshot.",
-                "generation=" + generation
-                + ", includesInstallReferrer=" + includesInstallReferrer
-                + ", platform=" + preparedContext.InitialSnapshot.Platform
-                + ", resolvedTaskStatus=" + DescribeTaskStatus(_resolvedContextTask));
+            lock (_gate)
+            {
+                var generation = _generation;
+                _snapshot = preparedContext.InitialSnapshot;
+                _resolvedContextTask = ResolveContextSnapshotSafelyAsync(
+                    preparedContext.ResolvedSnapshotTask,
+                    generation);
+                _resolvedContextIncludesInstallReferrer = includesInstallReferrer;
+            }
         }
 
         public void Reset()
         {
-            _generation += 1;
-            _resolvedContextTask = null;
-            _resolvedContextIncludesInstallReferrer = false;
-            _snapshot = null;
-            _debugLog("Reset context manager state.", "generation=" + _generation);
+            lock (_gate)
+            {
+                _generation += 1;
+                _resolvedContextTask = null;
+                _resolvedContextIncludesInstallReferrer = false;
+                _snapshot = null;
+            }
         }
 
         public Task<AttriaxContextSnapshot> EnsureResolvedForAppOpenAsync()
         {
-            if (_resolvedContextTask != null && _resolvedContextIncludesInstallReferrer)
+            lock (_gate)
             {
-                _debugLog(
-                    "Reusing existing resolved context task for app-open.",
-                    "generation=" + _generation
-                    + ", status=" + DescribeTaskStatus(_resolvedContextTask));
+                if (_resolvedContextTask != null && _resolvedContextIncludesInstallReferrer)
+                {
+                    return _resolvedContextTask;
+                }
+
+                _resolvedContextIncludesInstallReferrer = true;
+                _resolvedContextTask = RefreshResolvedForAppOpenAsync();
                 return _resolvedContextTask;
             }
-
-            _debugLog(
-                "Refreshing context for app-open install-referrer resolution.",
-                "generation=" + _generation
-                + ", hadTask=" + (_resolvedContextTask != null)
-                + ", includesInstallReferrer=" + _resolvedContextIncludesInstallReferrer);
-            _resolvedContextIncludesInstallReferrer = true;
-            _resolvedContextTask = RefreshResolvedForAppOpenAsync();
-            return _resolvedContextTask;
         }
 
         private async Task<AttriaxContextSnapshot> RefreshResolvedForAppOpenAsync()
         {
-            var generation = _generation;
-            _debugLog(
-                "Preparing refreshed context for app-open.",
-                "generation=" + generation);
-            var preparedContext = await _refreshProvider.PrepareContextRefreshAsync(true)
-                .ConfigureAwait(false);
-            _debugLog(
-                "Prepared refreshed context for app-open.",
-                "generation=" + generation
-                + ", platform=" + preparedContext.InitialSnapshot.Platform
-                + ", resolvedTaskStatus=" + DescribeTaskStatus(preparedContext.ResolvedSnapshotTask));
-
-            if (generation != _generation)
+            int generation;
+            lock (_gate)
             {
-                _debugLog(
-                    "Discarding prepared app-open context because the generation changed.",
-                    "preparedGeneration=" + generation + ", currentGeneration=" + _generation);
-                return preparedContext.InitialSnapshot;
+                generation = _generation;
             }
 
-            _snapshot = preparedContext.InitialSnapshot;
-            _debugLog(
-                "Awaiting resolved app-open context snapshot.",
-                "generation=" + generation);
+            var preparedContext = await _refreshProvider.PrepareContextRefreshAsync(true)
+                .ConfigureAwait(false);
+
+            lock (_gate)
+            {
+                if (generation != _generation)
+                {
+                    return preparedContext.InitialSnapshot;
+                }
+
+                _snapshot = preparedContext.InitialSnapshot;
+            }
+
             return await ResolveContextSnapshotSafelyAsync(
                     preparedContext.ResolvedSnapshotTask,
                     generation)
@@ -126,41 +112,37 @@ namespace Attriax.Unity.Internal
         {
             try
             {
-                _debugLog(
-                    "Waiting for resolved context snapshot task.",
-                    "generation=" + generation
-                    + ", taskStatus=" + DescribeTaskStatus(resolvedSnapshotTask));
                 var resolvedSnapshot = await resolvedSnapshotTask.ConfigureAwait(false);
-                if (generation == _generation)
+                lock (_gate)
                 {
-                    _snapshot = resolvedSnapshot;
+                    if (generation == _generation)
+                    {
+                        _snapshot = resolvedSnapshot;
+                    }
                 }
-
-                _debugLog(
-                    "Resolved context snapshot task completed.",
-                    "generation=" + generation
-                    + ", currentGeneration=" + _generation
-                    + ", platform=" + resolvedSnapshot.Platform);
 
                 return resolvedSnapshot;
             }
             catch (Exception exception)
             {
-                if (generation != _generation || _snapshot == null)
+                lock (_gate)
                 {
-                    throw;
-                }
+                    if (generation != _generation || _snapshot == null)
+                    {
+                        throw;
+                    }
 
-                _debugLog(
-                    "Failed to resolve the background install-referrer context.",
-                    exception.Message);
-                return Snapshot;
+                    return _snapshot;
+                }
             }
         }
 
-        private static string DescribeTaskStatus(Task? task)
+        private AttriaxContextSnapshot GetSnapshotOrThrow()
         {
-            return task == null ? "null" : task.Status.ToString();
+            lock (_gate)
+            {
+                return _snapshot ?? throw new InvalidOperationException("Attriax context has not been initialized.");
+            }
         }
     }
 }

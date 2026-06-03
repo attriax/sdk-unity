@@ -34,7 +34,7 @@ namespace Attriax.Unity.Tests
             PlayerPrefs.SetString(storageKey, "{ definitely-not-json }");
             PlayerPrefs.Save();
 
-            var queue = new AttriaxRequestQueue(storageKey, 8, (_, _) => { });
+            var queue = new AttriaxRequestQueue(storageKey, 8);
 
             Assert.That(queue.Count, Is.EqualTo(0));
         }
@@ -43,7 +43,7 @@ namespace Attriax.Unity.Tests
         public async Task ClearRejectsPendingRequestsAndRemovesPersistedQueue()
         {
             var storageKey = NewStorageKey();
-            var queue = new AttriaxRequestQueue(storageKey, 8, (_, _) => { });
+            var queue = new AttriaxRequestQueue(storageKey, 8);
             var pendingTask = queue.Enqueue(AttriaxQueuedRequest.CreateEvent(CreateEventRequest("first")));
 
             queue.Clear(new InvalidOperationException("cleared"));
@@ -130,7 +130,7 @@ namespace Attriax.Unity.Tests
         public void RetryMetadataPersistsAndReportsEarliestRetryAt()
         {
             var storageKey = NewStorageKey();
-            var queue = new AttriaxRequestQueue(storageKey, 8, (_, _) => { });
+            var queue = new AttriaxRequestQueue(storageKey, 8);
             _ = queue.Enqueue(AttriaxQueuedRequest.CreateEvent(CreateEventRequest("event-1")));
             _ = queue.Enqueue(AttriaxQueuedRequest.CreateEvent(CreateEventRequest("event-2")));
 
@@ -151,7 +151,7 @@ namespace Attriax.Unity.Tests
                     attemptedAt,
                     60000));
 
-            var reloaded = new AttriaxRequestQueue(storageKey, 8, (_, _) => { });
+            var reloaded = new AttriaxRequestQueue(storageKey, 8);
             var first = reloaded.PeekAt(0);
             var second = reloaded.PeekAt(1);
 
@@ -210,7 +210,7 @@ namespace Attriax.Unity.Tests
 
             try
             {
-                var queue = new AttriaxRequestQueue(storageKey, 8, (_, _) => { });
+                var queue = new AttriaxRequestQueue(storageKey, 8);
 
                 _ = queue.Enqueue(AttriaxQueuedRequest.CreateEvent(CreateEventRequest("memory_only")));
 
@@ -234,7 +234,7 @@ namespace Attriax.Unity.Tests
 
         private AttriaxRequestQueue CreateQueue()
         {
-            return new AttriaxRequestQueue(NewStorageKey(), 8, (_, _) => { });
+            return new AttriaxRequestQueue(NewStorageKey(), 8);
         }
 
         private string NewStorageKey()
