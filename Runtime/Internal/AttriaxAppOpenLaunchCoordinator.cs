@@ -50,6 +50,8 @@ namespace Attriax.Unity.Internal
                 return Task.CompletedTask;
             }
 
+            Task? scheduling = null;
+
             lock (_gate)
             {
                 if (_inFlight != null)
@@ -57,7 +59,6 @@ namespace Attriax.Unity.Internal
                     return _inFlight;
                 }
 
-                Task scheduling = null!;
                 scheduling = RunAsync();
                 _inFlight = scheduling;
                 return scheduling;
