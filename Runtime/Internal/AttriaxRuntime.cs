@@ -227,7 +227,8 @@ namespace Attriax.Unity.Internal
             _appOpenManager = new AttriaxAppOpenManager(
                 _runtimeState,
                 this,
-                _eventHub);
+                _eventHub,
+                (message, detail) => DebugLog(message, detail));
             _iosAppOpenEnrichmentManager = new AttriaxIosAppOpenEnrichmentManager(platform);
             _sdkRuntimeConfigCoordinator = new AttriaxSdkRuntimeConfigCoordinator(
                 LoadSdkRuntimeConfigAsync,
@@ -243,7 +244,8 @@ namespace Attriax.Unity.Internal
                     .InstallReferrerOverrideForAppOpen(
                         clipboardAttributionEnabled,
                         allowsAttributionTracking),
-                SchedulePreparedAppOpenAsync);
+                SchedulePreparedAppOpenAsync,
+                (message, detail) => DebugLog(message, detail));
             _trackingManager = new AttriaxTrackingManager(
                 _config.ProjectToken,
                 _config.FlushEventsImmediatelyOnFirstLaunch,
@@ -864,8 +866,14 @@ namespace Attriax.Unity.Internal
         {
             if (_disposed)
             {
+                DebugLog("Skipping prepared app-open scheduling because the runtime is disposed.", (string?)null);
                 return Task.CompletedTask;
             }
+
+            DebugLog(
+                "Scheduling prepared app-open through the app-open manager.",
+                "installReferrerOverridePresent=" + (!string.IsNullOrWhiteSpace(installReferrerOverride))
+                + ", metadataCount=" + deviceMetadataOverrides.Count);
 
             return _appOpenManager.ScheduleAsync(
                 installReferrerOverride,
@@ -925,8 +933,18 @@ namespace Attriax.Unity.Internal
             string? installReferrerOverride,
             IDictionary<string, object>? deviceMetadataOverrides)
         {
+            DebugLog(
+                "Waiting for resolved app-open context before enqueueing app-open.",
+                "installReferrerOverridePresent=" + (!string.IsNullOrWhiteSpace(installReferrerOverride))
+                + ", metadataCount=" + (deviceMetadataOverrides != null ? deviceMetadataOverrides.Count : 0));
             var snapshot = await _contextManager.EnsureResolvedForAppOpenAsync()
                 .ConfigureAwait(false);
+            DebugLog(
+                "Resolved app-open context is ready; enqueueing app-open.",
+                "platform=" + snapshot.Platform
+                + ", hasInstallReferrer=" + (!string.IsNullOrWhiteSpace(snapshot.RawPlatformInstallReferrer))
+                + ", sessionId=" + _sessionManager.CurrentSession.Id);
+
             var queued = _requestQueue.Enqueue(
                     AttriaxQueuedRequest.CreateOpen(
                         AttriaxGeneratedRequestFactory.BuildOpenRequest(
@@ -937,7 +955,11 @@ namespace Attriax.Unity.Internal
                             installReferrerOverride,
                             deviceMetadataOverrides)))
                 ;
+            DebugLog(
+                "App-open request was enqueued.",
+                "queueCount=" + _requestQueue.Count);
             RequestQueueFlush(true);
+            DebugLog("Waiting for app-open queue completion task.", (string?)null);
             return await queued.ContinueWith(
                 task =>
                 {
@@ -999,6 +1021,13 @@ namespace Attriax.Unity.Internal
                     PersistInstallReferrer(currentInstallReferrerDetails.RawPlatformInstallReferrer!);
                 }
 
+                DebugLog(
+                    "Resolved install referrer details from app-open result.",
+                    "hasOriginal=" + (originalInstallReferrerDetails != null)
+                    + ", hasReinstall=" + (reinstallReferrerDetails != null)
+                    + ", hasCurrent=" + (currentInstallReferrerDetails != null)
+                    + ", hasRawReferrer=" + (!string.IsNullOrWhiteSpace(currentInstallReferrerDetails?.RawPlatformInstallReferrer)));
+
                 CompleteOriginalInstallReferrer(originalInstallReferrerDetails);
                 CompleteReinstallInstallReferrer(reinstallReferrerDetails);
             }
@@ -1020,6 +1049,9 @@ namespace Attriax.Unity.Internal
         {
             var generation = _backgroundTaskGeneration;
             var platform = GetCurrentPlatform();
+            DebugLog(
+                "Resolving local install referrer for denied consent state.",
+                "generation=" + generation + ", platform=" + platform);
             if (platform != AttriaxPlatformType.Android)
             {
                 CompleteOriginalInstallReferrer(null);
@@ -1031,6 +1063,9 @@ namespace Attriax.Unity.Internal
             var context = await CollectInstallReferrerContextAsync(platform).ConfigureAwait(false);
             if (generation != _backgroundTaskGeneration)
             {
+                DebugLog(
+                    "Ignoring denied-consent install referrer resolution because the runtime generation changed.",
+                    "generation=" + generation + ", currentGeneration=" + _backgroundTaskGeneration);
                 return;
             }
 
@@ -1042,6 +1077,10 @@ namespace Attriax.Unity.Internal
                 PersistInstallReferrerDetails(ReinstallReferrerDetailsStorageKey, details);
             }
 
+            DebugLog(
+                "Completed denied-consent local install referrer resolution.",
+                "hasDetails=" + (details != null)
+                + ", hasRawReferrer=" + (!string.IsNullOrWhiteSpace(details?.RawPlatformInstallReferrer)));
             CompleteOriginalInstallReferrer(details);
             CompleteReinstallInstallReferrer(details);
             _deepLinkManager.MarkAppOpenUnavailable();
@@ -1360,13 +1399,24 @@ namespace Attriax.Unity.Internal
 
         private void RequestQueueFlush(bool immediate)
         {
+            DebugLog(
+                "Queue flush requested.",
+                "immediate=" + immediate
+                + ", queueCount=" + _requestQueue.Count
+                + ", consentDefers=" + _consentManager.ShouldDeferNetworkDispatch
+                + ", shouldGateOnAppOpen=" + _shouldGateRequestsOnSuccessfulAppOpen
+                + ", hasSuccessfulAppOpen=" + _appOpenManager.HasSuccessfulResult
+                + ", hasPendingOpen=" + _requestQueue.HasPendingOpen()
+                + ", flushTaskStatus=" + DescribeTaskStatus(_flushTask));
             if (_requestQueue.Count == 0)
             {
+                DebugLog("Skipping queue flush because the queue is empty.", (string?)null);
                 return;
             }
 
             if (_consentManager.ShouldDeferNetworkDispatch)
             {
+                DebugLog("Deferring queue flush because GDPR consent currently blocks network dispatch.", (string?)null);
                 _deferredFlushDueAt = null;
                 SetSynchronizationState(AttriaxSynchronizationState.Deferred);
                 return;
@@ -1374,6 +1424,9 @@ namespace Attriax.Unity.Internal
 
             if (_shouldGateRequestsOnSuccessfulAppOpen && !_appOpenManager.HasSuccessfulResult)
             {
+                DebugLog(
+                    "Queue flush is gated on a successful app-open; ensuring launch preparation is scheduled.",
+                    "appOpenCurrentTaskStatus=" + DescribeTaskStatus(_appOpenManager.CurrentTask));
                 ScheduleLaunchPreparationIfNeeded();
             }
 
@@ -1381,6 +1434,7 @@ namespace Attriax.Unity.Internal
             {
                 SetSynchronizationState(AttriaxSynchronizationState.Synchronizing);
                 _deferredFlushDueAt = null;
+                DebugLog("Starting immediate queue flush.", (string?)null);
                 _ = FlushAsync();
                 return;
             }
@@ -1395,6 +1449,9 @@ namespace Attriax.Unity.Internal
             }
 
             SetSynchronizationState(AttriaxSynchronizationState.Deferred);
+            DebugLog(
+                "Scheduled deferred queue flush.",
+                "dueAt=" + (_deferredFlushDueAt.HasValue ? _deferredFlushDueAt.Value.ToString("O") : "null"));
         }
 
         private void ScheduleFlushAt(DateTimeOffset scheduledAt)
@@ -1444,20 +1501,30 @@ namespace Attriax.Unity.Internal
 
         private async Task FlushInternalAsync()
         {
+            DebugLog(
+                "Starting internal queue flush.",
+                "queueCount=" + _requestQueue.Count
+                + ", enabled=" + _enabled
+                + ", disposed=" + _disposed
+                + ", consentDefers=" + _consentManager.ShouldDeferNetworkDispatch
+                + ", online=" + IsOnline());
             if (_disposed || !_enabled)
             {
+                DebugLog("Aborting queue flush because the runtime is disabled or disposed.", (string?)null);
                 SetSynchronizationState(AttriaxSynchronizationState.Disabled);
                 return;
             }
 
             if (_consentManager.ShouldDeferNetworkDispatch)
             {
+                DebugLog("Aborting queue flush because GDPR consent still defers network dispatch.", (string?)null);
                 SetSynchronizationState(AttriaxSynchronizationState.Deferred);
                 return;
             }
 
             if (!IsOnline())
             {
+                DebugLog("Aborting queue flush because the runtime is offline.", (string?)null);
                 SetSynchronizationState(AttriaxSynchronizationState.Offline);
                 ScheduleRetryFlush();
                 return;
@@ -1465,6 +1532,7 @@ namespace Attriax.Unity.Internal
 
             if (_requestQueue.Count == 0)
             {
+                DebugLog("Queue flush found no pending entries.", (string?)null);
                 SetSynchronizationState(AttriaxSynchronizationState.Synchronized);
                 return;
             }
@@ -1473,6 +1541,7 @@ namespace Attriax.Unity.Internal
 
             if (_requestQueue.Count == 0)
             {
+                DebugLog("Queue became empty after consent-based rewrites/purges.", (string?)null);
                 SetSynchronizationState(AttriaxSynchronizationState.Synchronized);
                 return;
             }
@@ -1485,9 +1554,15 @@ namespace Attriax.Unity.Internal
             {
                 var now = DateTimeOffset.UtcNow;
                 var entry = _requestQueue.PeekAt(queueIndex);
+                DebugLog(
+                    "Inspecting queued request during flush.",
+                    DescribeQueuedRequest(entry, queueIndex));
 
                 if (_config.GdprEnabled && !_consentManager.IsWaitingForConsent && !IsRequestAllowedByResolvedConsent(entry))
                 {
+                    DebugLog(
+                        "Dropping queued request because resolved GDPR consent blocks it.",
+                        DescribeQueuedRequest(entry, queueIndex));
                     _requestQueue.RemoveAt(queueIndex);
                     _requestQueue.Reject(entry.Id, new AttriaxApiError(
                         "Queued request was dropped because GDPR consent blocked this category.",
@@ -1500,6 +1575,9 @@ namespace Attriax.Unity.Internal
                 var retryDropReason = AttriaxQueueRetryPolicy.GetTerminalDropReason(entry, now);
                 if (retryDropReason != null)
                 {
+                    DebugLog(
+                        "Dropping queued request because the retry policy reached a terminal state.",
+                        DescribeQueuedRequest(entry, queueIndex) + ", reason=" + retryDropReason);
                     _requestQueue.RemoveAt(queueIndex);
                     _requestQueue.Reject(entry.Id, new AttriaxApiError(
                         "Attriax request dropped after exceeding the retry policy: " + retryDropReason + ".",
@@ -1511,6 +1589,9 @@ namespace Attriax.Unity.Internal
 
                 if (AttriaxQueueRetryPolicy.IsWaitingForRetryWindow(entry, now))
                 {
+                    DebugLog(
+                        "Skipping queued request because it is still waiting for its retry window.",
+                        DescribeQueuedRequest(entry, queueIndex));
                     queueIndex += 1;
                     continue;
                 }
@@ -1538,6 +1619,9 @@ namespace Attriax.Unity.Internal
                 try
                 {
                     var result = await PerformQueuedRequestAsync(entry).ConfigureAwait(false);
+                    DebugLog(
+                        "Queued request completed successfully.",
+                        DescribeQueuedRequest(entry, queueIndex));
                     _requestQueue.RemoveAt(queueIndex);
                     _requestQueue.Complete(entry.Id, result);
                 }
@@ -1581,6 +1665,10 @@ namespace Attriax.Unity.Internal
                 var nextRetryAt = _requestQueue.PeekEarliestRetryAt();
                 if (nextRetryAt.HasValue)
                 {
+                    DebugLog(
+                        "Queue still has entries waiting for retry.",
+                        "nextRetryAt=" + nextRetryAt.Value.ToString("O")
+                        + ", queueCount=" + _requestQueue.Count);
                     SetSynchronizationState(IsOnline()
                         ? AttriaxSynchronizationState.Deferred
                         : AttriaxSynchronizationState.Offline);
@@ -1605,9 +1693,21 @@ namespace Attriax.Unity.Internal
                 return true;
             }
 
-            return entry.Kind == AttriaxQueuedRequestKind.Open
+            var canDispatch = entry.Kind == AttriaxQueuedRequestKind.Open
                 || entry.Kind == AttriaxQueuedRequestKind.DeepLinkResolve
                 || _appOpenManager.HasSuccessfulResult;
+
+            if (!canDispatch)
+            {
+                DebugLog(
+                    "Queued request is blocked until app-open succeeds.",
+                    "kind=" + entry.Kind
+                    + ", hasSuccessfulAppOpen=" + _appOpenManager.HasSuccessfulResult
+                    + ", currentAppOpenTaskStatus=" + DescribeTaskStatus(_appOpenManager.CurrentTask)
+                    + ", requestId=" + entry.Id);
+            }
+
+            return canDispatch;
         }
 
         private async Task<BatchFlushResult> FlushBatchEntriesAsync(
@@ -2035,11 +2135,20 @@ namespace Attriax.Unity.Internal
         {
             if (!string.IsNullOrWhiteSpace(_deviceId))
             {
+                DebugLog(
+                    "Identified context already available; syncing session context without rebuilding.",
+                    "deviceIdSource=" + _deviceIdSource);
                 _sessionManager.SyncCurrentSessionContext();
                 return;
             }
 
             var includesInstallReferrer = _enabled && _consentManager.AllowsAttributionTracking;
+            DebugLog(
+                "Preparing identified context.",
+                "firstLaunch=" + _isFirstLaunch
+                + ", includesInstallReferrer=" + includesInstallReferrer
+                + ", enabled=" + _enabled
+                + ", allowsAttributionTracking=" + _consentManager.AllowsAttributionTracking);
             var preparedContext = await PrepareIdentifiedContextAsync(
                     _isFirstLaunch,
                     includesInstallReferrer)
@@ -2050,6 +2159,11 @@ namespace Attriax.Unity.Internal
                     preparedContext.InitialSnapshot,
                     preparedContext.ResolvedSnapshotTask),
                 includesInstallReferrer);
+            DebugLog(
+                "Prepared identified context and stored it in the context manager.",
+                "platform=" + preparedContext.InitialSnapshot.Platform
+                + ", deviceIdSource=" + preparedContext.DeviceId.Source
+                + ", deviceIdIsFallback=" + preparedContext.DeviceId.IsFallback);
             _sessionManager.SyncCurrentSessionContext();
         }
 
@@ -2144,11 +2258,20 @@ namespace Attriax.Unity.Internal
         private async Task<AttriaxPreparedContextRefresh> PrepareContextRefreshAsync(
             bool resolveInstallReferrer)
         {
+            DebugLog(
+                "Preparing context refresh.",
+                "resolveInstallReferrer=" + resolveInstallReferrer
+                + ", deviceIdSource=" + _deviceIdSource
+                + ", firstLaunch=" + _isFirstLaunch);
             var preparedContext = await PrepareContextAsync(
                     CurrentResolvedDeviceId(),
                     _isFirstLaunch,
                     resolveInstallReferrer)
                 .ConfigureAwait(false);
+            DebugLog(
+                "Prepared context refresh.",
+                "platform=" + preparedContext.InitialSnapshot.Platform
+                + ", hasResolvedTask=" + (preparedContext.ResolvedSnapshotTask != null));
             return new AttriaxPreparedContextRefresh(
                 preparedContext.InitialSnapshot,
                 preparedContext.ResolvedSnapshotTask);
@@ -2157,11 +2280,15 @@ namespace Attriax.Unity.Internal
         private async Task<AttriaxInstallReferrerContextPayload> CollectInstallReferrerContextAsync(
             AttriaxPlatformType platform)
         {
+            DebugLog(
+                "Collecting install referrer context.",
+                "platform=" + platform);
             if (platform == AttriaxPlatformType.Android)
             {
                 var cachedReferrer = ReadPersistedInstallReferrer();
                 if (!string.IsNullOrWhiteSpace(cachedReferrer))
                 {
+                    DebugLog("Using cached install referrer context for Android.", cachedReferrer);
                     return new AttriaxInstallReferrerContextPayload
                     {
                         InstallReferrer = cachedReferrer,
@@ -2172,19 +2299,28 @@ namespace Attriax.Unity.Internal
                     };
                 }
 
+                DebugLog("No cached Android install referrer found; starting native bridge attempt 1.", (string?)null);
                 var firstAttempt = await AttriaxNativeBridge.CollectInstallReferrerAsync(platform);
+                DebugLog(
+                    "Android install referrer attempt 1 completed.",
+                    DescribeInstallReferrerContext(firstAttempt));
                 if (!string.IsNullOrWhiteSpace(firstAttempt.InstallReferrer))
                 {
                     return firstAttempt;
                 }
 
+                DebugLog("Android install referrer attempt 1 returned no referrer; starting attempt 2.", (string?)null);
                 var secondAttempt = await AttriaxNativeBridge.CollectInstallReferrerAsync(platform);
+                DebugLog(
+                    "Android install referrer attempt 2 completed.",
+                    DescribeInstallReferrerContext(secondAttempt));
                 if (!string.IsNullOrWhiteSpace(secondAttempt.InstallReferrer))
                 {
                     secondAttempt.Metadata["installReferrerAttempts"] = 2;
                     return secondAttempt;
                 }
 
+                DebugLog("Android install referrer attempts completed without a referrer value.", (string?)null);
                 return new AttriaxInstallReferrerContextPayload
                 {
                     Metadata = MergeMetadata(
@@ -2202,7 +2338,11 @@ namespace Attriax.Unity.Internal
                 };
             }
 
-            return await AttriaxNativeBridge.CollectInstallReferrerAsync(platform);
+            var context = await AttriaxNativeBridge.CollectInstallReferrerAsync(platform);
+            DebugLog(
+                "Collected non-Android install referrer context.",
+                DescribeInstallReferrerContext(context));
+            return context;
         }
 
         private AttriaxDeviceSnapshot CollectDeviceSnapshot(
@@ -3811,20 +3951,48 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
+            var prefix = "[Attriax] [" + DateTimeOffset.UtcNow.ToString("O") + "] [thread "
+                + System.Threading.Thread.CurrentThread.ManagedThreadId + "] ";
+
             if (string.IsNullOrWhiteSpace(detail))
             {
                 AttriaxLifecycleDispatcher.InvokeOnMainThread(
-                    () => UnityEngine.Debug.Log("[Attriax] " + message));
+                    () => UnityEngine.Debug.Log(prefix + message));
                 return;
             }
 
             AttriaxLifecycleDispatcher.InvokeOnMainThread(
-                () => UnityEngine.Debug.Log("[Attriax] " + message + " " + detail));
+                () => UnityEngine.Debug.Log(prefix + message + " " + detail));
         }
 
         private void DebugLog(string message, Exception exception)
         {
             DebugLog(message, exception != null ? exception.Message : null);
+        }
+
+        private static string DescribeTaskStatus(Task? task)
+        {
+            return task == null ? "null" : task.Status.ToString();
+        }
+
+        private static string DescribeQueuedRequest(AttriaxQueuedRequest entry, int queueIndex)
+        {
+            return "index=" + queueIndex
+                + ", id=" + entry.Id
+                + ", kind=" + entry.Kind
+                + ", attempt=" + entry.AttemptCount
+                + ", nextRetryAt=" + (entry.NextRetryAt.HasValue ? entry.NextRetryAt.Value.ToString("O") : "null")
+                + ", lastHttpStatusCode=" + (entry.LastHttpStatusCode.HasValue ? entry.LastHttpStatusCode.Value.ToString() : "null");
+        }
+
+        private static string DescribeInstallReferrerContext(AttriaxInstallReferrerContextPayload context)
+        {
+            var metadata = context.Metadata;
+            return "hasReferrer=" + (!string.IsNullOrWhiteSpace(context.InstallReferrer))
+                + ", status=" + (ReadString(metadata, "installReferrerStatus") ?? "null")
+                + ", attempts=" + (ReadLong(metadata, "installReferrerAttempts")?.ToString() ?? "null")
+                + ", clickTs=" + (context.ReferrerClickTimestampSeconds?.ToString() ?? "null")
+                + ", installTs=" + (context.InstallBeginTimestampSeconds?.ToString() ?? "null");
         }
 
         private sealed class PreparedContext

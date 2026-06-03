@@ -35,6 +35,9 @@ namespace Attriax.Unity.Internal
 
         public Task<object> Enqueue(AttriaxQueuedRequest request)
         {
+            _debugLog(
+                "Enqueuing request.",
+                DescribeRequest(request) + ", queueCountBefore=" + _entries.Count);
             _entries.Add(request);
             while (_entries.Count > _maxQueueSize)
             {
@@ -51,6 +54,9 @@ namespace Attriax.Unity.Internal
 
             var pending = new PendingRequest();
             _pendingRequests[request.Id] = pending;
+            _debugLog(
+                "Enqueued request.",
+                DescribeRequest(request) + ", queueCountAfter=" + _entries.Count);
             return pending.Task;
         }
 
@@ -125,6 +131,9 @@ namespace Attriax.Unity.Internal
             _entries.AddRange(openEntries);
             _entries.AddRange(otherEntries);
             WriteQueue();
+            _debugLog(
+                "Reordered queue to prioritize open requests.",
+                "openCount=" + openEntries.Count + ", otherCount=" + otherEntries.Count);
         }
 
         public List<AttriaxQueuedRequest> PeekBatchablePrefix()
@@ -185,6 +194,9 @@ namespace Attriax.Unity.Internal
             }
 
             var removeCount = Math.Min(count, _entries.Count - index);
+            _debugLog(
+                "Removing queued request range.",
+                "index=" + index + ", count=" + removeCount + ", queueCountBefore=" + _entries.Count);
             _entries.RemoveRange(index, removeCount);
             WriteQueue();
         }
@@ -201,6 +213,9 @@ namespace Attriax.Unity.Internal
                 throw new ArgumentOutOfRangeException(nameof(index));
             }
 
+            _debugLog(
+                "Replacing queued request entry.",
+                "index=" + index + ", request=" + DescribeRequest(entry));
             _entries[index] = entry;
             WriteQueue();
         }
@@ -228,10 +243,12 @@ namespace Attriax.Unity.Internal
         {
             if (!_pendingRequests.TryGetValue(id, out var pending))
             {
+                _debugLog("Skipping queue completion because no pending request was found.", "id=" + id);
                 return;
             }
 
             _pendingRequests.Remove(id);
+            _debugLog("Completing queued request.", "id=" + id);
             pending.Resolve(value);
         }
 
@@ -239,10 +256,14 @@ namespace Attriax.Unity.Internal
         {
             if (!_pendingRequests.TryGetValue(id, out var pending))
             {
+                _debugLog("Skipping queue rejection because no pending request was found.", "id=" + id);
                 return;
             }
 
             _pendingRequests.Remove(id);
+            _debugLog(
+                "Rejecting queued request.",
+                "id=" + id + ", error=" + error.Message);
             pending.Reject(error);
         }
 
@@ -347,6 +368,14 @@ namespace Attriax.Unity.Internal
             });
             AttriaxPlayerPrefs.SetString(_storageKey, serialized);
             AttriaxPlayerPrefs.Save();
+        }
+
+        private static string DescribeRequest(AttriaxQueuedRequest request)
+        {
+            return "id=" + request.Id
+                + ", kind=" + request.Kind
+                + ", attempt=" + request.AttemptCount
+                + ", nextRetryAt=" + (request.NextRetryAt.HasValue ? request.NextRetryAt.Value.ToString("O") : "null");
         }
 
         [Serializable]

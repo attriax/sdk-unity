@@ -50,6 +50,12 @@ namespace Attriax.Unity.Internal
                 preparedContext.ResolvedSnapshotTask,
                 generation);
             _resolvedContextIncludesInstallReferrer = includesInstallReferrer;
+            _debugLog(
+                "Stored prepared context snapshot.",
+                "generation=" + generation
+                + ", includesInstallReferrer=" + includesInstallReferrer
+                + ", platform=" + preparedContext.InitialSnapshot.Platform
+                + ", resolvedTaskStatus=" + DescribeTaskStatus(_resolvedContextTask));
         }
 
         public void Reset()
@@ -58,15 +64,25 @@ namespace Attriax.Unity.Internal
             _resolvedContextTask = null;
             _resolvedContextIncludesInstallReferrer = false;
             _snapshot = null;
+            _debugLog("Reset context manager state.", "generation=" + _generation);
         }
 
         public Task<AttriaxContextSnapshot> EnsureResolvedForAppOpenAsync()
         {
             if (_resolvedContextTask != null && _resolvedContextIncludesInstallReferrer)
             {
+                _debugLog(
+                    "Reusing existing resolved context task for app-open.",
+                    "generation=" + _generation
+                    + ", status=" + DescribeTaskStatus(_resolvedContextTask));
                 return _resolvedContextTask;
             }
 
+            _debugLog(
+                "Refreshing context for app-open install-referrer resolution.",
+                "generation=" + _generation
+                + ", hadTask=" + (_resolvedContextTask != null)
+                + ", includesInstallReferrer=" + _resolvedContextIncludesInstallReferrer);
             _resolvedContextIncludesInstallReferrer = true;
             _resolvedContextTask = RefreshResolvedForAppOpenAsync();
             return _resolvedContextTask;
@@ -75,15 +91,29 @@ namespace Attriax.Unity.Internal
         private async Task<AttriaxContextSnapshot> RefreshResolvedForAppOpenAsync()
         {
             var generation = _generation;
+            _debugLog(
+                "Preparing refreshed context for app-open.",
+                "generation=" + generation);
             var preparedContext = await _refreshProvider.PrepareContextRefreshAsync(true)
                 .ConfigureAwait(false);
+            _debugLog(
+                "Prepared refreshed context for app-open.",
+                "generation=" + generation
+                + ", platform=" + preparedContext.InitialSnapshot.Platform
+                + ", resolvedTaskStatus=" + DescribeTaskStatus(preparedContext.ResolvedSnapshotTask));
 
             if (generation != _generation)
             {
+                _debugLog(
+                    "Discarding prepared app-open context because the generation changed.",
+                    "preparedGeneration=" + generation + ", currentGeneration=" + _generation);
                 return preparedContext.InitialSnapshot;
             }
 
             _snapshot = preparedContext.InitialSnapshot;
+            _debugLog(
+                "Awaiting resolved app-open context snapshot.",
+                "generation=" + generation);
             return await ResolveContextSnapshotSafelyAsync(
                     preparedContext.ResolvedSnapshotTask,
                     generation)
@@ -96,11 +126,21 @@ namespace Attriax.Unity.Internal
         {
             try
             {
+                _debugLog(
+                    "Waiting for resolved context snapshot task.",
+                    "generation=" + generation
+                    + ", taskStatus=" + DescribeTaskStatus(resolvedSnapshotTask));
                 var resolvedSnapshot = await resolvedSnapshotTask.ConfigureAwait(false);
                 if (generation == _generation)
                 {
                     _snapshot = resolvedSnapshot;
                 }
+
+                _debugLog(
+                    "Resolved context snapshot task completed.",
+                    "generation=" + generation
+                    + ", currentGeneration=" + _generation
+                    + ", platform=" + resolvedSnapshot.Platform);
 
                 return resolvedSnapshot;
             }
@@ -116,6 +156,11 @@ namespace Attriax.Unity.Internal
                     exception.Message);
                 return Snapshot;
             }
+        }
+
+        private static string DescribeTaskStatus(Task? task)
+        {
+            return task == null ? "null" : task.Status.ToString();
         }
     }
 }

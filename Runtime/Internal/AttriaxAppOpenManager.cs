@@ -10,6 +10,7 @@ namespace Attriax.Unity.Internal
         private readonly AttriaxRuntimeState _runtimeState;
         private readonly IAttriaxAppOpenPipeline _pipeline;
         private readonly AttriaxEventHub _eventHub;
+        private readonly Action<string, string?> _debugLog;
 
         private Task<AttriaxAppOpenResult>? _openTrackingTask;
         private AttriaxAppOpenResult? _lastAppOpenResult;
@@ -17,11 +18,13 @@ namespace Attriax.Unity.Internal
         public AttriaxAppOpenManager(
             AttriaxRuntimeState runtimeState,
             IAttriaxAppOpenPipeline pipeline,
-            AttriaxEventHub eventHub)
+            AttriaxEventHub eventHub,
+            Action<string, string?> debugLog)
         {
             _runtimeState = runtimeState;
             _pipeline = pipeline;
             _eventHub = eventHub;
+            _debugLog = debugLog;
         }
 
         public AttriaxAppOpen? LastPublicResult => _pipeline.ToPublicAppOpen(_lastAppOpenResult);
@@ -34,6 +37,12 @@ namespace Attriax.Unity.Internal
 
         public void ScheduleIfNeeded()
         {
+            _debugLog(
+                "App-open manager ScheduleIfNeeded invoked.",
+                "initialized=" + _runtimeState.IsInitialized
+                + ", enabled=" + _runtimeState.IsEnabled
+                + ", currentTaskStatus=" + DescribeTaskStatus(_openTrackingTask)
+                + ", hasLastResult=" + (_lastAppOpenResult != null));
             _ = ScheduleAsync();
         }
 
@@ -45,12 +54,24 @@ namespace Attriax.Unity.Internal
                 !_runtimeState.IsEnabled ||
                 _openTrackingTask != null)
             {
+                _debugLog(
+                    "Skipping app-open scheduling.",
+                    "initialized=" + _runtimeState.IsInitialized
+                    + ", enabled=" + _runtimeState.IsEnabled
+                    + ", currentTaskStatus=" + DescribeTaskStatus(_openTrackingTask));
                 return Task.CompletedTask;
             }
 
+            _debugLog(
+                "Scheduling app-open task.",
+                "installReferrerOverridePresent=" + (!string.IsNullOrWhiteSpace(installReferrerOverride))
+                + ", metadataCount=" + (deviceMetadataOverrides != null ? deviceMetadataOverrides.Count : 0));
             _openTrackingTask = _pipeline.EnqueueOpenAsync(
                 installReferrerOverride,
                 deviceMetadataOverrides);
+            _debugLog(
+                "App-open task created.",
+                "taskStatus=" + DescribeTaskStatus(_openTrackingTask));
             ObserveCompletion(_openTrackingTask);
             _ = _pipeline.ResolveInstallReferrerFromAppOpenAsync(_openTrackingTask);
             return Task.CompletedTask;
@@ -63,13 +84,22 @@ namespace Attriax.Unity.Internal
                 {
                     if (!ReferenceEquals(_openTrackingTask, completedTask))
                     {
+                        _debugLog("Ignoring stale app-open completion callback.", (string?)null);
                         return;
                     }
 
                     if (completedTask.IsFaulted || completedTask.IsCanceled)
                     {
+                        _debugLog(
+                            "App-open task finished without success; clearing current task.",
+                            "faulted=" + completedTask.IsFaulted + ", canceled=" + completedTask.IsCanceled);
                         _openTrackingTask = null;
+                        return;
                     }
+
+                    _debugLog(
+                        "App-open task completed successfully.",
+                        "taskStatus=" + DescribeTaskStatus(completedTask));
                 },
                 TaskContinuationOptions.ExecuteSynchronously);
         }
@@ -89,22 +119,32 @@ namespace Attriax.Unity.Internal
         {
             _openTrackingTask = null;
             _lastAppOpenResult = null;
+            _debugLog("Reset app-open manager state.", (string?)null);
         }
 
         public void HandleResult(AttriaxAppOpenResult result)
         {
             if (_openTrackingTask == null)
             {
+                _debugLog("Ignoring app-open result because no current app-open task exists.", (string?)null);
                 return;
             }
 
             _lastAppOpenResult = result;
-
             var deepLinkEvent = _pipeline.BuildDeepLinkEventFromAppOpenResult(result);
+            _debugLog(
+                "Stored successful app-open result.",
+                "hasDeepLink=" + (deepLinkEvent != null));
+
             if (deepLinkEvent != null)
             {
                 _eventHub.EmitDeepLinkEvent(deepLinkEvent);
             }
+        }
+
+        private static string DescribeTaskStatus(Task? task)
+        {
+            return task == null ? "null" : task.Status.ToString();
         }
     }
 }

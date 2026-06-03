@@ -12,6 +12,7 @@ import android.content.pm.verify.domain.DomainVerificationUserState;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
+import android.util.Log;
 import com.android.installreferrer.api.InstallReferrerClient;
 import com.android.installreferrer.api.InstallReferrerStateListener;
 import com.android.installreferrer.api.ReferrerDetails;
@@ -27,6 +28,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class AttriaxUnityAndroidBridge {
+    private static final String TAG = "AttriaxUnityBridge";
+
     private AttriaxUnityAndroidBridge() {
     }
 
@@ -110,6 +113,7 @@ public final class AttriaxUnityAndroidBridge {
         Context context = activity.getApplicationContext() != null
             ? activity.getApplicationContext()
             : activity;
+        Log.d(TAG, "collectInstallReferrerJson start package=" + context.getPackageName());
         JSONObject payload = new JSONObject();
         JSONObject metadata = new JSONObject();
 
@@ -123,15 +127,22 @@ public final class AttriaxUnityAndroidBridge {
 
         try {
             final InstallReferrerClient client = InstallReferrerClient.newBuilder(context).build();
+            Log.d(TAG, "Starting InstallReferrerClient connection.");
             client.startConnection(new InstallReferrerStateListener() {
                 @Override
                 public void onInstallReferrerSetupFinished(int responseCode) {
+                    Log.d(TAG, "InstallReferrer setup finished responseCode=" + responseCode);
                     try {
                         switch (responseCode) {
                             case InstallReferrerClient.InstallReferrerResponse.OK:
                                 ReferrerDetails details = client.getInstallReferrer();
                                 metadata.put("installReferrerStatus", "ok");
                                 installReferrer[0] = details.getInstallReferrer();
+                                Log.d(
+                                    TAG,
+                                    "InstallReferrer OK referrerPresent="
+                                        + (installReferrer[0] != null && !installReferrer[0].isEmpty())
+                                );
                                 metadata.put(
                                     "referrerClickTimestampSeconds",
                                     details.getReferrerClickTimestampSeconds()
@@ -166,6 +177,7 @@ public final class AttriaxUnityAndroidBridge {
                                 break;
                         }
                     } catch (Exception exception) {
+                        Log.e(TAG, "InstallReferrer setup callback failed", exception);
                         try {
                             metadata.put("installReferrerError", exception.getMessage());
                         } catch (Exception ignored) {
@@ -173,6 +185,7 @@ public final class AttriaxUnityAndroidBridge {
                     } finally {
                         try {
                             client.endConnection();
+                            Log.d(TAG, "InstallReferrerClient connection closed after callback.");
                         } catch (Exception ignored) {
                         }
                         latch.countDown();
@@ -181,6 +194,7 @@ public final class AttriaxUnityAndroidBridge {
 
                 @Override
                 public void onInstallReferrerServiceDisconnected() {
+                    Log.w(TAG, "InstallReferrer service disconnected.");
                     try {
                         metadata.put("installReferrerStatus", "service_disconnected");
                     } catch (Exception ignored) {
@@ -190,13 +204,16 @@ public final class AttriaxUnityAndroidBridge {
             });
 
             if (!latch.await(12, TimeUnit.SECONDS)) {
+                Log.w(TAG, "InstallReferrer await timed out after 12 seconds.");
                 metadata.put("installReferrerStatus", "timeout_unity");
                 try {
                     client.endConnection();
+                    Log.d(TAG, "InstallReferrerClient connection closed after timeout.");
                 } catch (Exception ignored) {
                 }
             }
         } catch (Exception exception) {
+            Log.e(TAG, "collectInstallReferrerJson failed", exception);
             try {
                 metadata.put("installReferrerStatus", "error_unity");
                 metadata.put("installReferrerError", exception.getMessage());
@@ -211,6 +228,8 @@ public final class AttriaxUnityAndroidBridge {
             payload.put("metadata", metadata);
         } catch (Exception ignored) {
         }
+
+        Log.d(TAG, "collectInstallReferrerJson end payload=" + payload.toString());
 
         return payload.toString();
     }
