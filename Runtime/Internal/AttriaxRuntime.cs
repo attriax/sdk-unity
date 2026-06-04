@@ -1319,6 +1319,7 @@ namespace Attriax.Unity.Internal
 
             try
             {
+                _requestQueue.FlushPendingWrite();
                 _sessionManager.HandleTick(deltaSeconds, DateTimeOffset.UtcNow);
 
                 if (_requestQueue.Count == 0 || !_deferredFlushDueAt.HasValue)

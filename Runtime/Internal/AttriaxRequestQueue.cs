@@ -22,6 +22,8 @@ namespace Attriax.Unity.Internal
         private readonly object _gate = new object();
         private readonly List<AttriaxQueuedRequest> _entries;
         private readonly Dictionary<string, PendingRequest> _pendingRequests = new Dictionary<string, PendingRequest>();
+        private string _pendingSerializedQueue = string.Empty;
+        private int _pendingQueueWriteRequested;
 
         public AttriaxRequestQueue(string storageKey, int maxQueueSize)
         {
@@ -332,7 +334,21 @@ namespace Attriax.Unity.Internal
                 pending.Reject(error);
             }
 
+            Interlocked.Exchange(ref _pendingSerializedQueue, null);
+            Interlocked.Exchange(ref _pendingQueueWriteRequested, 0);
             AttriaxPlayerPrefs.DeleteKey(_storageKey);
+            AttriaxPlayerPrefs.Save();
+        }
+
+        internal void FlushPendingWrite()
+        {
+            var serialized = Interlocked.Exchange(ref _pendingSerializedQueue, null);
+            if (Interlocked.Exchange(ref _pendingQueueWriteRequested, 0) == 0 || serialized == null)
+            {
+                return;
+            }
+
+            AttriaxPlayerPrefs.SetString(_storageKey, serialized);
             AttriaxPlayerPrefs.Save();
         }
 
@@ -436,8 +452,8 @@ namespace Attriax.Unity.Internal
                 Version = QueueSchemaVersion,
                 Entries = _entries,
             });
-            AttriaxPlayerPrefs.SetString(_storageKey, serialized);
-            AttriaxPlayerPrefs.Save();
+            Interlocked.Exchange(ref _pendingSerializedQueue, serialized);
+            Interlocked.Exchange(ref _pendingQueueWriteRequested, 1);
         }
 
         [Serializable]
