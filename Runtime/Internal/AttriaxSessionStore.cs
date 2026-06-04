@@ -35,7 +35,6 @@ namespace Attriax.Unity.Internal
                 var session = JsonConvert.DeserializeObject<AttriaxSessionSnapshot>(serialized);
                 if (session == null ||
                     string.IsNullOrWhiteSpace(session.Id) ||
-                    string.IsNullOrWhiteSpace(session.DeviceId) ||
                     string.IsNullOrWhiteSpace(session.SdkPackageVersion) ||
                     session.HeartbeatIntervalMs <= 0 ||
                     session.LastActivityAt < session.StartedAt)

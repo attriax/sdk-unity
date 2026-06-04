@@ -165,6 +165,13 @@ namespace Attriax.Unity
                 return;
             }
 
+            var configured = TryReuseConfiguredInstance();
+            if (configured != null)
+            {
+                Instance = configured;
+                return;
+            }
+
             try
             {
                 await InitializeAsync().ConfigureAwait(false);
@@ -250,6 +257,13 @@ namespace Attriax.Unity
         {
             if (Instance != null)
             {
+                return Instance;
+            }
+
+            var configured = TryReuseConfiguredInstance();
+            if (configured != null)
+            {
+                Instance = configured;
                 return Instance;
             }
 
