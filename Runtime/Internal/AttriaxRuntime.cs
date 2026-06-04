@@ -3432,6 +3432,11 @@ namespace Attriax.Unity.Internal
             SyncRuntimePersistenceMode();
             await EnsureIdentifiedContextAsync().ConfigureAwait(false);
 
+            // Parity guard: ensure the current session context is synced with the now-identified
+            // device identity so the same sessionId is preserved across the anonymous-to-identified
+            // transition. This lets the backend match and merge anonymous activity by sessionId.
+            _sessionManager.SyncCurrentSessionContext();
+
             var updatedSession = _sessionManager.CurrentSession;
             if (updatedSession != null && string.IsNullOrWhiteSpace(updatedSession.DeviceId) &&
                 !string.IsNullOrWhiteSpace(_deviceId))
