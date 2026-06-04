@@ -269,6 +269,19 @@ namespace Attriax.Unity
                 return Instance;
             }
 
+            var expectedToken = _configuredRuntimeConfig?.ProjectToken ?? _projectToken;
+            if (!string.IsNullOrWhiteSpace(expectedToken))
+            {
+                var existing = Attriax.TryGetActiveInstance(expectedToken);
+                if (existing != null)
+                {
+                    _instanceIsExternallyOwned = true;
+                    Instance = existing;
+                    WireUpSubscriptions();
+                    return Instance;
+                }
+            }
+
             var runtimeConfig = _configuredRuntimeConfig != null
                 ? CloneRuntimeConfig(_configuredRuntimeConfig)
                 : new AttriaxConfig
@@ -285,6 +298,16 @@ namespace Attriax.Unity
                 };
 
             Instance = new Attriax(runtimeConfig);
+            WireUpSubscriptions();
+            return Instance;
+        }
+
+        private void WireUpSubscriptions()
+        {
+            if (Instance == null)
+            {
+                return;
+            }
 
             try
             {
@@ -306,8 +329,6 @@ namespace Attriax.Unity
                 UnityEngine.Debug.LogWarning(
                     "[Attriax] Failed to subscribe to synchronization events: " + error.Message);
             }
-
-            return Instance;
         }
 
         private Attriax? TryReuseConfiguredInstance()
@@ -336,34 +357,16 @@ namespace Attriax.Unity
             }
 
             _instanceIsExternallyOwned = true;
+            Instance = host.Instance;
+            WireUpSubscriptions();
+
             Debug.LogWarning(
                 "[Attriax] AttriaxBehaviour detected a configured singleton for the same project token. " +
                 "Reusing the configured instance instead of creating a second runtime. " +
                 "Remove the AttriaxBehaviour component or disable its auto-initialization if you prefer the configured singleton flow.",
                 this);
 
-            try
-            {
-                _deepLinkSubscription = host.Instance.DeepLinks.Stream.Subscribe(HandleDeepLinkReceived);
-            }
-            catch (Exception error)
-            {
-                UnityEngine.Debug.LogWarning(
-                    "[Attriax] Failed to subscribe to deep-link events: " + error.Message);
-            }
-
-            try
-            {
-                _synchronizationSubscription = host.Instance.Synchronization.Subscribe(
-                    HandleSynchronizationChanged);
-            }
-            catch (Exception error)
-            {
-                UnityEngine.Debug.LogWarning(
-                    "[Attriax] Failed to subscribe to synchronization events: " + error.Message);
-            }
-
-            return host.Instance;
+            return Instance;
         }
 
         private bool CanCreateRuntimeConfig()

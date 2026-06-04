@@ -12,6 +12,9 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class Attriax : IDisposable
     {
+        private static readonly Dictionary<string, WeakReference<Attriax>> ActiveInstances =
+            new Dictionary<string, WeakReference<Attriax>>(StringComparer.Ordinal);
+
         private readonly AttriaxRuntime _runtime;
 
         /// <summary>
@@ -19,6 +22,11 @@ namespace Attriax.Unity
         /// </summary>
         public Attriax(AttriaxConfig config)
         {
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
             _runtime = new AttriaxRuntime(config);
             Consent = new AttriaxConsent(_runtime);
             Synchronization = new AttriaxSynchronization(_runtime);
@@ -26,6 +34,29 @@ namespace Attriax.Unity
             DeepLinks = new AttriaxDeepLinks(_runtime);
             Referrer = new AttriaxReferrer(_runtime);
             Skan = new AttriaxSkan(_runtime);
+
+            lock (ActiveInstances)
+            {
+                ActiveInstances[config.ProjectToken] = new WeakReference<Attriax>(this);
+            }
+        }
+
+        /// <summary>
+        /// Returns an existing active instance for the given project token, or null if none exists.
+        /// </summary>
+        internal static Attriax? TryGetActiveInstance(string projectToken)
+        {
+            lock (ActiveInstances)
+            {
+                if (ActiveInstances.TryGetValue(projectToken, out var weakRef) &&
+                    weakRef.TryGetTarget(out var existing) &&
+                    existing != null)
+                {
+                    return existing;
+                }
+
+                return null;
+            }
         }
 
         /// <summary>
@@ -184,6 +215,16 @@ namespace Attriax.Unity
         public void Dispose()
         {
             _runtime.Dispose();
+
+            lock (ActiveInstances)
+            {
+                if (ActiveInstances.TryGetValue(_runtime.Config.ProjectToken, out var weakRef) &&
+                    weakRef.TryGetTarget(out var existing) &&
+                    ReferenceEquals(existing, this))
+                {
+                    ActiveInstances.Remove(_runtime.Config.ProjectToken);
+                }
+            }
         }
     }
 }

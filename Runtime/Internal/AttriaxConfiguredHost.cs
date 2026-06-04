@@ -13,6 +13,7 @@ namespace Attriax.Unity.Internal
 
         private AttriaxProjectSettings? _settings;
         private Task? _initializationTask;
+        private bool _instanceIsExternallyOwned;
 
         internal Attriax? Instance { get; private set; }
 
@@ -91,7 +92,11 @@ namespace Attriax.Unity.Internal
                 _instance = null;
             }
 
-            Instance?.Dispose();
+            if (Instance != null && !_instanceIsExternallyOwned)
+            {
+                Instance.Dispose();
+            }
+
             Instance = null;
         }
 
@@ -135,6 +140,14 @@ namespace Attriax.Unity.Internal
 
             if (_settings == null)
             {
+                return;
+            }
+
+            var existing = Attriax.TryGetActiveInstance(_settings.ProjectToken);
+            if (existing != null)
+            {
+                Instance = existing;
+                _instanceIsExternallyOwned = true;
                 return;
             }
 
