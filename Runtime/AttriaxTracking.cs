@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
+using Attriax.Unity.Internal;
 
 namespace Attriax.Unity
 {
