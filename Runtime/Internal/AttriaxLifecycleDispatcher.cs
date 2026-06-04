@@ -270,37 +270,31 @@ namespace Attriax.Unity.Internal
         private static readonly Dictionary<string, object> MemoryValues =
             new Dictionary<string, object>(StringComparer.Ordinal);
         private static int _pendingSaveRequested;
+        private static int _lastSaveTimestampTicks;
 
-        public static void SetRuntimePersistenceMode(
-            IEnumerable<string> runtimeKeys,
-            AttriaxPlayerPrefsPersistenceMode mode)
+        public static void Save()
         {
-            var keys = NormalizeKeys(runtimeKeys);
-            lock (PersistenceGate)
-            {
-                foreach (var key in keys)
-                {
-                    RuntimeKeyModes[key] = mode;
-                }
-            }
+            Interlocked.Exchange(ref _pendingSaveRequested, 1);
+        }
 
-            if (mode == AttriaxPlayerPrefsPersistenceMode.FullRuntime)
+        internal static void FlushPendingSave()
+        {
+            if (Interlocked.Exchange(ref _pendingSaveRequested, 0) == 0)
             {
-                foreach (var key in keys)
-                {
-                    SyncMemoryValueToPersistentStorage(key);
-                }
-
-                Save();
                 return;
             }
 
-            foreach (var key in keys)
+            var nowTicks = Environment.TickCount;
+            var lastTicks = Volatile.Read(ref _lastSaveTimestampTicks);
+            var elapsed = nowTicks - lastTicks;
+            if (elapsed < 500 && elapsed >= 0)
             {
-                RemovePersistedValue(key);
+                Interlocked.Exchange(ref _pendingSaveRequested, 1);
+                return;
             }
 
-            Save();
+            Volatile.Write(ref _lastSaveTimestampTicks, nowTicks);
+            PlayerPrefs.Save();
         }
 
         public static void ForgetRuntimeKeys(IEnumerable<string> runtimeKeys)
@@ -406,21 +400,6 @@ namespace Attriax.Unity.Internal
             }
 
             AttriaxLifecycleDispatcher.InvokeOnMainThread(() => PlayerPrefs.DeleteKey(key));
-        }
-
-        public static void Save()
-        {
-            Interlocked.Exchange(ref _pendingSaveRequested, 1);
-        }
-
-        internal static void FlushPendingSave()
-        {
-            if (Interlocked.Exchange(ref _pendingSaveRequested, 0) == 0)
-            {
-                return;
-            }
-
-            PlayerPrefs.Save();
         }
 
         private static bool TrackWriteAndCheckPersistence(string key, object value)

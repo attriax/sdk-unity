@@ -477,7 +477,8 @@ namespace Attriax.Unity.Generated.Client
         #if UNITY_2020_2_OR_NEWER
                 // For Unity 2020.2 and newer, use UnityWebRequest.Result.
                 var asyncOp = request.SendWebRequest();
-                TaskCompletionSource<UnityWebRequest.Result> tcs = new TaskCompletionSource<UnityWebRequest.Result>();
+                TaskCompletionSource<UnityWebRequest.Result> tcs = new TaskCompletionSource<UnityWebRequest.Result>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
                 asyncOp.completed += (_) => tcs.TrySetResult(request.result);
                 using (var tokenRegistration = cancellationToken.Register(request.Abort, true))
                 {

@@ -87,6 +87,7 @@ namespace Attriax.Unity.Internal
         private bool _shouldGateRequestsOnSuccessfulAppOpen;
         private Task? _identifiedConsentTransitionTask;
         private AttriaxPlatformType _resolvedPlatform = AttriaxPlatformType.Unknown;
+        private readonly AttriaxPlatformType _platform;
 
         private bool _initialized
         {
@@ -135,7 +136,7 @@ namespace Attriax.Unity.Internal
         {
             AttriaxLifecycleDispatcher.BindToCurrentThread();
             _config = NormalizeConfig(config);
-            var platform = GetCurrentPlatform();
+            _platform = GetCurrentPlatform();
             _openBrowserUrlAsync = openBrowserUrlAsync ?? AttriaxNativeBridge.OpenBrowserUrlAsync;
             _contextSnapshotBuilder = new AttriaxContextSnapshotBuilder(
                 _config.ToPublic(),
@@ -195,7 +196,7 @@ namespace Attriax.Unity.Internal
                 NoopDebugLog);
             _skanManager = new AttriaxSkanManager(
                 _config.Skan ?? new AttriaxSkanConfig(),
-                platform,
+                _platform,
                 () => DateTimeOffset.UtcNow,
                 () => AttriaxPlayerPrefs.HasKey(Key(SkanStateStorageKey))
                     ? AttriaxPlayerPrefs.GetString(Key(SkanStateStorageKey), string.Empty)
@@ -221,9 +222,9 @@ namespace Attriax.Unity.Internal
                     occurredAt));
             _trackingAuthorizationManager = new AttriaxTrackingAuthorizationManager(
                 _config.ToPublic(),
-                platform,
-                () => AttriaxNativeBridge.GetTrackingAuthorizationStatusAsync(platform),
-                () => AttriaxNativeBridge.RequestTrackingAuthorizationAsync(platform));
+                _platform,
+                () => AttriaxNativeBridge.GetTrackingAuthorizationStatusAsync(_platform),
+                () => AttriaxNativeBridge.RequestTrackingAuthorizationAsync(_platform));
             _sessionManager = new AttriaxSessionManager(
                 _config.SessionTrackingEnabled,
                 () => ShouldTrackSessionActivity,
@@ -248,7 +249,7 @@ namespace Attriax.Unity.Internal
                 _appOpenManager.WaitForPublicResultAsync,
                 _eventHub.SubscribeToDeepLinks,
                 () => _sessionManager.CurrentSession);
-            _iosAppOpenEnrichmentManager = new AttriaxIosAppOpenEnrichmentManager(platform);
+            _iosAppOpenEnrichmentManager = new AttriaxIosAppOpenEnrichmentManager(_platform);
             _sdkRuntimeConfigCoordinator = new AttriaxSdkRuntimeConfigCoordinator(
                 LoadSdkRuntimeConfigAsync,
                 HandleSdkRuntimeConfigLoadedAsync);
@@ -1327,7 +1328,7 @@ namespace Attriax.Unity.Internal
                 if (DateTimeOffset.UtcNow >= _deferredFlushDueAt.Value)
                 {
                     _deferredFlushDueAt = null;
-                    _ = FlushAsync();
+                    _ = Task.Run(async () => await FlushAsync().ConfigureAwait(false));
                 }
             }
             catch (Exception error)
@@ -1515,9 +1516,8 @@ namespace Attriax.Unity.Internal
 
             if (immediate || _config.EventFlushIntervalMs == 0)
             {
-                SetSynchronizationState(AttriaxSynchronizationState.Synchronizing);
                 _deferredFlushDueAt = null;
-                _ = FlushAsync();
+                _ = Task.Run(async () => await FlushAsync().ConfigureAwait(false));
                 return;
             }
 
@@ -3596,15 +3596,28 @@ namespace Attriax.Unity.Internal
             _eventHub.SetSynchronizationState(state);
         }
 
+        private bool _cachedOnlineFlag = true;
+        private int _lastOnlineCheckTicks;
+
         private bool IsOnline()
         {
-            return AttriaxLifecycleDispatcher.InvokeOnMainThread(
+            var nowTicks = Environment.TickCount;
+            var lastTicks = Volatile.Read(ref _lastOnlineCheckTicks);
+            var elapsed = nowTicks - lastTicks;
+            if (elapsed >= 0 && elapsed < 1000)
+            {
+                return _cachedOnlineFlag;
+            }
+
+            _cachedOnlineFlag = AttriaxLifecycleDispatcher.InvokeOnMainThread(
                 () => Application.isEditor || Application.internetReachability != NetworkReachability.NotReachable);
+            Volatile.Write(ref _lastOnlineCheckTicks, nowTicks);
+            return _cachedOnlineFlag;
         }
 
         private AttriaxPlatformType GetCurrentPlatform()
         {
-            return AttriaxLifecycleDispatcher.InvokeOnMainThread(() => MapPlatform(Application.platform));
+            return _platform;
         }
 
         private void AssertInitialized()
