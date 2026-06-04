@@ -967,8 +967,18 @@ namespace Attriax.Unity.Internal
 
         private async Task RunInitializeAsync(AttriaxInitOptions options)
         {
-            var bootstrapCoordinator = new AttriaxRuntimeBootstrapCoordinator(this);
-            await bootstrapCoordinator.RunAsync(options).ConfigureAwait(false);
+            try
+            {
+                var bootstrapCoordinator = new AttriaxRuntimeBootstrapCoordinator(this);
+                await bootstrapCoordinator.RunAsync(options).ConfigureAwait(false);
+            }
+            catch (Exception error)
+            {
+                UnityEngine.Debug.LogError(
+                    "[Attriax] SDK initialization failed. The SDK will not be available for this session. "
+                    + error);
+                throw;
+            }
         }
 
         private async Task AwaitInitializationAsync(Task task)
@@ -1305,17 +1315,25 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
-            _sessionManager.HandleTick(deltaSeconds, DateTimeOffset.UtcNow);
-
-            if (_requestQueue.Count == 0 || !_deferredFlushDueAt.HasValue)
+            try
             {
-                return;
+                _sessionManager.HandleTick(deltaSeconds, DateTimeOffset.UtcNow);
+
+                if (_requestQueue.Count == 0 || !_deferredFlushDueAt.HasValue)
+                {
+                    return;
+                }
+
+                if (DateTimeOffset.UtcNow >= _deferredFlushDueAt.Value)
+                {
+                    _deferredFlushDueAt = null;
+                    _ = FlushAsync();
+                }
             }
-
-            if (DateTimeOffset.UtcNow >= _deferredFlushDueAt.Value)
+            catch (Exception error)
             {
-                _deferredFlushDueAt = null;
-                _ = FlushAsync();
+                UnityEngine.Debug.LogError(
+                    "[Attriax] Lifecycle tick handler threw an unexpected error: " + error);
             }
         }
 
@@ -1325,42 +1343,24 @@ namespace Attriax.Unity.Internal
             {
                 return;
             }
-
-            if (paused)
+            try
             {
-                if (_config.SessionTrackingEnabled)
+
+                if (paused)
                 {
-                    _sessionManager.HandlePause(DateTimeOffset.UtcNow);
+                    if (_config.SessionTrackingEnabled)
+                    {
+                        _sessionManager.HandlePause(DateTimeOffset.UtcNow);
+                    }
+
+                    if (_enabled)
+                    {
+                        RequestQueueFlush(true);
+                    }
+
+                    return;
                 }
 
-                if (_enabled)
-                {
-                    RequestQueueFlush(true);
-                }
-
-                return;
-            }
-
-            if (_config.SessionTrackingEnabled)
-            {
-                _sessionManager.HandleFocus(DateTimeOffset.UtcNow);
-            }
-
-            if (_enabled)
-            {
-                RequestQueueFlush(true);
-            }
-        }
-
-        private void HandleApplicationFocusChanged(bool hasFocus)
-        {
-            if (_disposed || !_initialized)
-            {
-                return;
-            }
-
-            if (hasFocus)
-            {
                 if (_config.SessionTrackingEnabled)
                 {
                     _sessionManager.HandleFocus(DateTimeOffset.UtcNow);
@@ -1370,18 +1370,78 @@ namespace Attriax.Unity.Internal
                 {
                     RequestQueueFlush(true);
                 }
-
-                return;
             }
-
-            if (_config.SessionTrackingEnabled)
+            catch (Exception error)
             {
-                _sessionManager.HandlePause(DateTimeOffset.UtcNow);
+                UnityEngine.Debug.LogError(
+                    "[Attriax] Application-pause handler threw an unexpected error: " + error);
             }
+        }
 
-            if (_enabled)
+        private void HandleApplicationFocusChanged(bool hasFocus)
+        {
+            try
             {
-                RequestQueueFlush(true);
+                if (_disposed || !_initialized)
+                {
+                    return;
+                }
+
+                if (hasFocus)
+                {
+                    if (_config.SessionTrackingEnabled)
+                    {
+                        _sessionManager.HandleFocus(DateTimeOffset.UtcNow);
+                    }
+
+                    if (_enabled)
+                    {
+                        RequestQueueFlush(true);
+                    }
+
+                    return;
+                }
+
+                if (_config.SessionTrackingEnabled)
+                {
+                    _sessionManager.HandlePause(DateTimeOffset.UtcNow);
+                }
+
+                if (_enabled)
+                {
+                    RequestQueueFlush(true);
+                }
+            }
+            catch (Exception error)
+            {
+                UnityEngine.Debug.LogError(
+                    "[Attriax] Application-focus handler threw an unexpected error: " + error);
+            }
+        }
+
+        private void HandleApplicationQuitting()
+        {
+            try
+            {
+                if (_disposed || !_initialized)
+                {
+                    return;
+                }
+
+                if (_config.SessionTrackingEnabled)
+                {
+                    _sessionManager.HandleQuitting(DateTimeOffset.UtcNow);
+                }
+
+                if (_enabled)
+                {
+                    RequestQueueFlush(true);
+                }
+            }
+            catch (Exception error)
+            {
+                UnityEngine.Debug.LogError(
+                    "[Attriax] Application-quitting handler threw an unexpected error: " + error);
             }
         }
 
@@ -1534,6 +1594,8 @@ namespace Attriax.Unity.Internal
 
         private async Task FlushInternalAsync()
         {
+            try
+            {
             if (_disposed || !_enabled)
             {
                 SetSynchronizationState(AttriaxSynchronizationState.Disabled);
@@ -1684,6 +1746,13 @@ namespace Attriax.Unity.Internal
             }
 
             SetSynchronizationState(AttriaxSynchronizationState.Synchronized);
+            }
+            catch (Exception error)
+            {
+                SetSynchronizationState(AttriaxSynchronizationState.Failed);
+                UnityEngine.Debug.LogError(
+                    "[Attriax] Request-flush loop terminated by an unexpected error: " + error);
+            }
         }
 
         private bool CanDispatchRequest(AttriaxQueuedRequest entry)

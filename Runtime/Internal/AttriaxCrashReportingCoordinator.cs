@@ -81,26 +81,34 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
-            var metadata = new Dictionary<string, object>
+            try
             {
-                ["logType"] = logType.ToString(),
-            };
+                var metadata = new Dictionary<string, object>
+                {
+                    ["logType"] = logType.ToString(),
+                };
 
-            _observeBackgroundTask(
-                _trackingManager.RecordCrashAsync(
-                    ExtractExceptionType(condition),
-                    string.IsNullOrWhiteSpace(condition) ? "Unhandled Unity exception" : condition,
-                    string.IsNullOrWhiteSpace(stackTrace)
-                        ? (string.IsNullOrWhiteSpace(condition) ? "Unhandled Unity exception" : condition)
-                        : stackTrace,
-                    new AttriaxRecordErrorOptions
-                    {
-                        Source = "unity_log_exception",
-                        IsFatal = false,
-                        Reason = "Unhandled Unity exception",
-                        Metadata = metadata,
-                    }),
-                "Automatic Unity crash reporting failed.");
+                _observeBackgroundTask(
+                    _trackingManager.RecordCrashAsync(
+                        ExtractExceptionType(condition),
+                        string.IsNullOrWhiteSpace(condition) ? "Unhandled Unity exception" : condition,
+                        string.IsNullOrWhiteSpace(stackTrace)
+                            ? (string.IsNullOrWhiteSpace(condition) ? "Unhandled Unity exception" : condition)
+                            : stackTrace,
+                        new AttriaxRecordErrorOptions
+                        {
+                            Source = "unity_log_exception",
+                            IsFatal = false,
+                            Reason = "Unhandled Unity exception",
+                            Metadata = metadata,
+                        }),
+                    "Automatic Unity crash reporting failed.");
+            }
+            catch (Exception error)
+            {
+                UnityEngine.Debug.LogError(
+                    "[Attriax] Automatic crash-reporting handler threw an unexpected error: " + error.Message);
+            }
         }
 
         internal static string ExtractExceptionType(string condition)

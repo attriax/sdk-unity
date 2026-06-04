@@ -121,14 +121,20 @@ namespace Attriax.Unity.Internal
                     "Attriax configured runtime is missing project settings.");
             }
 
-            await Instance.InitializeAsync(_settings.CreateInitOptions());
+            await Instance.InitializeAsync(_settings.CreateInitOptions()).ConfigureAwait(false);
         }
 
         private async Task AwaitInitializationAsync(Task initializationTask)
         {
             try
             {
-                await initializationTask;
+                await initializationTask.ConfigureAwait(false);
+            }
+            catch (Exception error)
+            {
+                UnityEngine.Debug.LogError(
+                    "[Attriax] Configured-runtime initialization failed. The SDK will not be available for this session. "
+                    + "See the inner exception for details: " + error.Message);
             }
             finally
             {

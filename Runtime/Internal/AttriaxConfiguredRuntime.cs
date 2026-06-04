@@ -51,8 +51,17 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
-            var host = AttriaxConfiguredHost.EnsureCreated(settings);
-            _ = host.InitializeIfNeededAsync();
+            try
+            {
+                var host = AttriaxConfiguredHost.EnsureCreated(settings);
+                _ = host.InitializeIfNeededAsync();
+            }
+            catch (Exception error)
+            {
+                UnityEngine.Debug.LogError(
+                    "[Attriax] Automatic SDK bootstrap failed. The SDK will not auto-initialize for this session. "
+                    + error.Message);
+            }
         }
 
         private static AttriaxConfiguredHost EnsureHost()

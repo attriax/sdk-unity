@@ -167,7 +167,7 @@ namespace Attriax.Unity
 
             try
             {
-                await InitializeAsync();
+                await InitializeAsync().ConfigureAwait(false);
             }
             catch (Exception error)
             {
@@ -270,9 +270,27 @@ namespace Attriax.Unity
 
             Instance = new Attriax(runtimeConfig);
 
-            _deepLinkSubscription = Instance.DeepLinks.Stream.Subscribe(HandleDeepLinkReceived);
-            _synchronizationSubscription = Instance.Synchronization.Subscribe(
-                HandleSynchronizationChanged);
+            try
+            {
+                _deepLinkSubscription = Instance.DeepLinks.Stream.Subscribe(HandleDeepLinkReceived);
+            }
+            catch (Exception error)
+            {
+                UnityEngine.Debug.LogWarning(
+                    "[Attriax] Failed to subscribe to deep-link events: " + error.Message);
+            }
+
+            try
+            {
+                _synchronizationSubscription = Instance.Synchronization.Subscribe(
+                    HandleSynchronizationChanged);
+            }
+            catch (Exception error)
+            {
+                UnityEngine.Debug.LogWarning(
+                    "[Attriax] Failed to subscribe to synchronization events: " + error.Message);
+            }
+
             return Instance;
         }
 
