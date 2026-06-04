@@ -304,7 +304,11 @@ namespace Attriax.Unity.Internal
 
         public bool Enabled => _enabled;
 
-        public bool EventsEnabled => _eventsEnabled;
+        public bool EventsEnabled
+        {
+            get => _eventsEnabled;
+            set => SetEventsEnabled(value);
+        }
 
         public bool IsFirstLaunch => _isFirstLaunch;
 
@@ -313,7 +317,11 @@ namespace Attriax.Unity.Internal
                 ? _deviceId
                 : null;
 
-        public bool AnonymousTrackingEnabled => _consentManager.AnonymousTrackingEnabled;
+        public bool AnonymousTrackingEnabled
+        {
+            get => _consentManager.AnonymousTrackingEnabled;
+            set => SetAnonymousTrackingEnabled(value);
+        }
 
         public AttriaxSdkSnapshot? SdkSnapshot => _initialized ? _contextManager.Snapshot.Sdk : null;
 
@@ -466,6 +474,184 @@ namespace Attriax.Unity.Internal
         {
             AssertInitialized();
             return _trackingManager.TrackPageViewAsync(pageName, options);
+        }
+
+        public Task RecordEventAsync(string eventName, AttriaxTrackEventOptions options)
+        {
+            AssertInitialized();
+            return _trackingManager.TrackEventAsync(eventName, options);
+        }
+
+        public Task RecordPageViewAsync(string pageName, AttriaxPageViewOptions options)
+        {
+            AssertInitialized();
+            return _trackingManager.TrackPageViewAsync(pageName, options);
+        }
+
+        public Task RecordPurchaseAsync(double revenue, AttriaxRecordPurchaseOptions options)
+        {
+            AssertInitialized();
+
+            if (double.IsInfinity(revenue) || double.IsNaN(revenue))
+            {
+                throw new ArgumentException("revenue must be finite.", nameof(revenue));
+            }
+
+            if (options.Quantity <= 0)
+            {
+                throw new ArgumentException("quantity must be positive.", nameof(options.Quantity));
+            }
+
+            var eventData = BuildPurchaseRevenueEventData(
+                AttriaxAnalyticsEventKeys.Purchase,
+                revenue,
+                options.Currency,
+                options.RevenueInMicros,
+                options.PurchaseType,
+                options.ProductId,
+                options.TransactionId,
+                options.OriginalTransactionId,
+                options.ValidationProvider,
+                options.ValidationEnvironment,
+                options.PurchaseToken,
+                options.ReceiptData,
+                options.SignedPayload,
+                options.ReceiptSignature,
+                options.IsRenewal,
+                options.Quantity,
+                options.Store,
+                options.PackageName,
+                options.Voided,
+                options.Test,
+                options.ValidationId,
+                options.Metadata,
+                isRefund: false);
+
+            return TrackEventAsync(AttriaxAnalyticsEventKeys.Purchase, new AttriaxTrackEventOptions
+            {
+                EventData = eventData,
+                FlushImmediately = options.FlushImmediately,
+            });
+        }
+
+        public Task RecordRefundAsync(double revenue, AttriaxRecordRefundOptions options)
+        {
+            AssertInitialized();
+
+            if (double.IsInfinity(revenue) || double.IsNaN(revenue))
+            {
+                throw new ArgumentException("revenue must be finite.", nameof(revenue));
+            }
+
+            if (options.Quantity <= 0)
+            {
+                throw new ArgumentException("quantity must be positive.", nameof(options.Quantity));
+            }
+
+            var eventData = BuildRefundRevenueEventData(
+                revenue,
+                options.Currency,
+                options.RevenueInMicros,
+                options.PurchaseType,
+                options.ProductId,
+                options.TransactionId,
+                options.OriginalTransactionId,
+                options.Quantity,
+                options.Store,
+                options.PackageName,
+                options.Voided,
+                options.Test,
+                options.Reason,
+                options.Metadata);
+
+            return TrackEventAsync(AttriaxAnalyticsEventKeys.Refund, new AttriaxTrackEventOptions
+            {
+                EventData = eventData,
+                FlushImmediately = options.FlushImmediately,
+            });
+        }
+
+        public Task RecordAdRevenueAsync(double revenue, AttriaxRecordAdRevenueOptions options)
+        {
+            AssertInitialized();
+
+            if (double.IsInfinity(revenue) || double.IsNaN(revenue))
+            {
+                throw new ArgumentException("revenue must be finite.", nameof(revenue));
+            }
+
+            var eventData = BuildAdRevenueEventData(
+                revenue,
+                options.Currency,
+                options.RevenueInMicros,
+                options.AdNetwork,
+                options.AdFormat,
+                options.AdType,
+                options.AdPlacement,
+                options.Test,
+                options.Metadata);
+
+            return TrackEventAsync(AttriaxAnalyticsEventKeys.AdRevenue, new AttriaxTrackEventOptions
+            {
+                EventData = eventData,
+                FlushImmediately = options.FlushImmediately,
+            });
+        }
+
+        public Task RecordAdEventAsync(AttriaxAdEventType type, AttriaxRecordAdEventOptions options)
+        {
+            AssertInitialized();
+
+            if (options.LoadLatencyMs.HasValue &&
+                (double.IsInfinity(options.LoadLatencyMs.Value) || double.IsNaN(options.LoadLatencyMs.Value)))
+            {
+                throw new ArgumentException("loadLatencyMs must be finite.", nameof(options));
+            }
+
+            if (options.RewardAmount.HasValue &&
+                (double.IsInfinity(options.RewardAmount.Value) || double.IsNaN(options.RewardAmount.Value)))
+            {
+                throw new ArgumentException("rewardAmount must be finite.", nameof(options));
+            }
+
+            var eventName = AdEventTypeToEventName(type);
+            var eventData = BuildAdEventData(
+                options.AdNetwork,
+                options.MediationNetwork,
+                options.AdUnitId,
+                options.AdPlacement,
+                options.AdFormat,
+                options.AdType,
+                options.FailureReason,
+                options.LoadLatencyMs,
+                options.RewardType,
+                options.RewardAmount,
+                options.Test,
+                options.Metadata);
+
+            return TrackEventAsync(eventName, new AttriaxTrackEventOptions
+            {
+                EventData = eventData,
+                FlushImmediately = options.FlushImmediately,
+            });
+        }
+
+        private static string AdEventTypeToEventName(AttriaxAdEventType type)
+        {
+            switch (type)
+            {
+                case AttriaxAdEventType.Request: return "ad_request";
+                case AttriaxAdEventType.Load: return "ad_load";
+                case AttriaxAdEventType.LoadFailed: return "ad_load_failed";
+                case AttriaxAdEventType.Show: return "ad_show";
+                case AttriaxAdEventType.ShowFailed: return "ad_show_failed";
+                case AttriaxAdEventType.Impression: return "ad_impression";
+                case AttriaxAdEventType.Click: return "ad_click";
+                case AttriaxAdEventType.Dismiss: return "ad_dismiss";
+                case AttriaxAdEventType.Reward: return "ad_reward";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown AttriaxAdEventType.");
+            }
         }
 
         public Task<AttriaxSkanUpdateResult> UpdateSkanConversionValueAsync(
@@ -2039,6 +2225,289 @@ namespace Attriax.Unity.Internal
             }
 
             return string.IsNullOrWhiteSpace(second) ? null : second;
+        }
+
+        private static string SanitizeOptionalString(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            return value!.Trim();
+        }
+
+        private static IDictionary<string, object> BuildPurchaseRevenueEventData(
+            string eventName,
+            double revenue,
+            string currency,
+            bool revenueInMicros,
+            string? purchaseType,
+            string? productId,
+            string? transactionId,
+            string? originalTransactionId,
+            string? validationProvider,
+            string? validationEnvironment,
+            string? purchaseToken,
+            string? receiptData,
+            string? signedPayload,
+            string? receiptSignature,
+            bool? isRenewal,
+            int quantity,
+            string? store,
+            string? packageName,
+            bool? voided,
+            bool? test,
+            string? validationId,
+            IDictionary<string, object>? metadata,
+            bool isRefund)
+        {
+            var normalizedCurrency = SanitizeOptionalString(currency)?.ToUpperInvariant();
+            if (normalizedCurrency == null || normalizedCurrency.Length != 3)
+            {
+                normalizedCurrency = "USD";
+            }
+
+            var eventData = new Dictionary<string, object>
+            {
+                [AttriaxAnalyticsParamKeys.Revenue] = revenue,
+                [AttriaxAnalyticsParamKeys.Currency] = normalizedCurrency,
+            };
+            if (revenueInMicros)
+            {
+                eventData[AttriaxAnalyticsParamKeys.RevenueInMicros] = true;
+            }
+
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.PurchaseType, purchaseType);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.ProductId, productId);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.TransactionId, transactionId);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.OriginalTransactionId, originalTransactionId);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.ValidationProvider, validationProvider);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.ValidationEnvironment, validationEnvironment);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.PurchaseToken, purchaseToken);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.ReceiptData, receiptData);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.SignedPayload, signedPayload);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.ReceiptSignature, receiptSignature);
+
+            if (isRenewal.HasValue)
+            {
+                eventData[AttriaxAnalyticsParamKeys.IsRenewal] = isRenewal.Value;
+            }
+
+            if (quantity != 1)
+            {
+                eventData[AttriaxAnalyticsParamKeys.Quantity] = quantity;
+            }
+
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.Store, store);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.PackageName, packageName);
+
+            if (voided.HasValue)
+            {
+                eventData[AttriaxAnalyticsParamKeys.Voided] = voided.Value;
+            }
+
+            if (test.HasValue)
+            {
+                eventData[AttriaxAnalyticsParamKeys.Test] = test.Value;
+            }
+
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.ValidationId, validationId);
+
+            if (isRefund)
+            {
+                eventData[AttriaxAnalyticsParamKeys.RevenueType] = AttriaxAnalyticsEventKeys.Refund;
+            }
+
+            if (metadata != null)
+            {
+                foreach (var entry in metadata)
+                {
+                    eventData[entry.Key] = entry.Value;
+                }
+            }
+
+            return eventData;
+        }
+
+        private static IDictionary<string, object> BuildRefundRevenueEventData(
+            double revenue,
+            string currency,
+            bool revenueInMicros,
+            string? purchaseType,
+            string? productId,
+            string? transactionId,
+            string? originalTransactionId,
+            int quantity,
+            string? store,
+            string? packageName,
+            bool? voided,
+            bool? test,
+            string? reason,
+            IDictionary<string, object>? metadata)
+        {
+            var normalizedCurrency = SanitizeOptionalString(currency)?.ToUpperInvariant();
+            if (normalizedCurrency == null || normalizedCurrency.Length != 3)
+            {
+                normalizedCurrency = "USD";
+            }
+
+            var refundRevenue = revenue == 0 ? 0 : -Math.Abs(revenue);
+
+            var eventData = new Dictionary<string, object>
+            {
+                [AttriaxAnalyticsParamKeys.Revenue] = refundRevenue,
+                [AttriaxAnalyticsParamKeys.Currency] = normalizedCurrency,
+                [AttriaxAnalyticsParamKeys.RevenueType] = AttriaxAnalyticsEventKeys.Refund,
+            };
+            if (revenueInMicros)
+            {
+                eventData[AttriaxAnalyticsParamKeys.RevenueInMicros] = true;
+            }
+
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.PurchaseType, purchaseType);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.ProductId, productId);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.TransactionId, transactionId);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.OriginalTransactionId, originalTransactionId);
+
+            if (quantity != 1)
+            {
+                eventData[AttriaxAnalyticsParamKeys.Quantity] = quantity;
+            }
+
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.Store, store);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.PackageName, packageName);
+
+            if (voided.HasValue)
+            {
+                eventData[AttriaxAnalyticsParamKeys.Voided] = voided.Value;
+            }
+
+            if (test.HasValue)
+            {
+                eventData[AttriaxAnalyticsParamKeys.Test] = test.Value;
+            }
+
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.Reason, reason);
+
+            if (metadata != null)
+            {
+                foreach (var entry in metadata)
+                {
+                    eventData[entry.Key] = entry.Value;
+                }
+            }
+
+            return eventData;
+        }
+
+        private static IDictionary<string, object> BuildAdRevenueEventData(
+            double revenue,
+            string currency,
+            bool revenueInMicros,
+            string? adNetwork,
+            string? adFormat,
+            string? adType,
+            string? adPlacement,
+            bool? test,
+            IDictionary<string, object>? metadata)
+        {
+            var normalizedCurrency = SanitizeOptionalString(currency)?.ToUpperInvariant();
+            if (normalizedCurrency == null || normalizedCurrency.Length != 3)
+            {
+                normalizedCurrency = "USD";
+            }
+
+            var eventData = new Dictionary<string, object>
+            {
+                [AttriaxAnalyticsParamKeys.Revenue] = revenue,
+                [AttriaxAnalyticsParamKeys.Currency] = normalizedCurrency,
+            };
+            if (revenueInMicros)
+            {
+                eventData[AttriaxAnalyticsParamKeys.RevenueInMicros] = true;
+            }
+
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.AdNetwork, adNetwork);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.AdFormat, adFormat);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.AdType, adType);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.AdPlacement, adPlacement);
+
+            if (test.HasValue)
+            {
+                eventData[AttriaxAnalyticsParamKeys.Test] = test.Value;
+            }
+
+            if (metadata != null)
+            {
+                foreach (var entry in metadata)
+                {
+                    eventData[entry.Key] = entry.Value;
+                }
+            }
+
+            return eventData;
+        }
+
+        private static IDictionary<string, object> BuildAdEventData(
+            string? adNetwork,
+            string? mediationNetwork,
+            string? adUnitId,
+            string? adPlacement,
+            string? adFormat,
+            string? adType,
+            string? failureReason,
+            double? loadLatencyMs,
+            string? rewardType,
+            double? rewardAmount,
+            bool? test,
+            IDictionary<string, object>? metadata)
+        {
+            var eventData = new Dictionary<string, object>();
+
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.AdNetwork, adNetwork);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.MediationNetwork, mediationNetwork);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.AdUnitId, adUnitId);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.AdPlacement, adPlacement);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.AdFormat, adFormat);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.AdType, adType);
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.FailureReason, failureReason);
+
+            if (loadLatencyMs.HasValue)
+            {
+                eventData[AttriaxAnalyticsParamKeys.LoadLatencyMs] = loadLatencyMs.Value;
+            }
+
+            AddIfNotNullOrWhitespace(eventData, AttriaxAnalyticsParamKeys.RewardType, rewardType);
+
+            if (rewardAmount.HasValue)
+            {
+                eventData[AttriaxAnalyticsParamKeys.RewardAmount] = rewardAmount.Value;
+            }
+
+            if (test.HasValue)
+            {
+                eventData[AttriaxAnalyticsParamKeys.Test] = test.Value;
+            }
+
+            if (metadata != null)
+            {
+                foreach (var entry in metadata)
+                {
+                    eventData[entry.Key] = entry.Value;
+                }
+            }
+
+            return eventData;
+        }
+
+        private static void AddIfNotNullOrWhitespace(IDictionary<string, object> eventData, string key, string? value)
+        {
+            var sanitized = SanitizeOptionalString(value);
+            if (sanitized != null)
+            {
+                eventData[key] = sanitized;
+            }
         }
 
         private static string ReadString(IDictionary<string, object> source, string key)
