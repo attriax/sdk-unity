@@ -183,6 +183,34 @@ namespace Attriax.Unity.Internal
             return result;
         }
 
+        public static void PostToMainThread(Action action)
+        {
+            if (action == null)
+            {
+                throw new ArgumentNullException(nameof(action));
+            }
+
+            BindToCurrentThread();
+            if (IsMainThread)
+            {
+                action();
+                return;
+            }
+
+            var context = _mainThreadContext;
+            if (context == null)
+            {
+                throw new InvalidOperationException(
+                    "Attriax could not access the Unity main thread. Initialize the runtime on the Unity thread before using background continuations.");
+            }
+
+            context.Post(_ =>
+            {
+                BindToCurrentThread();
+                action();
+            }, null);
+        }
+
         public static string InitialAbsoluteUrl
         {
             get { return Application.absoluteURL; }

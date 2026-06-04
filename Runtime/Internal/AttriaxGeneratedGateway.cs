@@ -397,23 +397,32 @@ namespace Attriax.Unity.Internal
 
         private static async Task<TResult> ExecuteAsync<TResult>(Func<Task<TResult>> execute)
         {
-            try
+            var tcs = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            AttriaxLifecycleDispatcher.PostToMainThread(async () =>
             {
-                var task = AttriaxLifecycleDispatcher.InvokeOnMainThread(execute);
-                return await task.ConfigureAwait(false);
-            }
-            catch (GeneratedApiException exception)
-            {
-                throw NormalizeGeneratedApiException(exception);
-            }
-            catch (GeneratedConnectionException exception)
-            {
-                throw NormalizeGeneratedConnectionException(exception);
-            }
-            catch (GeneratedUnexpectedResponseException exception)
-            {
-                throw NormalizeGeneratedUnexpectedResponseException(exception);
-            }
+                try
+                {
+                    TResult result = await execute().ConfigureAwait(false);
+                    tcs.TrySetResult(result);
+                }
+                catch (GeneratedApiException exception)
+                {
+                    tcs.TrySetException(NormalizeGeneratedApiException(exception));
+                }
+                catch (GeneratedConnectionException exception)
+                {
+                    tcs.TrySetException(NormalizeGeneratedConnectionException(exception));
+                }
+                catch (GeneratedUnexpectedResponseException exception)
+                {
+                    tcs.TrySetException(NormalizeGeneratedUnexpectedResponseException(exception));
+                }
+                catch (Exception exception)
+                {
+                    tcs.TrySetException(exception);
+                }
+            });
+            return await tcs.Task.ConfigureAwait(false);
         }
 
         private static async Task ExecuteCommandAsync<TResult>(Func<Task<TResult>> execute)
