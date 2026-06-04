@@ -1468,24 +1468,6 @@ namespace Attriax.Unity.Internal
                 "Automatic Unity scene page tracking failed.");
         }
 
-        private void HandleApplicationQuitting()
-        {
-            if (_disposed || !_initialized)
-            {
-                return;
-            }
-
-            if (_config.SessionTrackingEnabled)
-            {
-                _sessionManager.HandleQuitting(DateTimeOffset.UtcNow);
-            }
-
-            if (_enabled)
-            {
-                RequestQueueFlush(true);
-            }
-        }
-
         private void QueueSessionLifecycle(
             SdkSessionLifecycleKind kind,
             AttriaxSessionSnapshot session,
