@@ -102,7 +102,7 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
-            var duplicate = FindObjectsOfType<Attriax.Unity.AttriaxBehaviour>()
+            var duplicate = FindObjectsOfType<AttriaxBehaviour>()
                 .FirstOrDefault(b =>
                 {
                     var token = b.Instance?.Config.ProjectToken;
