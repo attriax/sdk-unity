@@ -297,6 +297,38 @@ namespace Attriax.Unity.Internal
             PlayerPrefs.Save();
         }
 
+        public static void SetRuntimePersistenceMode(
+            IEnumerable<string> runtimeKeys,
+            AttriaxPlayerPrefsPersistenceMode mode)
+        {
+            var keys = NormalizeKeys(runtimeKeys);
+            lock (PersistenceGate)
+            {
+                foreach (var key in keys)
+                {
+                    RuntimeKeyModes[key] = mode;
+                }
+            }
+
+            if (mode == AttriaxPlayerPrefsPersistenceMode.FullRuntime)
+            {
+                foreach (var key in keys)
+                {
+                    SyncMemoryValueToPersistentStorage(key);
+                }
+
+                Save();
+                return;
+            }
+
+            foreach (var key in keys)
+            {
+                RemovePersistedValue(key);
+            }
+
+            Save();
+        }
+
         public static void ForgetRuntimeKeys(IEnumerable<string> runtimeKeys)
         {
             var keys = NormalizeKeys(runtimeKeys);
