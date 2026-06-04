@@ -70,6 +70,39 @@ namespace Attriax.Unity.Tests
             Assert.That(sessionManager.CurrentSession, Is.Null);
         }
 
+        [Test]
+        public void AnonymousSessionSnapshotIsRestoredWithEmptyDeviceId()
+        {
+            var storageKey = "attriax.tests.session.anonymous." + Guid.NewGuid().ToString("N");
+            _storageKeys.Add(storageKey);
+
+            var occurredAt = new DateTimeOffset(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
+            var store = new AttriaxPlayerPrefsSessionStore(storageKey, (_, _) => { });
+
+            var anonymousSession = new AttriaxSessionSnapshot
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                DeviceId = string.Empty,
+                Platform = AttriaxPlatformType.UnityEditor,
+                Locale = "en-US",
+                IsFirstLaunch = true,
+                StartedAt = occurredAt,
+                LastActivityAt = occurredAt,
+                HeartbeatIntervalMs = 30000,
+                AppVersion = "1.0.0",
+                AppBuildNumber = "1",
+                AppPackageName = "com.attriax.test",
+                SdkPackageVersion = "0.4.0",
+            };
+
+            store.WriteSessionSnapshot(anonymousSession);
+            var restored = store.ReadSessionSnapshot();
+
+            Assert.That(restored, Is.Not.Null);
+            Assert.That(restored!.DeviceId, Is.EqualTo(string.Empty));
+            Assert.That(restored.Id, Is.EqualTo(anonymousSession.Id));
+        }
+
         private AttriaxSessionManager CreateSessionManager(
             IAttriaxSessionLifecycleQueue lifecycleQueue,
             Func<bool>? canTrackSessions = null)

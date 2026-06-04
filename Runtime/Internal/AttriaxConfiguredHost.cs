@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -79,6 +80,8 @@ namespace Attriax.Unity.Internal
             {
                 DontDestroyOnLoad(gameObject);
             }
+
+            WarnIfDuplicateBehaviourExists();
         }
 
         private void OnDestroy()
@@ -90,6 +93,31 @@ namespace Attriax.Unity.Internal
 
             Instance?.Dispose();
             Instance = null;
+        }
+
+        private void WarnIfDuplicateBehaviourExists()
+        {
+            if (_settings == null)
+            {
+                return;
+            }
+
+            var duplicate = FindObjectsOfType<Attriax.Unity.AttriaxBehaviour>()
+                .FirstOrDefault(b =>
+                {
+                    var token = b.Instance?.Config.ProjectToken;
+                    return !string.IsNullOrWhiteSpace(token) &&
+                           string.Equals(token, _settings.ProjectToken, StringComparison.Ordinal);
+                });
+
+            if (duplicate != null)
+            {
+                UnityEngine.Debug.LogWarning(
+                    "[Attriax] A configured singleton and an AttriaxBehaviour both target the same project token. " +
+                    "The AttriaxBehaviour will reuse the configured instance to avoid duplicate sessions. " +
+                    "Consider removing one initialization path.",
+                    duplicate);
+            }
         }
 
         internal void ApplySettings(AttriaxProjectSettings settings)
