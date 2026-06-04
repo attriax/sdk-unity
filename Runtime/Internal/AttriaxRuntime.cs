@@ -79,6 +79,7 @@ namespace Attriax.Unity.Internal
 
         private Task _initializationTask;
         private Task _flushTask;
+        private readonly object _flushGate = new object();
         private DateTimeOffset? _deferredFlushDueAt;
         private NormalizedConfig _config;
         private string _storageNamespace;
@@ -852,13 +853,16 @@ namespace Attriax.Unity.Internal
         {
             _deferredFlushDueAt = null;
 
-            if (_flushTask != null)
+            lock (_flushGate)
             {
-                return _flushTask;
-            }
+                if (_flushTask != null)
+                {
+                    return _flushTask;
+                }
 
-            _flushTask = FlushInternalAsync();
-            return AwaitFlushAsync(_flushTask);
+                _flushTask = FlushInternalAsync();
+                return AwaitFlushAsync(_flushTask);
+            }
         }
 
         public async Task ResetAsync()
