@@ -138,7 +138,7 @@ namespace Attriax.Unity.Internal
         {
             AttriaxLifecycleDispatcher.BindToCurrentThread();
             _config = NormalizeConfig(config);
-            _platform = GetCurrentPlatform();
+            _platform = MapPlatform(Application.platform);
             _openBrowserUrlAsync = openBrowserUrlAsync ?? AttriaxNativeBridge.OpenBrowserUrlAsync;
             _contextSnapshotBuilder = new AttriaxContextSnapshotBuilder(
                 _config.ToPublic(),
@@ -3431,7 +3431,35 @@ namespace Attriax.Unity.Internal
         {
             SyncRuntimePersistenceMode();
             await EnsureIdentifiedContextAsync().ConfigureAwait(false);
+
+            var updatedSession = _sessionManager.CurrentSession;
+            if (updatedSession != null && string.IsNullOrWhiteSpace(updatedSession.DeviceId) &&
+                !string.IsNullOrWhiteSpace(_deviceId))
+            {
+                _sessionManager.HandleSdkEnabled(DateTimeOffset.UtcNow);
+            }
+
             _activationCoordinator.HandleConsentStateChanged(_enabled, RuntimeActivationState);
+
+            if (!_consentManager.IsWaitingForConsent && ShouldTrackSessionActivity)
+            {
+                var currentSession = _sessionManager.CurrentSession;
+                if (currentSession != null)
+                {
+                    var decision = TrackingDecisionFor(AttriaxTrackingSignal.Session);
+                    _ = _requestQueue.Enqueue(
+                        AttriaxQueuedRequest.CreateSession(
+                            AttriaxGeneratedRequestFactory.BuildTrackSessionRequest(
+                                _config.ProjectToken,
+                                decision.AttachDeviceIdentity ? _deviceId : null,
+                                decision.AttachDeviceIdentity ? RequireDeviceIdSource() : null,
+                                currentSession,
+                                SdkSessionLifecycleKind.Heartbeat,
+                                DateTimeOffset.UtcNow,
+                                null)));
+                    RequestQueueFlush(true);
+                }
+            }
         }
 
         private void RewriteAndPurgeQueuedRequestsForConsent()
@@ -3623,7 +3651,7 @@ namespace Attriax.Unity.Internal
 
         private AttriaxPlatformType GetCurrentPlatform()
         {
-            return _platform;
+            return MapPlatform(Application.platform);
         }
 
         private void AssertInitialized()
