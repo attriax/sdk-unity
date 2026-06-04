@@ -11,9 +11,9 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxTracking
     {
-        private readonly Attriax _attriax;
+        private readonly AttriaxRuntime _attriax;
 
-        internal AttriaxTracking(Attriax attriax)
+        internal AttriaxTracking(AttriaxRuntime attriax)
         {
             _attriax = attriax;
         }

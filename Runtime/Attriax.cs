@@ -22,7 +22,7 @@ namespace Attriax.Unity
             _runtime = new AttriaxRuntime(config);
             Consent = new AttriaxConsent(_runtime);
             Synchronization = new AttriaxSynchronization(_runtime);
-            Tracking = new AttriaxTracking(this);
+            Tracking = new AttriaxTracking(_runtime);
             DeepLinks = new AttriaxDeepLinks(_runtime);
             Referrer = new AttriaxReferrer(_runtime);
             Skan = new AttriaxSkan(_runtime);
