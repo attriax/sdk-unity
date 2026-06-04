@@ -15,7 +15,7 @@ namespace Attriax.Unity.Internal
         private readonly AttriaxRuntimeState _runtimeState;
         private readonly Func<bool> _shouldDispatchAnalytics;
         private readonly AttriaxSessionManager _sessionManager;
-        private readonly AttriaxRequestQueue _requestQueue;
+        private readonly AttriaxRequestManager _requestManager;
         private readonly AttriaxSkanManager _skanManager;
         private readonly Action<bool> _requestFlush;
         private readonly Action<string, string?> _debugLog;
@@ -28,7 +28,7 @@ namespace Attriax.Unity.Internal
             AttriaxRuntimeState runtimeState,
             Func<bool> shouldDispatchAnalytics,
             AttriaxSessionManager sessionManager,
-            AttriaxRequestQueue requestQueue,
+            AttriaxRequestManager requestManager,
             AttriaxSkanManager skanManager,
             Action<bool> requestFlush,
             Action<string, string?> debugLog)
@@ -40,7 +40,7 @@ namespace Attriax.Unity.Internal
             _runtimeState = runtimeState;
             _shouldDispatchAnalytics = shouldDispatchAnalytics;
             _sessionManager = sessionManager;
-            _requestQueue = requestQueue;
+            _requestManager = requestManager;
             _skanManager = skanManager;
             _requestFlush = requestFlush;
             _debugLog = debugLog;
@@ -75,7 +75,7 @@ namespace Attriax.Unity.Internal
                 ? _sessionManager.PrepareTrackedActivity(occurredAt).CurrentSession
                 : null;
 
-            await _requestQueue.Enqueue(
+            await _requestManager.Enqueue(
                     AttriaxQueuedRequest.CreateEvent(
                         AttriaxGeneratedRequestFactory.BuildTrackEventRequest(
                             _projectToken,
@@ -138,7 +138,7 @@ namespace Attriax.Unity.Internal
                 : null;
             var snapshot = _sessionManager.ContextSnapshot;
 
-            await _requestQueue.Enqueue(
+            await _requestManager.Enqueue(
                     AttriaxQueuedRequest.CreateCrash(
                         AttriaxGeneratedRequestFactory.BuildTrackCrashRequest(
                             _projectToken,
@@ -291,7 +291,7 @@ namespace Attriax.Unity.Internal
                 _sessionManager.PrepareTrackedActivity(DateTimeOffset.UtcNow);
             }
 
-            await _requestQueue.Enqueue(
+            await _requestManager.Enqueue(
                     AttriaxQueuedRequest.CreateUser(
                         AttriaxGeneratedRequestFactory.BuildUserRequest(
                             _projectToken,

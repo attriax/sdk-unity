@@ -20,8 +20,7 @@ namespace Attriax.Unity.Internal
 
         private void PersistEnabledState(bool enabled)
         {
-            _enabled = enabled;
-            _runtimeSettingsStore.WriteEnabled(enabled);
+            _settingsState.SetEnabled(enabled);
         }
 
         private void RefreshAppOpenDispatchGate()

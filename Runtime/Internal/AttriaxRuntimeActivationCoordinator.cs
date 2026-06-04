@@ -71,47 +71,29 @@ namespace Attriax.Unity.Internal
             _isInitialized = isInitialized ?? throw new ArgumentNullException(nameof(isInitialized));
         }
 
-        public void SetEnabled(bool enabled, AttriaxRuntimeActivationState state)
+        public void Apply(bool enabled, AttriaxRuntimeActivationState state)
         {
             _persistEnabled(enabled);
             _refreshAppOpenDispatchGate();
 
             if (!enabled)
             {
-                _clearDeferredFlush();
-                _handleSdkDisabled();
-                _setSynchronizationState(AttriaxSynchronizationState.Disabled);
+                ApplyDisabledState(callHandleSdkDisabled: true);
                 return;
             }
 
             _handleSdkEnabled();
             _prepareReferrerTasksForEnabledState();
             _scheduleLaunchPreparationIfNeeded();
+            ApplyTrackingMode(
+                state,
+                requestFlushOnlyWhenQueuePending: false,
+                synchronizeWhenQueueEmpty: true);
+        }
 
-            if (state.ShouldDeferNetworkDispatch)
-            {
-                _clearDeferredFlush();
-                _setSynchronizationState(AttriaxSynchronizationState.Deferred);
-                return;
-            }
-
-            if (!state.AllowsAttributionTracking)
-            {
-                _resolveDeniedAttributionState();
-            }
-
-            if (!state.ShouldTrackAnything)
-            {
-                _clearDeferredFlush();
-                _setSynchronizationState(AttriaxSynchronizationState.Disabled);
-                return;
-            }
-
-            _requestImmediateQueueFlush();
-            if (_queueCount() == 0)
-            {
-                _setSynchronizationState(AttriaxSynchronizationState.Synchronized);
-            }
+        public void SetEnabled(bool enabled, AttriaxRuntimeActivationState state)
+        {
+            Apply(enabled, state);
         }
 
         public void HandleConsentStateChanged(bool enabled, AttriaxRuntimeActivationState state)
@@ -128,17 +110,26 @@ namespace Attriax.Unity.Internal
 
             if (!enabled)
             {
-                _clearDeferredFlush();
-                _setSynchronizationState(AttriaxSynchronizationState.Disabled);
+                ApplyDisabledState(callHandleSdkDisabled: false);
                 return;
             }
 
             _scheduleLaunchPreparationIfNeeded();
 
+            ApplyTrackingMode(
+                state,
+                requestFlushOnlyWhenQueuePending: true,
+                synchronizeWhenQueueEmpty: true);
+        }
+
+        private void ApplyTrackingMode(
+            AttriaxRuntimeActivationState state,
+            bool requestFlushOnlyWhenQueuePending,
+            bool synchronizeWhenQueueEmpty)
+        {
             if (state.ShouldDeferNetworkDispatch)
             {
-                _clearDeferredFlush();
-                _setSynchronizationState(AttriaxSynchronizationState.Deferred);
+                ApplyDeferredState();
                 return;
             }
 
@@ -149,18 +140,51 @@ namespace Attriax.Unity.Internal
 
             if (!state.ShouldTrackAnything)
             {
-                _clearDeferredFlush();
-                _setSynchronizationState(AttriaxSynchronizationState.Disabled);
+                ApplyNoTrackingState();
                 return;
             }
 
-            if (_queueCount() > 0)
+            ApplyActiveState(
+                requestFlushOnlyWhenQueuePending: requestFlushOnlyWhenQueuePending,
+                synchronizeWhenQueueEmpty: synchronizeWhenQueueEmpty);
+        }
+
+        private void ApplyDisabledState(bool callHandleSdkDisabled)
+        {
+            _clearDeferredFlush();
+            if (callHandleSdkDisabled)
+            {
+                _handleSdkDisabled();
+            }
+
+            _setSynchronizationState(AttriaxSynchronizationState.Disabled);
+        }
+
+        private void ApplyDeferredState()
+        {
+            _clearDeferredFlush();
+            _setSynchronizationState(AttriaxSynchronizationState.Deferred);
+        }
+
+        private void ApplyNoTrackingState()
+        {
+            _clearDeferredFlush();
+            _setSynchronizationState(AttriaxSynchronizationState.Disabled);
+        }
+
+        private void ApplyActiveState(
+            bool requestFlushOnlyWhenQueuePending,
+            bool synchronizeWhenQueueEmpty)
+        {
+            if (!requestFlushOnlyWhenQueuePending || _queueCount() > 0)
             {
                 _requestImmediateQueueFlush();
-                return;
             }
 
-            _setSynchronizationState(AttriaxSynchronizationState.Synchronized);
+            if (synchronizeWhenQueueEmpty && _queueCount() == 0)
+            {
+                _setSynchronizationState(AttriaxSynchronizationState.Synchronized);
+            }
         }
     }
 }

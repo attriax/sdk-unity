@@ -51,16 +51,21 @@ namespace Attriax.Unity.Internal
         private readonly object _initializationGate = new object();
         private readonly AttriaxAppOpenManager _appOpenManager;
         private readonly AttriaxIosAppOpenEnrichmentManager _iosAppOpenEnrichmentManager;
+        private readonly AttriaxPlatformInstallReferrerManager _platformInstallReferrerManager;
         private readonly AttriaxConsentManager _consentManager;
+        private readonly AttriaxContextSnapshotBuilder _contextSnapshotBuilder;
         private readonly AttriaxContextManager _contextManager;
         private readonly AttriaxDeepLinkManager _deepLinkManager;
         private readonly AttriaxEventHub _eventHub;
         private readonly AttriaxGeneratedGateway _generatedGateway;
         private readonly Func<AttriaxPlatformType, string, AttriaxResolvedUrlOpenMode, Task<bool>> _openBrowserUrlAsync;
+        private readonly AttriaxRequestManager _requestManager;
         private readonly AttriaxRequestQueue _requestQueue;
         private readonly string[] _runtimeScopedStorageKeys;
         private readonly AttriaxRuntimeState _runtimeState = new AttriaxRuntimeState();
         private readonly AttriaxRuntimeSettingsStore _runtimeSettingsStore;
+        private readonly AttriaxRuntimeSettingsState _settingsState;
+        private readonly AttriaxReferrerManager _referrerManager;
         private readonly AttriaxSdkRuntimeConfigCoordinator _sdkRuntimeConfigCoordinator;
         private readonly AttriaxSkanManager _skanManager;
         private readonly AttriaxSessionManager _sessionManager;
@@ -68,15 +73,12 @@ namespace Attriax.Unity.Internal
         private readonly AttriaxTrackingManager _trackingManager;
         private readonly AttriaxAppOpenLaunchCoordinator _appOpenLaunchCoordinator;
         private readonly AttriaxRuntimeActivationCoordinator _activationCoordinator;
-        private readonly AttriaxRuntimeInstallReferrerStore _installReferrerStore;
+        private readonly AttriaxCrashReportingCoordinator _crashReportingCoordinator;
+        private readonly AttriaxInstallReferrerStore _installReferrerStore;
 
         private Task _initializationTask;
         private Task _flushTask;
         private DateTimeOffset? _deferredFlushDueAt;
-        private readonly AttriaxInstallReferrerState _originalInstallReferrerState =
-            new AttriaxInstallReferrerState();
-        private readonly AttriaxInstallReferrerState _reinstallInstallReferrerState =
-            new AttriaxInstallReferrerState();
         private NormalizedConfig _config;
         private string _storageNamespace;
         private bool _lifecycleAttached;
@@ -135,6 +137,13 @@ namespace Attriax.Unity.Internal
             _config = NormalizeConfig(config);
             var platform = GetCurrentPlatform();
             _openBrowserUrlAsync = openBrowserUrlAsync ?? AttriaxNativeBridge.OpenBrowserUrlAsync;
+            _contextSnapshotBuilder = new AttriaxContextSnapshotBuilder(
+                _config.ToPublic(),
+                SdkApiVersion,
+                SdkPackageVersion,
+                ResolveCurrentTimezone);
+            _platformInstallReferrerManager = new AttriaxPlatformInstallReferrerManager(
+                ReadPersistedInstallReferrer);
             _contextManager = new AttriaxContextManager(
                 this);
             _eventHub = new AttriaxEventHub();
@@ -144,7 +153,7 @@ namespace Attriax.Unity.Internal
                 _eventHub);
             _generatedGateway = new AttriaxGeneratedGateway(_config.ApiBaseUrl, _config.RequestTimeoutMs);
             _storageNamespace = BuildStorageNamespace(_config.ProjectToken);
-            _installReferrerStore = new AttriaxRuntimeInstallReferrerStore(this);
+            _installReferrerStore = new AttriaxInstallReferrerStore(Key);
             _runtimeSettingsStore = new AttriaxRuntimeSettingsStore(
                 Key("deviceId"),
                 Key("deviceIdSource"),
@@ -167,9 +176,11 @@ namespace Attriax.Unity.Internal
             AttriaxPlayerPrefs.SetRuntimePersistenceMode(
                 _runtimeScopedStorageKeys,
                 ResolveInitialRuntimePersistenceMode());
+            _requestManager = new AttriaxRequestManager();
             _requestQueue = new AttriaxRequestQueue(Key("queue"), _config.MaxQueueSize);
-            _enabled = _runtimeSettingsStore.ReadEnabled(true);
-            _eventsEnabled = _runtimeSettingsStore.ReadEventsEnabled(true);
+            _requestManager.BindQueue(_requestQueue);
+            _settingsState = new AttriaxRuntimeSettingsState(_runtimeSettingsStore, _runtimeState);
+            _settingsState.RestoreFromStore();
             _consentManager = new AttriaxConsentManager(
                 new AttriaxPlayerPrefsConsentStore(
                     Key(GdprConsentStorageKey),
@@ -229,6 +240,14 @@ namespace Attriax.Unity.Internal
                 _runtimeState,
                 this,
                 _eventHub);
+            _referrerManager = new AttriaxReferrerManager(
+                _runtimeState,
+                () => _deepLinkManager.InitialDeepLinkValue,
+                () => _deepLinkManager.LatestDeepLink,
+                () => _deepLinkManager.InitialDeepLink,
+                _appOpenManager.WaitForPublicResultAsync,
+                _eventHub.SubscribeToDeepLinks,
+                () => _sessionManager.CurrentSession);
             _iosAppOpenEnrichmentManager = new AttriaxIosAppOpenEnrichmentManager(platform);
             _sdkRuntimeConfigCoordinator = new AttriaxSdkRuntimeConfigCoordinator(
                 LoadSdkRuntimeConfigAsync,
@@ -252,10 +271,15 @@ namespace Attriax.Unity.Internal
                 _runtimeState,
                 ShouldDispatchAnalyticsInCurrentMode,
                 _sessionManager,
-                _requestQueue,
+                _requestManager,
                 _skanManager,
                 RequestQueueFlush,
                 NoopDebugLog);
+            _crashReportingCoordinator = new AttriaxCrashReportingCoordinator(
+                _config.ToPublic(),
+                () => !_disposed && _initialized && _enabled,
+                _trackingManager,
+                ObserveBackgroundTask);
             _activationCoordinator = new AttriaxRuntimeActivationCoordinator(
                 PersistEnabledState,
                 RefreshAppOpenDispatchGate,
@@ -304,10 +328,10 @@ namespace Attriax.Unity.Internal
         public AttriaxSkanState? SkanState => _skanManager.State;
 
         public Task<AttriaxInstallReferrerDetails?> OriginalInstallReferrer =>
-            _originalInstallReferrerState.Task;
+            _referrerManager.OriginalInstallReferrer;
 
         public Task<AttriaxInstallReferrerDetails?> ReinstallReferrer =>
-            _reinstallInstallReferrerState.Task;
+            _referrerManager.ReinstallReferrer;
 
         public Task<AttriaxInstallReferrerDetails?> InstallReferrer =>
             GetLegacyInstallReferrerAsync();
@@ -322,6 +346,16 @@ namespace Attriax.Unity.Internal
             AttriaxRawDeepLinkEvent rawEvent)
         {
             return _deepLinkManager.WaitForResolutionAsync(rawEvent);
+        }
+
+        public async Task<AttriaxDeepLinkReferrerDetails?> GetSessionReferrerAsync()
+        {
+            return await _referrerManager.GetSessionReferrerAsync().ConfigureAwait(false);
+        }
+
+        public Task<AttriaxDeepLinkReferrerDetails?> GetLatestDeepLinkReferrerAsync()
+        {
+            return _referrerManager.GetLatestDeepLinkReferrerAsync();
         }
 
         public Task<AttriaxTrackingAuthorizationStatus> RequestTrackingAuthorizationAsync(
@@ -680,15 +714,14 @@ namespace Attriax.Unity.Internal
                 true,
                 true);
 
-            _requestQueue.Clear(resetError);
+            _requestManager.Clear(resetError);
             DetachLifecycle();
             _sessionManager.Reset();
             _appOpenManager.Reset();
             _appOpenLaunchCoordinator.Reset();
             _sdkRuntimeConfigCoordinator.Reset();
             _contextManager.Reset();
-            _originalInstallReferrerState.Reset();
-            _reinstallInstallReferrerState.Reset();
+            _referrerManager.Reset();
             _deepLinkManager.Reset();
             _eventHub.Reset();
             await _skanManager.ResetAsync().ConfigureAwait(false);
@@ -710,8 +743,7 @@ namespace Attriax.Unity.Internal
 
         public void SetEventsEnabled(bool enabled)
         {
-            _eventsEnabled = enabled;
-            _runtimeSettingsStore.WriteEventsEnabled(enabled);
+            _settingsState.SetEventsEnabled(enabled);
         }
 
         public void SetAnonymousTrackingEnabled(bool enabled)
@@ -731,8 +763,7 @@ namespace Attriax.Unity.Internal
             _deferredFlushDueAt = null;
             _identifiedConsentTransitionTask = null;
             _resolvedPlatform = AttriaxPlatformType.Unknown;
-            _originalInstallReferrerState.Complete(null);
-            _reinstallInstallReferrerState.Complete(null);
+            _referrerManager.CompleteAllWithNull();
             CompleteInitialDeepLink(null);
             DetachLifecycle();
             _appOpenManager.Reset();
@@ -740,7 +771,7 @@ namespace Attriax.Unity.Internal
             _sdkRuntimeConfigCoordinator.Reset();
             _generatedGateway.Dispose();
             AttriaxPlayerPrefs.ForgetRuntimeKeys(_runtimeScopedStorageKeys);
-            _requestQueue.RejectAll(new AttriaxApiError(
+            _requestManager.RejectAll(new AttriaxApiError(
                 "Attriax instance was disposed before queued work completed.",
                 null,
                 true,
@@ -893,20 +924,13 @@ namespace Attriax.Unity.Internal
 
         private async Task<AttriaxInstallReferrerDetails?> GetLegacyInstallReferrerAsync()
         {
-            var reinstallReferrer = await ReinstallReferrer.ConfigureAwait(false);
-            if (reinstallReferrer != null)
-            {
-                return reinstallReferrer;
-            }
-
-            return await OriginalInstallReferrer.ConfigureAwait(false);
+            return await _referrerManager.GetLegacyInstallReferrerAsync().ConfigureAwait(false);
         }
 
         private void EnsureReferrerTasksForEnabledState()
         {
-            _originalInstallReferrerState.PrepareForEnabledState(
-                ReadPersistedInstallReferrerDetails(OriginalInstallReferrerDetailsStorageKey));
-            _reinstallInstallReferrerState.PrepareForEnabledState(
+            _referrerManager.PrepareForEnabledState(
+                ReadPersistedInstallReferrerDetails(OriginalInstallReferrerDetailsStorageKey),
                 ReadPersistedInstallReferrerDetails(ReinstallReferrerDetailsStorageKey));
         }
 
@@ -997,8 +1021,8 @@ namespace Attriax.Unity.Internal
                     PersistInstallReferrer(currentInstallReferrerDetails.RawPlatformInstallReferrer!);
                 }
 
-                CompleteOriginalInstallReferrer(originalInstallReferrerDetails);
-                CompleteReinstallInstallReferrer(reinstallReferrerDetails);
+                _referrerManager.CompleteOriginal(originalInstallReferrerDetails);
+                _referrerManager.CompleteReinstall(reinstallReferrerDetails);
             }
             catch (Exception)
             {
@@ -1008,8 +1032,8 @@ namespace Attriax.Unity.Internal
                 }
 
                 _deepLinkManager.MarkAppOpenUnavailable();
-                CompleteOriginalInstallReferrer(null);
-                CompleteReinstallInstallReferrer(null);
+                _referrerManager.CompleteOriginal(null);
+                _referrerManager.CompleteReinstall(null);
             }
         }
 
@@ -1019,8 +1043,8 @@ namespace Attriax.Unity.Internal
             var platform = GetCurrentPlatform();
             if (platform != AttriaxPlatformType.Android)
             {
-                CompleteOriginalInstallReferrer(null);
-                CompleteReinstallInstallReferrer(null);
+                _referrerManager.CompleteOriginal(null);
+                _referrerManager.CompleteReinstall(null);
                 _deepLinkManager.MarkAppOpenUnavailable();
                 return;
             }
@@ -1031,95 +1055,16 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
-            var details = BuildLocalInstallReferrerDetails(context);
+            var details = _platformInstallReferrerManager.BuildLocalInstallReferrerDetails(context);
             if (!string.IsNullOrWhiteSpace(details?.RawPlatformInstallReferrer))
             {
                 PersistInstallReferrer(details.RawPlatformInstallReferrer!);
                 PersistInstallReferrerDetails(OriginalInstallReferrerDetailsStorageKey, details);
                 PersistInstallReferrerDetails(ReinstallReferrerDetailsStorageKey, details);
             }
-            CompleteOriginalInstallReferrer(details);
-            CompleteReinstallInstallReferrer(details);
+            _referrerManager.CompleteOriginal(details);
+            _referrerManager.CompleteReinstall(details);
             _deepLinkManager.MarkAppOpenUnavailable();
-        }
-
-        private static AttriaxInstallReferrerDetails? BuildLocalInstallReferrerDetails(
-            AttriaxInstallReferrerContextPayload context)
-        {
-            if (string.IsNullOrWhiteSpace(context.InstallReferrer))
-            {
-                return null;
-            }
-
-            var query = ParseQueryString(context.InstallReferrer!);
-            var deepLinkUrl = FirstQueryValue(
-                query,
-                "deep_link_uri",
-                "deep_link_url",
-                "deep_link",
-                "af_dp");
-
-            return new AttriaxInstallReferrerDetails
-            {
-                RawPlatformInstallReferrer = context.InstallReferrer,
-                Source = FirstQueryValue(query, "utm_source", "source"),
-                Medium = FirstQueryValue(query, "utm_medium", "medium"),
-                Campaign = FirstQueryValue(query, "utm_campaign", "campaign"),
-                Term = FirstQueryValue(query, "utm_term", "term"),
-                Content = FirstQueryValue(query, "utm_content", "content"),
-                AdClickId = FirstQueryValue(query, "gclid", "gbraid", "wbraid", "fbclid"),
-                AttributionType = AttributionType.Referrer,
-                DeepLinkUri = deepLinkUrl,
-                InstallBeginTimestampSeconds = context.InstallBeginTimestampSeconds,
-                ReferrerClickTimestampSeconds = context.ReferrerClickTimestampSeconds,
-                GooglePlayInstantParam = context.GooglePlayInstantParam,
-                Precision = 0.5,
-            };
-        }
-
-        private static Dictionary<string, string> ParseQueryString(string query)
-        {
-            var parsed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var part in query.Split('&'))
-            {
-                if (string.IsNullOrWhiteSpace(part))
-                {
-                    continue;
-                }
-
-                var separatorIndex = part.IndexOf('=');
-                var rawKey = separatorIndex >= 0 ? part.Substring(0, separatorIndex) : part;
-                var rawValue = separatorIndex >= 0 ? part.Substring(separatorIndex + 1) : string.Empty;
-                var key = DecodeQueryComponent(rawKey);
-                if (string.IsNullOrWhiteSpace(key))
-                {
-                    continue;
-                }
-
-                parsed[key] = DecodeQueryComponent(rawValue);
-            }
-
-            return parsed;
-        }
-
-        private static string? FirstQueryValue(
-            IDictionary<string, string> query,
-            params string[] keys)
-        {
-            foreach (var key in keys)
-            {
-                if (query.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
-                {
-                    return value;
-                }
-            }
-
-            return null;
-        }
-
-        private static string DecodeQueryComponent(string value)
-        {
-            return Uri.UnescapeDataString(value.Replace("+", " "));
         }
 
         private void AttachLifecycle()
@@ -1135,8 +1080,8 @@ namespace Attriax.Unity.Internal
             AttriaxLifecycleDispatcher.ApplicationPaused += HandleApplicationPaused;
             AttriaxLifecycleDispatcher.ApplicationFocusChanged += HandleApplicationFocusChanged;
             AttriaxLifecycleDispatcher.SceneChanged += HandleSceneChanged;
-            AttriaxLifecycleDispatcher.UnhandledExceptionLogged += HandleUnhandledExceptionLogged;
             AttriaxLifecycleDispatcher.Quitting += HandleApplicationQuitting;
+            _crashReportingCoordinator.Activate();
             _lifecycleAttached = true;
         }
 
@@ -1152,42 +1097,9 @@ namespace Attriax.Unity.Internal
             AttriaxLifecycleDispatcher.ApplicationPaused -= HandleApplicationPaused;
             AttriaxLifecycleDispatcher.ApplicationFocusChanged -= HandleApplicationFocusChanged;
             AttriaxLifecycleDispatcher.SceneChanged -= HandleSceneChanged;
-            AttriaxLifecycleDispatcher.UnhandledExceptionLogged -= HandleUnhandledExceptionLogged;
             AttriaxLifecycleDispatcher.Quitting -= HandleApplicationQuitting;
+            _crashReportingCoordinator.Deactivate();
             _lifecycleAttached = false;
-        }
-
-        private void HandleUnhandledExceptionLogged(string condition, string stackTrace, LogType logType)
-        {
-            if (_disposed ||
-                !_initialized ||
-                !_enabled ||
-                !_config.AutomaticCrashReportingEnabled ||
-                logType != LogType.Exception)
-            {
-                return;
-            }
-
-            var metadata = new Dictionary<string, object>
-            {
-                ["logType"] = logType.ToString(),
-            };
-
-            ObserveBackgroundTask(
-                _trackingManager.RecordCrashAsync(
-                    ExtractExceptionType(condition),
-                    string.IsNullOrWhiteSpace(condition) ? "Unhandled Unity exception" : condition,
-                    string.IsNullOrWhiteSpace(stackTrace)
-                        ? (string.IsNullOrWhiteSpace(condition) ? "Unhandled Unity exception" : condition)
-                        : stackTrace,
-                    new AttriaxRecordErrorOptions
-                    {
-                        Source = "unity_log_exception",
-                        IsFatal = false,
-                        Reason = "Unhandled Unity exception",
-                        Metadata = metadata,
-                    }),
-                "Automatic Unity crash reporting failed.");
         }
 
         private void HandleDeepLinkActivated(string url)
@@ -1866,22 +1778,6 @@ namespace Attriax.Unity.Internal
                 error);
         }
 
-        private static string ExtractExceptionType(string condition)
-        {
-            if (string.IsNullOrWhiteSpace(condition))
-            {
-                return "Exception";
-            }
-
-            var separatorIndex = condition.IndexOf(':');
-            if (separatorIndex > 0)
-            {
-                return condition.Substring(0, separatorIndex).Trim();
-            }
-
-            return "Exception";
-        }
-
         private async Task<PreparedContext> PrepareContextAsync(
             ResolvedDeviceId resolvedDeviceId,
             bool isFirstLaunch,
@@ -1994,30 +1890,7 @@ namespace Attriax.Unity.Internal
             AttriaxPlatformType platform,
             bool isFirstLaunch)
         {
-            return new AttriaxContextSnapshot
-            {
-                Platform = platform,
-                DeviceId = string.Empty,
-                IsFirstLaunch = isFirstLaunch,
-                Sdk = new AttriaxSdkSnapshot
-                {
-                    ApiVersion = SdkApiVersion,
-                    PackageVersion = SdkPackageVersion,
-                    Metadata = CollectSdkMetadata(platform),
-                },
-                App = new AttriaxAppSnapshot
-                {
-                    Version = string.IsNullOrWhiteSpace(_config.AppVersion) ? Application.version : _config.AppVersion,
-                    BuildNumber = FirstNonEmpty(_config.AppBuildNumber, Application.buildGUID),
-                    PackageName = string.IsNullOrWhiteSpace(_config.AppPackageName) ? Application.identifier : _config.AppPackageName,
-                },
-                Device = new AttriaxDeviceSnapshot
-                {
-                    Timezone = ResolveCurrentTimezone(),
-                    SupportedAbis = new List<string>(),
-                    Metadata = new Dictionary<string, object>(),
-                },
-            };
+            return _contextSnapshotBuilder.BuildAnonymousContextSnapshot(platform, isFirstLaunch);
         }
 
         private async Task EnsureIdentifiedContextAsync()
@@ -2054,20 +1927,7 @@ namespace Attriax.Unity.Internal
         private AttriaxInstallReferrerContextPayload BuildInitialInstallReferrerContext(
             AttriaxPlatformType platform)
         {
-            var cachedInstallReferrer = platform == AttriaxPlatformType.Android
-                ? ReadPersistedInstallReferrer()
-                : null;
-
-            return new AttriaxInstallReferrerContextPayload
-            {
-                InstallReferrer = cachedInstallReferrer,
-                Metadata = new Dictionary<string, object>
-                {
-                    ["source"] = !string.IsNullOrWhiteSpace(cachedInstallReferrer)
-                        ? "unity_cached_install_referrer"
-                        : "unity_initial_context",
-                },
-            };
+            return _platformInstallReferrerManager.BuildInitialInstallReferrerContext(platform);
         }
 
         private async Task<AttriaxContextSnapshot> ResolveContextSnapshotAsync(
@@ -2105,29 +1965,13 @@ namespace Attriax.Unity.Internal
             AttriaxInstallReferrerContextPayload installReferrerContext,
             string? rawPlatformInstallReferrer)
         {
-            return new AttriaxContextSnapshot
-            {
-                Platform = platform,
-                DeviceId = deviceId,
-                IsFirstLaunch = isFirstLaunch,
-                RawPlatformInstallReferrer = rawPlatformInstallReferrer,
-                InstallBeginTimestampSeconds = installReferrerContext.InstallBeginTimestampSeconds,
-                ReferrerClickTimestampSeconds = installReferrerContext.ReferrerClickTimestampSeconds,
-                GooglePlayInstantParam = installReferrerContext.GooglePlayInstantParam,
-                Sdk = new AttriaxSdkSnapshot
-                {
-                    ApiVersion = SdkApiVersion,
-                    PackageVersion = SdkPackageVersion,
-                    Metadata = CollectSdkMetadata(platform),
-                },
-                App = new AttriaxAppSnapshot
-                {
-                    Version = string.IsNullOrWhiteSpace(_config.AppVersion) ? Application.version : _config.AppVersion,
-                    BuildNumber = FirstNonEmpty(_config.AppBuildNumber, Application.buildGUID),
-                    PackageName = string.IsNullOrWhiteSpace(_config.AppPackageName) ? Application.identifier : _config.AppPackageName,
-                },
-                Device = CollectDeviceSnapshot(platform, nativeContext, installReferrerContext),
-            };
+            return _contextSnapshotBuilder.BuildContextSnapshot(
+                platform,
+                deviceId,
+                isFirstLaunch,
+                nativeContext,
+                installReferrerContext,
+                rawPlatformInstallReferrer);
         }
 
         private async Task<AttriaxPreparedContextRefresh> PrepareContextRefreshAsync(
@@ -2146,287 +1990,9 @@ namespace Attriax.Unity.Internal
         private async Task<AttriaxInstallReferrerContextPayload> CollectInstallReferrerContextAsync(
             AttriaxPlatformType platform)
         {
-            if (platform == AttriaxPlatformType.Android)
-            {
-                var cachedReferrer = ReadPersistedInstallReferrer();
-                if (!string.IsNullOrWhiteSpace(cachedReferrer))
-                {
-                    return new AttriaxInstallReferrerContextPayload
-                    {
-                        InstallReferrer = cachedReferrer,
-                        Metadata = new Dictionary<string, object>
-                        {
-                            ["source"] = "unity_cached_install_referrer",
-                        },
-                    };
-                }
-
-                var firstAttempt = await AttriaxNativeBridge.CollectInstallReferrerAsync(platform);
-                if (!string.IsNullOrWhiteSpace(firstAttempt.InstallReferrer))
-                {
-                    return firstAttempt;
-                }
-
-                var secondAttempt = await AttriaxNativeBridge.CollectInstallReferrerAsync(platform);
-                if (!string.IsNullOrWhiteSpace(secondAttempt.InstallReferrer))
-                {
-                    secondAttempt.Metadata["installReferrerAttempts"] = 2;
-                    return secondAttempt;
-                }
-                return new AttriaxInstallReferrerContextPayload
-                {
-                    Metadata = MergeMetadata(
-                        firstAttempt.Metadata,
-                        secondAttempt.Metadata,
-                        new Dictionary<string, object>
-                        {
-                            ["installReferrerAttempts"] = 2,
-                            ["installReferrerStatus"] = ReadString(
-                                secondAttempt.Metadata,
-                                "installReferrerStatus")
-                                ?? ReadString(firstAttempt.Metadata, "installReferrerStatus")
-                                ?? "empty",
-                        }),
-                };
-            }
-
-            return await AttriaxNativeBridge.CollectInstallReferrerAsync(platform);
-        }
-
-        private AttriaxDeviceSnapshot CollectDeviceSnapshot(
-            AttriaxPlatformType platform,
-            AttriaxNativeContextPayload nativeContext,
-            AttriaxInstallReferrerContextPayload installReferrerContext)
-        {
-            var metadata = new Dictionary<string, object>
-            {
-                ["unityRuntime"] = CollectUnityRuntimeMetadata(platform),
-                ["nativeContext"] = nativeContext.Metadata,
-                ["installReferrerContext"] = installReferrerContext.Metadata,
-            };
-
-            if (platform == AttriaxPlatformType.UnityEditor)
-            {
-                metadata["editorContext"] = CollectEditorMetadata();
-            }
-
-            if (platform == AttriaxPlatformType.Windows ||
-                platform == AttriaxPlatformType.MacOS ||
-                platform == AttriaxPlatformType.Linux)
-            {
-                metadata["desktopContext"] = CollectDesktopMetadata(platform);
-            }
-
-            var language = ReadString(nativeContext.Metadata, "locale")
-                ?? ReadString(nativeContext.Metadata, "language")
-                ?? CultureInfo.CurrentCulture.Name
-                ?? Application.systemLanguage.ToString();
-            var timezone = ReadString(nativeContext.Metadata, "timezone")
-                ?? TimeZoneInfo.Local.Id;
-            var screenResolution = GetScreenResolution();
-            var screenWidth = GetScreenWidth();
-            var screenHeight = GetScreenHeight();
-            var devicePixelRatio = GetDevicePixelRatio(nativeContext.Metadata);
-            var colorDepth = ReadInt(nativeContext.Metadata, "colorDepth");
-
-            switch (platform)
-            {
-                case AttriaxPlatformType.Android:
-                    return new AttriaxDeviceSnapshot
-                    {
-                        Model = ReadString(nativeContext.Metadata, "model") ?? SystemInfo.deviceModel,
-                        Name = ReadString(nativeContext.Metadata, "device")
-                            ?? ReadString(nativeContext.Metadata, "product")
-                            ?? SystemInfo.deviceName,
-                        Brand = ReadString(nativeContext.Metadata, "brand"),
-                        Manufacturer = ReadString(nativeContext.Metadata, "manufacturer"),
-                        Hardware = ReadString(nativeContext.Metadata, "hardware") ?? SystemInfo.processorType,
-                        OsVersion = ReadString(nativeContext.Metadata, "releaseVersion") ?? SystemInfo.operatingSystem,
-                        Language = language,
-                        Timezone = timezone,
-                        ScreenResolution = screenResolution,
-                        ScreenWidth = screenWidth,
-                        ScreenHeight = screenHeight,
-                        DevicePixelRatio = devicePixelRatio,
-                        ColorDepth = colorDepth,
-                        AdvertisingId = _config.CollectAdvertisingId ? nativeContext.AdvertisingId : null,
-                        AndroidId = nativeContext.AndroidId,
-                        IsPhysicalDevice = true,
-                        SupportedAbis = ReadStringList(nativeContext.Metadata, "supportedAbis"),
-                        Metadata = metadata,
-                    };
-                case AttriaxPlatformType.IOS:
-                    return new AttriaxDeviceSnapshot
-                    {
-                        Model = ReadString(nativeContext.Metadata, "deviceModel") ?? SystemInfo.deviceModel,
-                        Name = ReadString(nativeContext.Metadata, "deviceName") ?? SystemInfo.deviceName,
-                        Brand = "Apple",
-                        Manufacturer = "Apple",
-                        Hardware = ReadString(nativeContext.Metadata, "hardwareModel") ?? SystemInfo.deviceModel,
-                        OsVersion = ReadString(nativeContext.Metadata, "systemVersion") ?? SystemInfo.operatingSystem,
-                        Language = language,
-                        Timezone = timezone,
-                        ScreenResolution = screenResolution,
-                        ScreenWidth = screenWidth,
-                        ScreenHeight = screenHeight,
-                        DevicePixelRatio = devicePixelRatio,
-                        ColorDepth = colorDepth,
-                        AdvertisingId = _config.CollectAdvertisingId ? nativeContext.AdvertisingId : null,
-                        IsPhysicalDevice = !ReadBoolean(nativeContext.Metadata, "isSimulator"),
-                        SupportedAbis = new List<string>(),
-                        Metadata = metadata,
-                    };
-                case AttriaxPlatformType.UnityEditor:
-                    return new AttriaxDeviceSnapshot
-                    {
-                        Model = SystemInfo.deviceModel,
-                        Name = Environment.MachineName,
-                        Brand = "Unity",
-                        Manufacturer = "Unity",
-                        Hardware = SystemInfo.processorType,
-                        OsVersion = Environment.OSVersion.VersionString,
-                        Language = language,
-                        Timezone = timezone,
-                        ScreenResolution = screenResolution,
-                        ScreenWidth = screenWidth,
-                        ScreenHeight = screenHeight,
-                        DevicePixelRatio = devicePixelRatio,
-                        ColorDepth = colorDepth,
-                        IsPhysicalDevice = false,
-                        SupportedAbis = new List<string>(),
-                        Metadata = metadata,
-                    };
-                case AttriaxPlatformType.Windows:
-                case AttriaxPlatformType.MacOS:
-                case AttriaxPlatformType.Linux:
-                    return new AttriaxDeviceSnapshot
-                    {
-                        Model = SystemInfo.deviceModel,
-                        Name = Environment.MachineName,
-                        Brand = GetDesktopBrand(platform),
-                        Manufacturer = GetDesktopBrand(platform),
-                        Hardware = SystemInfo.processorType,
-                        OsVersion = Environment.OSVersion.VersionString,
-                        Language = language,
-                        Timezone = timezone,
-                        ScreenResolution = screenResolution,
-                        ScreenWidth = screenWidth,
-                        ScreenHeight = screenHeight,
-                        DevicePixelRatio = devicePixelRatio,
-                        ColorDepth = colorDepth,
-                        IsPhysicalDevice = true,
-                        SupportedAbis = new List<string>(),
-                        Metadata = metadata,
-                    };
-                case AttriaxPlatformType.Web:
-                    return new AttriaxDeviceSnapshot
-                    {
-                        Model = SystemInfo.deviceModel,
-                        Name = SystemInfo.deviceName,
-                        Hardware = SystemInfo.processorType,
-                        OsVersion = SystemInfo.operatingSystem,
-                        Language = language,
-                        Timezone = timezone,
-                        ScreenResolution = screenResolution,
-                        ScreenWidth = screenWidth,
-                        ScreenHeight = screenHeight,
-                        DevicePixelRatio = devicePixelRatio,
-                        ColorDepth = colorDepth,
-                        IsPhysicalDevice = !Application.isEditor,
-                        SupportedAbis = new List<string>(),
-                        Metadata = metadata,
-                    };
-                default:
-                    return new AttriaxDeviceSnapshot
-                    {
-                        Model = SystemInfo.deviceModel,
-                        Name = SystemInfo.deviceName,
-                        Hardware = SystemInfo.processorType,
-                        OsVersion = SystemInfo.operatingSystem,
-                        Language = language,
-                        Timezone = timezone,
-                        ScreenResolution = screenResolution,
-                        ScreenWidth = screenWidth,
-                        ScreenHeight = screenHeight,
-                        DevicePixelRatio = devicePixelRatio,
-                        ColorDepth = colorDepth,
-                        IsPhysicalDevice = !Application.isEditor,
-                        SupportedAbis = new List<string>(),
-                        Metadata = metadata,
-                    };
-            }
-        }
-
-        private Dictionary<string, object> CollectSdkMetadata(AttriaxPlatformType platform)
-        {
-            var metadata = new Dictionary<string, object>(_config.SdkMetadata)
-            {
-                ["clientRuntime"] = "unity",
-                ["executionEnvironment"] = Application.isEditor ? "unity_editor" : "unity_player",
-                ["unityVersion"] = Application.unityVersion,
-                ["runtimePlatform"] = Application.platform.ToString(),
-            };
-
-            if (platform == AttriaxPlatformType.UnityEditor)
-            {
-                metadata["editorHostPlatform"] = DetectEditorHostPlatform();
-            }
-
-            return metadata;
-        }
-
-        private Dictionary<string, object> CollectUnityRuntimeMetadata(AttriaxPlatformType platform)
-        {
-            var metadata = new Dictionary<string, object>
-            {
-                ["unityVersion"] = Application.unityVersion,
-                ["runtimePlatform"] = Application.platform.ToString(),
-                ["resolvedPlatform"] = PlatformName(platform),
-                ["productName"] = Application.productName,
-                ["companyName"] = Application.companyName,
-                ["deviceType"] = SystemInfo.deviceType.ToString(),
-                ["processorType"] = SystemInfo.processorType,
-                ["processorCount"] = SystemInfo.processorCount,
-                ["systemMemorySize"] = SystemInfo.systemMemorySize,
-                ["graphicsDeviceName"] = SystemInfo.graphicsDeviceName,
-                ["graphicsDeviceVendor"] = SystemInfo.graphicsDeviceVendor,
-                ["graphicsMemorySize"] = SystemInfo.graphicsMemorySize,
-                ["graphicsDeviceType"] = SystemInfo.graphicsDeviceType.ToString(),
-                ["operatingSystem"] = SystemInfo.operatingSystem,
-                ["operatingSystemFamily"] = SystemInfo.operatingSystemFamily.ToString(),
-                ["internetReachability"] = Application.internetReachability.ToString(),
-            };
-
-            if (!string.IsNullOrWhiteSpace(AttriaxLifecycleDispatcher.InitialAbsoluteUrl))
-            {
-                metadata["absoluteUrl"] = AttriaxLifecycleDispatcher.InitialAbsoluteUrl;
-            }
-
-            return metadata;
-        }
-
-        private Dictionary<string, object> CollectDesktopMetadata(AttriaxPlatformType platform)
-        {
-            return new Dictionary<string, object>
-            {
-                ["platform"] = PlatformName(platform),
-                ["machineName"] = Environment.MachineName,
-                ["osVersion"] = Environment.OSVersion.VersionString,
-                ["is64BitOperatingSystem"] = Environment.Is64BitOperatingSystem,
-                ["is64BitProcess"] = Environment.Is64BitProcess,
-                ["processorCount"] = Environment.ProcessorCount,
-            };
-        }
-
-        private Dictionary<string, object> CollectEditorMetadata()
-        {
-            return new Dictionary<string, object>
-            {
-                ["hostPlatform"] = DetectEditorHostPlatform(),
-                ["productName"] = Application.productName,
-                ["companyName"] = Application.companyName,
-                ["isBatchMode"] = Application.isBatchMode,
-            };
+            return await _platformInstallReferrerManager
+                .CollectInstallReferrerContextAsync(platform)
+                .ConfigureAwait(false);
         }
 
         private string ReadPersistedInstallReferrer()
@@ -2451,20 +2017,6 @@ namespace Attriax.Unity.Internal
             _installReferrerStore.PersistInstallReferrerDetails(storageKey, installReferrerDetails);
         }
 
-        private void CompleteOriginalInstallReferrer(
-            AttriaxInstallReferrerDetails? installReferrerDetails,
-            bool disabledResult = false)
-        {
-            _originalInstallReferrerState.Complete(installReferrerDetails, disabledResult);
-        }
-
-        private void CompleteReinstallInstallReferrer(
-            AttriaxInstallReferrerDetails? installReferrerDetails,
-            bool disabledResult = false)
-        {
-            _reinstallInstallReferrerState.Complete(installReferrerDetails, disabledResult);
-        }
-
         private void ClearPersistedState()
         {
             _runtimeSettingsStore.Clear();
@@ -2479,81 +2031,6 @@ namespace Attriax.Unity.Internal
             AttriaxPlayerPrefs.Save();
         }
 
-        private static string GetScreenResolution()
-        {
-            try
-            {
-                if (Screen.width > 0 && Screen.height > 0)
-                {
-                    return string.Format(CultureInfo.InvariantCulture, "{0}x{1}", Screen.width, Screen.height);
-                }
-            }
-            catch (Exception)
-            {
-            }
-
-            return null;
-        }
-
-        private static int? GetScreenWidth()
-        {
-            try
-            {
-                if (Screen.width > 0)
-                {
-                    return Screen.width;
-                }
-            }
-            catch (Exception)
-            {
-            }
-
-            return null;
-        }
-
-        private static int? GetScreenHeight()
-        {
-            try
-            {
-                if (Screen.height > 0)
-                {
-                    return Screen.height;
-                }
-            }
-            catch (Exception)
-            {
-            }
-
-            return null;
-        }
-
-        private static double? GetDevicePixelRatio(IDictionary<string, object> source)
-        {
-            var nativeScale = ReadDouble(source, "devicePixelRatio")
-                ?? ReadDouble(source, "screenScale");
-            if (nativeScale.HasValue && nativeScale.Value > 0)
-            {
-                return nativeScale.Value;
-            }
-
-            try
-            {
-                if (Screen.dpi > 0f)
-                {
-                    var dpiRatio = Screen.dpi / 96f;
-                    if (dpiRatio > 0f && !float.IsNaN(dpiRatio) && !float.IsInfinity(dpiRatio))
-                    {
-                        return Math.Round(dpiRatio, 4, MidpointRounding.AwayFromZero);
-                    }
-                }
-            }
-            catch (Exception)
-            {
-            }
-
-            return null;
-        }
-
         private static string FirstNonEmpty(string first, string second)
         {
             if (!string.IsNullOrWhiteSpace(first))
@@ -2562,26 +2039,6 @@ namespace Attriax.Unity.Internal
             }
 
             return string.IsNullOrWhiteSpace(second) ? null : second;
-        }
-
-        private static Dictionary<string, object> MergeMetadata(
-            params Dictionary<string, object>[] dictionaries)
-        {
-            var merged = new Dictionary<string, object>();
-            foreach (var dictionary in dictionaries)
-            {
-                if (dictionary == null)
-                {
-                    continue;
-                }
-
-                foreach (var pair in dictionary)
-                {
-                    merged[pair.Key] = pair.Value;
-                }
-            }
-
-            return merged;
         }
 
         private static string ReadString(IDictionary<string, object> source, string key)
@@ -2638,153 +2095,6 @@ namespace Attriax.Unity.Internal
             }
 
             return JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(value));
-        }
-
-        private static bool ReadBoolean(IDictionary<string, object> source, string key)
-        {
-            if (source == null || !source.TryGetValue(key, out var rawValue) || rawValue == null)
-            {
-                return false;
-            }
-
-            if (rawValue is bool boolValue)
-            {
-                return boolValue;
-            }
-
-            if (rawValue is JValue jValue)
-            {
-                return jValue.ToObject<bool>();
-            }
-
-            bool.TryParse(rawValue.ToString(), out var parsed);
-            return parsed;
-        }
-
-        private static int? ReadInt(IDictionary<string, object> source, string key)
-        {
-            if (source == null || !source.TryGetValue(key, out var rawValue) || rawValue == null)
-            {
-                return null;
-            }
-
-            if (rawValue is int intValue)
-            {
-                return intValue;
-            }
-
-            if (rawValue is long longValue)
-            {
-                return Convert.ToInt32(longValue, CultureInfo.InvariantCulture);
-            }
-
-            if (rawValue is JValue jValue)
-            {
-                return jValue.ToObject<int?>();
-            }
-
-            return int.TryParse(rawValue.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
-                ? parsed
-                : (int?)null;
-        }
-
-        private static double? ReadDouble(IDictionary<string, object> source, string key)
-        {
-            if (source == null || !source.TryGetValue(key, out var rawValue) || rawValue == null)
-            {
-                return null;
-            }
-
-            if (rawValue is double doubleValue)
-            {
-                return doubleValue;
-            }
-
-            if (rawValue is float floatValue)
-            {
-                return floatValue;
-            }
-
-            if (rawValue is decimal decimalValue)
-            {
-                return Convert.ToDouble(decimalValue, CultureInfo.InvariantCulture);
-            }
-
-            if (rawValue is JValue jValue)
-            {
-                return jValue.ToObject<double?>();
-            }
-
-            return double.TryParse(rawValue.ToString(), NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var parsed)
-                ? parsed
-                : (double?)null;
-        }
-
-        private static IList<string> ReadStringList(IDictionary<string, object> source, string key)
-        {
-            var values = new List<string>();
-            if (source == null || !source.TryGetValue(key, out var rawValue) || rawValue == null)
-            {
-                return values;
-            }
-
-            if (rawValue is JArray jArray)
-            {
-                foreach (var item in jArray)
-                {
-                    var value = item.ToObject<string>();
-                    if (!string.IsNullOrWhiteSpace(value))
-                    {
-                        values.Add(value);
-                    }
-                }
-
-                return values;
-            }
-
-            if (rawValue is IEnumerable enumerable && !(rawValue is string))
-            {
-                foreach (var item in enumerable)
-                {
-                    var value = item?.ToString();
-                    if (!string.IsNullOrWhiteSpace(value))
-                    {
-                        values.Add(value);
-                    }
-                }
-            }
-
-            return values;
-        }
-
-        private static string GetDesktopBrand(AttriaxPlatformType platform)
-        {
-            switch (platform)
-            {
-                case AttriaxPlatformType.Windows:
-                    return "Microsoft";
-                case AttriaxPlatformType.MacOS:
-                    return "Apple";
-                case AttriaxPlatformType.Linux:
-                    return "Linux";
-                default:
-                    return "Desktop";
-            }
-        }
-
-        private static string DetectEditorHostPlatform()
-        {
-            switch (Application.platform)
-            {
-                case RuntimePlatform.WindowsEditor:
-                    return "windows";
-                case RuntimePlatform.OSXEditor:
-                    return "macos";
-                case RuntimePlatform.LinuxEditor:
-                    return "linux";
-                default:
-                    return "unknown";
-            }
         }
 
         private StoredDeviceIdState EnsureDeviceId()
@@ -3373,29 +2683,6 @@ namespace Attriax.Unity.Internal
                     return AttriaxPlatformType.Linux;
                 default:
                     return AttriaxPlatformType.Unknown;
-            }
-        }
-
-        private static string PlatformName(AttriaxPlatformType platform)
-        {
-            switch (platform)
-            {
-                case AttriaxPlatformType.Android:
-                    return "android";
-                case AttriaxPlatformType.IOS:
-                    return "ios";
-                case AttriaxPlatformType.Web:
-                    return "web";
-                case AttriaxPlatformType.UnityEditor:
-                    return "unity_editor";
-                case AttriaxPlatformType.Windows:
-                    return "windows";
-                case AttriaxPlatformType.MacOS:
-                    return "macos";
-                case AttriaxPlatformType.Linux:
-                    return "linux";
-                default:
-                    return "unknown";
             }
         }
 
