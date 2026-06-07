@@ -13,16 +13,6 @@ namespace Attriax.Unity.Internal
             _consentManager.Init();
             SyncRuntimePersistenceMode();
 
-            if (options.Enabled.HasValue)
-            {
-                _settingsState.SetEnabled(options.Enabled.Value);
-            }
-
-            if (options.EventsEnabled.HasValue)
-            {
-                _settingsState.SetEventsEnabled(options.EventsEnabled.Value);
-            }
-
             _isFirstLaunch = !_settingsState.ReadHasLaunched(false);
             _referrerManager.EnsureTaskSources();
             _deepLinkManager.Reset();

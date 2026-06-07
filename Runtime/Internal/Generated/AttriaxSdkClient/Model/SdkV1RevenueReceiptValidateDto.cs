@@ -37,34 +37,22 @@ namespace Attriax.Unity.Generated.Model
         /// <param name="clientOccurredAt">clientOccurredAt.</param>
         /// <param name="deviceId">deviceId.</param>
         /// <param name="environment">environment.</param>
-        /// <param name="originalTransactionId">originalTransactionId.</param>
-        /// <param name="packageName">packageName.</param>
         /// <param name="productId">productId.</param>
         /// <param name="projectToken">Attriax project token that scopes the SDK request..</param>
         /// <param name="provider">provider.</param>
-        /// <param name="purchaseToken">purchaseToken.</param>
-        /// <param name="receiptData">receiptData.</param>
-        /// <param name="receiptSignature">receiptSignature.</param>
-        /// <param name="signedPayload">signedPayload.</param>
-        /// <param name="store">store.</param>
+        /// <param name="receipt">receipt.</param>
         /// <param name="test">test.</param>
         /// <param name="transactionId">transactionId.</param>
-        public SdkV1RevenueReceiptValidateDto(string appToken = default, string clientOccurredAt = default, string deviceId = default, string environment = default, string originalTransactionId = default, string packageName = default, string productId = default, string projectToken = default, string provider = default, string purchaseToken = default, string receiptData = default, string receiptSignature = default, string signedPayload = default, string store = default, bool test = default, string transactionId = default)
+        public SdkV1RevenueReceiptValidateDto(string appToken = default, string clientOccurredAt = default, string deviceId = default, string environment = default, string productId = default, string projectToken = default, string provider = default, string receipt = default, bool test = default, string transactionId = default)
         {
             this.appToken = appToken;
             this.clientOccurredAt = clientOccurredAt;
             this.deviceId = deviceId;
             this.environment = environment;
-            this.originalTransactionId = originalTransactionId;
-            this.packageName = packageName;
             this.productId = productId;
             this.projectToken = projectToken;
             this.provider = provider;
-            this.purchaseToken = purchaseToken;
-            this.receiptData = receiptData;
-            this.receiptSignature = receiptSignature;
-            this.signedPayload = signedPayload;
-            this.store = store;
+            this.receipt = receipt;
             this.test = test;
             this.transactionId = transactionId;
         }
@@ -96,18 +84,6 @@ namespace Attriax.Unity.Generated.Model
         public string environment { get; set; }
 
         /// <summary>
-        /// Gets or Sets originalTransactionId
-        /// </summary>
-        [DataMember(Name = "originalTransactionId", EmitDefaultValue = false)]
-        public string originalTransactionId { get; set; }
-
-        /// <summary>
-        /// Gets or Sets packageName
-        /// </summary>
-        [DataMember(Name = "packageName", EmitDefaultValue = false)]
-        public string packageName { get; set; }
-
-        /// <summary>
         /// Gets or Sets productId
         /// </summary>
         [DataMember(Name = "productId", EmitDefaultValue = false)]
@@ -127,34 +103,10 @@ namespace Attriax.Unity.Generated.Model
         public string provider { get; set; }
 
         /// <summary>
-        /// Gets or Sets purchaseToken
+        /// Gets or Sets receipt
         /// </summary>
-        [DataMember(Name = "purchaseToken", EmitDefaultValue = false)]
-        public string purchaseToken { get; set; }
-
-        /// <summary>
-        /// Gets or Sets receiptData
-        /// </summary>
-        [DataMember(Name = "receiptData", EmitDefaultValue = false)]
-        public string receiptData { get; set; }
-
-        /// <summary>
-        /// Gets or Sets receiptSignature
-        /// </summary>
-        [DataMember(Name = "receiptSignature", EmitDefaultValue = false)]
-        public string receiptSignature { get; set; }
-
-        /// <summary>
-        /// Gets or Sets signedPayload
-        /// </summary>
-        [DataMember(Name = "signedPayload", EmitDefaultValue = false)]
-        public string signedPayload { get; set; }
-
-        /// <summary>
-        /// Gets or Sets store
-        /// </summary>
-        [DataMember(Name = "store", EmitDefaultValue = false)]
-        public string store { get; set; }
+        [DataMember(Name = "receipt", EmitDefaultValue = false)]
+        public string receipt { get; set; }
 
         /// <summary>
         /// Gets or Sets test
@@ -180,16 +132,10 @@ namespace Attriax.Unity.Generated.Model
             sb.Append("  clientOccurredAt: ").Append(clientOccurredAt).Append("\n");
             sb.Append("  deviceId: ").Append(deviceId).Append("\n");
             sb.Append("  environment: ").Append(environment).Append("\n");
-            sb.Append("  originalTransactionId: ").Append(originalTransactionId).Append("\n");
-            sb.Append("  packageName: ").Append(packageName).Append("\n");
             sb.Append("  productId: ").Append(productId).Append("\n");
             sb.Append("  projectToken: ").Append(projectToken).Append("\n");
             sb.Append("  provider: ").Append(provider).Append("\n");
-            sb.Append("  purchaseToken: ").Append(purchaseToken).Append("\n");
-            sb.Append("  receiptData: ").Append(receiptData).Append("\n");
-            sb.Append("  receiptSignature: ").Append(receiptSignature).Append("\n");
-            sb.Append("  signedPayload: ").Append(signedPayload).Append("\n");
-            sb.Append("  store: ").Append(store).Append("\n");
+            sb.Append("  receipt: ").Append(receipt).Append("\n");
             sb.Append("  test: ").Append(test).Append("\n");
             sb.Append("  transactionId: ").Append(transactionId).Append("\n");
             sb.Append("}\n");

@@ -11,15 +11,16 @@ namespace Attriax.Unity.Tests
     public sealed class AttriaxRuntimeBootstrapCoordinatorTests
     {
         [Test]
-        public async Task InitializeAsyncWithDisabledOptionCompletesBootstrapInDisabledState()
+        public async Task InitializeAsyncWithDisabledRuntimeCompletesBootstrapInDisabledState()
         {
             var runtime = CreateRuntime();
 
             try
             {
+                runtime.SetEnabled(false);
+
                 await runtime.InitializeAsync(new AttriaxInitOptions
                 {
-                    Enabled = false,
                     CaptureInitialUrl = false,
                 });
 
@@ -39,15 +40,16 @@ namespace Attriax.Unity.Tests
         }
 
         [Test]
-        public async Task InitializeAsyncHonorsEventsEnabledOverrideDuringBootstrap()
+        public async Task InitializeAsyncHonorsPreInitEventsEnabledOverrideDuringBootstrap()
         {
             var runtime = CreateRuntime();
 
             try
             {
+                runtime.SetEventsEnabled(false);
+
                 await runtime.InitializeAsync(new AttriaxInitOptions
                 {
-                    EventsEnabled = false,
                     CaptureInitialUrl = false,
                 });
 

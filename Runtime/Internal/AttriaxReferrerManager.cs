@@ -142,26 +142,7 @@ namespace Attriax.Unity.Internal
             }
 
             var currentReferrer = ResolveLatestDeepLinkReferrer();
-            if (currentReferrer != null)
-            {
-                return Task.FromResult<AttriaxDeepLinkReferrerDetails?>(currentReferrer);
-            }
-
-            var taskSource = new TaskCompletionSource<AttriaxDeepLinkReferrerDetails?>(
-                TaskCreationOptions.RunContinuationsAsynchronously);
-            IDisposable? subscription = null;
-            subscription = _subscribeToDeepLinks(deepLinkEvent =>
-            {
-                var nextReferrer = BuildDeepLinkReferrerDetailsForCurrentSession(deepLinkEvent);
-                if (nextReferrer == null)
-                {
-                    return;
-                }
-
-                subscription?.Dispose();
-                taskSource.TrySetResult(nextReferrer);
-            });
-            return taskSource.Task;
+            return Task.FromResult<AttriaxDeepLinkReferrerDetails?>(currentReferrer);
         }
 
         private AttriaxDeepLinkReferrerDetails? ResolveSessionOpeningReferrer()

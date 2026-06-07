@@ -17,15 +17,11 @@ namespace Attriax.Unity.Tests
             var request = AttriaxGeneratedRequestFactory.BuildValidateReceiptRequest(
                 projectToken: "ax_test",
                 deviceId: "device_1",
-                config: new AttriaxConfig
-                {
-                    AppPackageName = "com.attriax.game",
-                },
                 options: new AttriaxValidateReceiptOptions
                 {
                     Provider = " unity ",
                     ProductId = " coins_500 ",
-                    PurchaseToken = " purchase-token-123 ",
+                    Receipt = " purchase-token-123 ",
                 },
                 occurredAt: occurredAt);
 
@@ -35,8 +31,7 @@ namespace Attriax.Unity.Tests
             Assert.That(request.clientOccurredAt, Is.EqualTo("2026-05-08T13:15:00.0000000+00:00"));
             Assert.That(request.provider, Is.EqualTo("unity"));
             Assert.That(request.productId, Is.EqualTo("coins_500"));
-            Assert.That(request.purchaseToken, Is.EqualTo("purchase-token-123"));
-            Assert.That(request.packageName, Is.EqualTo("com.attriax.game"));
+            Assert.That(request.receipt, Is.EqualTo("purchase-token-123"));
         }
 
         [Test]
@@ -45,8 +40,10 @@ namespace Attriax.Unity.Tests
             var request = AttriaxGeneratedRequestFactory.BuildValidateReceiptRequest(
                 projectToken: "ax_test",
                 deviceId: null,
-                config: new AttriaxConfig(),
-                options: new AttriaxValidateReceiptOptions(),
+                options: new AttriaxValidateReceiptOptions
+                {
+                    Receipt = "receipt-data",
+                },
                 occurredAt: DateTimeOffset.UtcNow);
 
             Assert.That(request.deviceId, Is.Null);

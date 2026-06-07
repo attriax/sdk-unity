@@ -18,6 +18,10 @@ namespace Attriax.Unity
         /// <summary>
         /// Returns the original install-referrer details retained for this device, if any.
         /// </summary>
+        /// <remarks>
+        /// This returns null when SDK tracking is disabled, or when GDPR attribution
+        /// consent is required but has not been granted.
+        /// </remarks>
         public Task<AttriaxInstallReferrerDetails?> GetOriginalInstallReferrerAsync()
         {
             return _runtime.OriginalInstallReferrer;
@@ -26,6 +30,10 @@ namespace Attriax.Unity
         /// <summary>
         /// Returns the latest reinstall-referrer details retained for this device, if any.
         /// </summary>
+        /// <remarks>
+        /// This returns null when SDK tracking is disabled, or when GDPR attribution
+        /// consent is required but has not been granted.
+        /// </remarks>
         public Task<AttriaxInstallReferrerDetails?> GetReinstallReferrerAsync()
         {
             return _runtime.ReinstallReferrer;
@@ -48,8 +56,7 @@ namespace Attriax.Unity
         /// Most recent deep-link referrer observed in the current session.
         /// </summary>
         /// <remarks>
-        /// If no deep link has been received yet, this waits for the next handled
-        /// deep-link event.
+        /// If no deep link has been handled yet, this returns null immediately.
         /// </remarks>
         public Task<AttriaxDeepLinkReferrerDetails?> GetLatestDeepLinkReferrerAsync()
         {

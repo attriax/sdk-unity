@@ -527,10 +527,9 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxInitOptions
     {
-        public bool? Enabled { get; set; }
-
-        public bool? EventsEnabled { get; set; }
-
+        /// <summary>
+        /// Controls whether startup should inspect the current URL for an initial deep link.
+        /// </summary>
         public bool CaptureInitialUrl { get; set; } = true;
     }
 
@@ -736,28 +735,34 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxValidateReceiptOptions
     {
+        /// <summary>
+        /// Raw receipt payload submitted by the host app.
+        /// </summary>
+        public string Receipt { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Backend-recognized receipt provider such as <c>unity</c> or a store adapter name.
+        /// </summary>
         public string? Provider { get; set; }
 
+        /// <summary>
+        /// Validation environment such as <c>production</c>, <c>sandbox</c>, or a provider-specific label.
+        /// </summary>
         public string? Environment { get; set; }
 
+        /// <summary>
+        /// Transaction identifier reported by the mobile store or purchase wrapper.
+        /// </summary>
         public string? TransactionId { get; set; }
 
-        public string? OriginalTransactionId { get; set; }
-
+        /// <summary>
+        /// Purchased product identifier or SKU.
+        /// </summary>
         public string? ProductId { get; set; }
 
-        public string? Store { get; set; }
-
-        public string? PackageName { get; set; }
-
-        public string? PurchaseToken { get; set; }
-
-        public string? ReceiptData { get; set; }
-
-        public string? SignedPayload { get; set; }
-
-        public string? ReceiptSignature { get; set; }
-
+        /// <summary>
+        /// Marks sandbox, QA, or other non-production validation traffic.
+        /// </summary>
         public bool? Test { get; set; }
     }
 
@@ -975,16 +980,36 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxCreateDynamicLinkOptions
     {
+        /// <summary>
+        /// Optional display name retained in the Attriax dashboard.
+        /// </summary>
         public string? Name { get; set; }
 
+        /// <summary>
+        /// Destination URL opened when the dynamic link resolves outside the app.
+        /// </summary>
         public string? DestinationUrl { get; set; }
 
+        /// <summary>
+        /// Optional grouping key for dashboard organization and reporting.
+        /// </summary>
         public string? Group { get; set; }
 
+        /// <summary>
+        /// Optional path prefix for the generated short link, for example <c>/promo</c>.
+        /// </summary>
         public string? Prefix { get; set; }
 
+        /// <summary>
+        /// Controls whether iOS visitors should be redirected according to project settings.
+        /// Leave null to use the backend default for the project.
+        /// </summary>
         public bool? IOSRedirect { get; set; }
 
+        /// <summary>
+        /// Controls whether Android visitors should be redirected according to project settings.
+        /// Leave null to use the backend default for the project.
+        /// </summary>
         public bool? AndroidRedirect { get; set; }
 
         public string? PreviewTitle { get; set; }
@@ -1011,14 +1036,24 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxDeepLinkConversionOptions
     {
-        public string? Uri { get; set; }
+        /// <summary>
+        /// Full deep-link URL or path-like URI that should be resolved and recorded.
+        /// </summary>
+        public string Uri { get; set; } = string.Empty;
 
-        public string? LinkPath { get; set; }
-
+        /// <summary>
+        /// Extra JSON metadata attached to the manual deep-link resolution request.
+        /// </summary>
         public IDictionary<string, object>? Metadata { get; set; }
 
+        /// <summary>
+        /// Optional source label. Defaults to <c>manual</c> or <c>initial_url</c>.
+        /// </summary>
         public string? Source { get; set; }
 
+        /// <summary>
+        /// Marks this conversion as the startup URL for the current session.
+        /// </summary>
         public bool IsInitialLink { get; set; }
     }
 

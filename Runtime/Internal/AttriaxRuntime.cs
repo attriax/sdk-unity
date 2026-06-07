@@ -710,11 +710,22 @@ namespace Attriax.Unity.Internal
         {
             AssertInitialized();
 
+            if (options == null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
+
+            if (string.IsNullOrWhiteSpace(options.Receipt))
+            {
+                throw new ArgumentException(
+                    "ValidateReceiptAsync() requires a non-empty receipt.",
+                    nameof(options));
+            }
+
             return await _generatedGateway.SendValidateReceiptAsync(
                     AttriaxGeneratedRequestFactory.BuildValidateReceiptRequest(
                         _config.ProjectToken,
-                    string.IsNullOrWhiteSpace(_deviceId) ? null : _deviceId,
-                        _config.ToPublic(),
+                        string.IsNullOrWhiteSpace(_deviceId) ? null : _deviceId,
                         options,
                         DateTimeOffset.UtcNow))
                 .ConfigureAwait(false);
@@ -3232,7 +3243,6 @@ namespace Attriax.Unity.Internal
                 fallbackUri: BuildFallbackDeepLinkUri(
                     rawEvent,
                     options.Uri,
-                    options.LinkPath,
                     resolution.DeepLink),
                 found: resolution.Matched && resolution.DeepLink != null);
         }
@@ -3295,7 +3305,6 @@ namespace Attriax.Unity.Internal
         private static Uri BuildFallbackDeepLinkUri(
             AttriaxRawDeepLinkEvent? rawEvent,
             string? uri,
-            string? linkPath,
             AttriaxDeepLink? deepLink)
         {
             if (deepLink?.Uri != null)
@@ -3315,7 +3324,7 @@ namespace Attriax.Unity.Internal
                 return parsedUri;
             }
 
-            var normalizedPath = NormalizeDeepLinkPath(linkPath) ?? NormalizeDeepLinkPath(deepLink?.Path);
+            var normalizedPath = NormalizeDeepLinkPath(uri) ?? NormalizeDeepLinkPath(deepLink?.Path);
             return string.IsNullOrWhiteSpace(normalizedPath)
                 ? new Uri("https://attriax.invalid/")
                 : new Uri("https://attriax.invalid/" + normalizedPath);
@@ -3364,7 +3373,6 @@ namespace Attriax.Unity.Internal
             var fallbackUri = BuildFallbackDeepLinkUri(
                 null,
                 result.DeepLink.Uri != null ? result.DeepLink.Uri.ToString() : null,
-                result.DeepLink.Path,
                 result.DeepLink);
             var clickedAt = result.DeepLinkClickedAt ?? result.AcceptedAt ?? DateTimeOffset.UtcNow;
             var deepLinkEvent = BuildResolvedDeepLinkEvent(

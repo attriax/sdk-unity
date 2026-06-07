@@ -432,8 +432,6 @@ namespace Attriax.Unity
         {
             return new AttriaxInitOptions
             {
-                Enabled = options.Enabled,
-                EventsEnabled = options.EventsEnabled,
                 CaptureInitialUrl = options.CaptureInitialUrl,
             };
         }

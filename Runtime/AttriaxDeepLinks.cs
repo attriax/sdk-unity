@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace Attriax.Unity
 {
     /// <summary>
-    /// Stream-like subscription facade for handled deep-link events.
+    /// Subscription handle for raw deep-link inputs captured by the SDK.
     /// </summary>
     public sealed class AttriaxRawDeepLinkStream
     {
@@ -26,7 +26,7 @@ namespace Attriax.Unity
     }
 
     /// <summary>
-    /// Stream-like subscription facade for resolved deep-link events.
+    /// Subscription handle for resolved deep-link events.
     /// </summary>
     public sealed class AttriaxDeepLinkStream
     {
@@ -106,7 +106,8 @@ namespace Attriax.Unity
         }
 
         /// <summary>
-        /// Creates a dynamic link through the Attriax backend.
+        /// Creates a dynamic link through the Attriax backend and returns the final short URL.
+        /// Optional iOS and Android redirect flags override project defaults for this link.
         /// </summary>
         public Task<AttriaxCreateDynamicLinkResult> CreateDynamicLinkAsync(
             AttriaxCreateDynamicLinkOptions? options = null)
@@ -115,7 +116,7 @@ namespace Attriax.Unity
         }
 
         /// <summary>
-        /// Resolves and records a deep-link conversion event.
+        /// Resolves and records a deep-link conversion event for the provided URI.
         /// </summary>
         public Task<AttriaxDeepLinkEvent?> RecordDeepLinkConversionAsync(
             AttriaxDeepLinkConversionOptions options)
@@ -124,12 +125,12 @@ namespace Attriax.Unity
         }
 
         /// <summary>
-        /// Stream-like subscription facade for raw deep-link events.
+        /// Raw deep-link event subscription.
         /// </summary>
         public AttriaxRawDeepLinkStream RawStream { get; }
 
         /// <summary>
-        /// Stream-like subscription facade for handled deep-link events.
+        /// Resolved deep-link event subscription.
         /// Deferred deep links resolved later by app-open tracking also flow here.
         /// </summary>
         public AttriaxDeepLinkStream Stream { get; }

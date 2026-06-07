@@ -278,7 +278,6 @@ namespace Attriax.Unity.Internal
         public static SdkV1RevenueReceiptValidateDto BuildValidateReceiptRequest(
             string projectToken,
             string? deviceId,
-            AttriaxConfig config,
             AttriaxValidateReceiptOptions options,
             DateTimeOffset occurredAt)
         {
@@ -287,18 +286,9 @@ namespace Attriax.Unity.Internal
                 clientOccurredAt: occurredAt.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture),
                 deviceId: deviceId,
                 environment: NormalizeOptionalString(options.Environment),
-                originalTransactionId: NormalizeOptionalString(options.OriginalTransactionId),
-                packageName: NormalizeOptionalString(
-                    string.IsNullOrWhiteSpace(options.PackageName)
-                        ? config.AppPackageName
-                        : options.PackageName),
                 productId: NormalizeOptionalString(options.ProductId),
                 provider: NormalizeOptionalString(options.Provider),
-                purchaseToken: NormalizeOptionalString(options.PurchaseToken),
-                receiptData: NormalizeOptionalString(options.ReceiptData),
-                receiptSignature: NormalizeOptionalString(options.ReceiptSignature),
-                signedPayload: NormalizeOptionalString(options.SignedPayload),
-                store: NormalizeOptionalString(options.Store),
+                receipt: NormalizeOptionalString(options.Receipt),
                 test: options.Test ?? default,
                 transactionId: NormalizeOptionalString(options.TransactionId));
         }
@@ -381,7 +371,7 @@ namespace Attriax.Unity.Internal
                 deviceId: deviceId,
                 deviceIdSource: deviceIdSource,
                 isFirstLaunch: isFirstLaunch,
-                linkPath: string.IsNullOrWhiteSpace(options.LinkPath) ? null : options.LinkPath,
+                linkPath: ExtractLinkPath(options.Uri),
                 metadata: AttriaxObjectNormalizer.NormalizeObjectMap(options.Metadata),
                 platform: MapGeneratedPlatform(platform),
                 rawUrl: string.IsNullOrWhiteSpace(options.Uri) ? null : NormalizeUrl(options.Uri),
@@ -469,6 +459,23 @@ namespace Attriax.Unity.Internal
             }
 
             return value;
+        }
+
+        private static string? ExtractLinkPath(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var trimmed = value.Trim();
+            if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absolute))
+            {
+                trimmed = absolute.AbsolutePath;
+            }
+
+            var path = trimmed.Trim('/');
+            return string.IsNullOrWhiteSpace(path) ? null : path;
         }
 
         private static decimal GetSessionRelativeTimeMs(

@@ -130,7 +130,7 @@ namespace Attriax.Unity
         }
 
         /// <summary>
-        /// Backward-compatible alias for <see cref="SetUser"/> kept on the tracking facade.
+        /// Backward-compatible alias for <see cref="SetUser"/> kept on the tracking API.
         /// </summary>
         [Obsolete("Use Tracking.SetUser(...) instead.")]
         public void Identify(string? userId, AttriaxIdentifyOptions? options = null)

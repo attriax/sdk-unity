@@ -25,7 +25,8 @@ namespace Attriax.Unity
 
         /// <summary>
         /// Manually requests a SKAdNetwork conversion-value update.
-        /// Most apps should rely on the dashboard-managed event schema instead of calling this directly.
+        /// Use this when the app wants to resolve SKAN values itself instead of relying
+        /// on Attriax dashboard-managed event rules.
         /// </summary>
         public Task<AttriaxSkanUpdateResult> UpdateConversionValueAsync(
             int fineValue,

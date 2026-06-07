@@ -184,9 +184,14 @@ namespace Attriax.Unity
         /// Validates a purchase receipt immediately and returns the public result.
         /// </summary>
         public Task<AttriaxRevenueReceiptValidationResult> ValidateReceiptAsync(
-            AttriaxValidateReceiptOptions? options = null)
+            AttriaxValidateReceiptOptions options)
         {
-            return _runtime.ValidateReceiptAsync(options ?? new AttriaxValidateReceiptOptions());
+            if (options == null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
+
+            return _runtime.ValidateReceiptAsync(options);
         }
 
         private static Dictionary<string, object> CloneMetadata(IDictionary<string, object>? metadata)
