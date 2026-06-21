@@ -7,7 +7,7 @@ namespace Attriax.Unity.Samples
 {
     public sealed class AttriaxManualRuntimeSample : MonoBehaviour
     {
-        [SerializeField] private string _appToken = "ax_your_app_token";
+        [SerializeField] private string _projectToken = "ax_your_project_token";
         [SerializeField] private string _apiBaseUrl = string.Empty;
         [SerializeField] private bool _enableDebugLogs = true;
 
@@ -21,7 +21,7 @@ namespace Attriax.Unity.Samples
             {
                 var attriax = new Attriax(new AttriaxConfig
                 {
-                    ProjectToken = _appToken,
+                    ProjectToken = _projectToken,
                     ApiBaseUrl = string.IsNullOrWhiteSpace(_apiBaseUrl) ? null : _apiBaseUrl,
                     EnableDebugLogs = _enableDebugLogs,
                 });
