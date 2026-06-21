@@ -1646,6 +1646,18 @@ namespace Attriax.Unity.Internal
 
             RewriteAndPurgeQueuedRequestsForConsent();
 
+            // Re-stamp every queued request's identity + context from the live
+            // session/context snapshot immediately before dispatch. Queued requests
+            // capture identity at BUILD time; if a request was built before the
+            // identified device id / resolved platform landed (or under a config where
+            // the consent rewrite above is a no-op, e.g. GDPR disabled), it would ship
+            // with a stale/empty deviceId or platform=Unknown — forking the backend
+            // dashboard session into separate (anonymous / "Unknown" platform) rows.
+            // This is the single chokepoint covering BOTH the single-send and batch
+            // paths, so every outbound request of one flush carries identical
+            // deviceId / platform / appVersion / sdkPackageVersion / locale.
+            RestampQueuedRequestsForLiveContext();
+
             if (_requestQueue.Count == 0)
             {
                 SetSynchronizationState(AttriaxSynchronizationState.Synchronized);
@@ -1802,6 +1814,16 @@ namespace Attriax.Unity.Internal
             }
 
             var preparedBatch = PrepareBatchEntries(entries, DateTimeOffset.UtcNow);
+
+            if (_config.EnableDebugLogs)
+            {
+                foreach (var transportEntry in preparedBatch.TransportEntries)
+                {
+                    DebugLogOutboundPayload(
+                        "batch:" + DescribeEndpointForKind(transportEntry.Kind),
+                        transportEntry);
+                }
+            }
 
             try
             {
@@ -1973,6 +1995,8 @@ namespace Attriax.Unity.Internal
 
         private async Task<object> PerformQueuedRequestAsync(AttriaxQueuedRequest entry)
         {
+            DebugLogOutboundPayload("single:" + DescribeEndpointForKind(entry.Kind), entry);
+
             switch (entry.Kind)
             {
                 case AttriaxQueuedRequestKind.Open:
@@ -3615,6 +3639,180 @@ namespace Attriax.Unity.Internal
             }
         }
 
+        // Re-stamp identity + context onto each queued request from the live snapshot
+        // right before dispatch, so single-send and batch paths emit identical values.
+        // Only fills identity when the live per-kind tracking decision says identity
+        // should be attached (never overrides an intentional anonymous request), and
+        // only when the live device id is actually resolved.
+        private void RestampQueuedRequestsForLiveContext()
+        {
+            if (_requestQueue.Count == 0)
+            {
+                return;
+            }
+
+            var deviceId = _deviceId;
+            if (string.IsNullOrWhiteSpace(deviceId))
+            {
+                return;
+            }
+
+            var deviceIdSource = RequireDeviceIdSource();
+            var context = _sessionManager.ContextSnapshot;
+            var policy = ConsentQueuePolicy;
+
+            _requestQueue.RewriteWhere(
+                entry => ShouldRestampQueuedRequest(entry, policy),
+                entry => RestampQueuedRequest(entry, deviceId, deviceIdSource, context));
+        }
+
+        private static bool ShouldRestampQueuedRequest(
+            AttriaxQueuedRequest entry,
+            AttriaxConsentQueuePolicy policy)
+        {
+            switch (entry.Kind)
+            {
+                case AttriaxQueuedRequestKind.Event:
+                case AttriaxQueuedRequestKind.Session:
+                case AttriaxQueuedRequestKind.User:
+                    break;
+                default:
+                    return false;
+            }
+
+            var decision = policy.TrackingDecisionForQueuedRequest(entry);
+            return decision.Capture && decision.AttachDeviceIdentity;
+        }
+
+        private void RestampQueuedRequest(
+            AttriaxQueuedRequest entry,
+            string deviceId,
+            string deviceIdSource,
+            AttriaxContextSnapshot context)
+        {
+            switch (entry.Kind)
+            {
+                case AttriaxQueuedRequestKind.Event:
+                {
+                    var request = entry.RequireEventRequest();
+                    request.deviceId = deviceId;
+                    request.deviceIdSource = deviceIdSource;
+                    break;
+                }
+                case AttriaxQueuedRequestKind.Session:
+                {
+                    var request = entry.RequireSessionRequest();
+                    request.deviceId = deviceId;
+                    request.deviceIdSource = deviceIdSource;
+                    // The session lifecycle request is one of only two requests that
+                    // carry platform/version (the other is open). If it was built from
+                    // the anonymous/initial snapshot it could carry platform=Unknown or
+                    // an empty version; re-stamp from the live context so the backend
+                    // stamps the dashboard session consistently.
+                    request.platform = AttriaxGeneratedRequestFactory.MapGeneratedPlatform(context.Platform);
+                    if (!string.IsNullOrWhiteSpace(context.App.Version))
+                    {
+                        request.appVersion = context.App.Version;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(context.App.BuildNumber))
+                    {
+                        request.appBuildNumber = context.App.BuildNumber;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(context.App.PackageName))
+                    {
+                        request.appPackageName = context.App.PackageName;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(context.Sdk.PackageVersion))
+                    {
+                        request.sdkPackageVersion = context.Sdk.PackageVersion;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(context.Device.Language))
+                    {
+                        request.locale = context.Device.Language;
+                    }
+
+                    break;
+                }
+                case AttriaxQueuedRequestKind.User:
+                {
+                    var request = entry.RequireUserRequest();
+                    request.deviceId = deviceId;
+                    request.deviceIdSource = deviceIdSource;
+                    break;
+                }
+            }
+        }
+
+        // Gated outbound-payload trace emitted at the actual send/flush boundary so a
+        // single Editor run is enough to verify identity/context consistency across all
+        // request paths. One line per dispatched request.
+        private void DebugLogOutboundPayload(string endpoint, AttriaxQueuedRequest entry)
+        {
+            if (!_config.EnableDebugLogs)
+            {
+                return;
+            }
+
+            string sessionId = null;
+            string deviceId = null;
+            string platform = null;
+            string appVersion = null;
+            string sdkPackageVersion = null;
+
+            switch (entry.Kind)
+            {
+                case AttriaxQueuedRequestKind.Event:
+                {
+                    var request = entry.RequireEventRequest();
+                    sessionId = request.sessionId;
+                    deviceId = request.deviceId;
+                    break;
+                }
+                case AttriaxQueuedRequestKind.Session:
+                {
+                    var request = entry.RequireSessionRequest();
+                    sessionId = request.sessionId;
+                    deviceId = request.deviceId;
+                    platform = request.platform?.ToString();
+                    appVersion = request.appVersion;
+                    sdkPackageVersion = request.sdkPackageVersion;
+                    break;
+                }
+                case AttriaxQueuedRequestKind.User:
+                {
+                    var request = entry.RequireUserRequest();
+                    deviceId = request.deviceId;
+                    break;
+                }
+                case AttriaxQueuedRequestKind.Open:
+                {
+                    var request = entry.RequireOpenRequest();
+                    sessionId = request.sessionId;
+                    deviceId = request.deviceId;
+                    platform = request.platform.ToString();
+                    appVersion = request.app?.version;
+                    sdkPackageVersion = request.sdk?.packageVersion;
+                    break;
+                }
+            }
+
+            var hasDeviceId = !string.IsNullOrWhiteSpace(deviceId);
+            DebugLog(
+                "Outbound payload",
+                "endpoint=" + endpoint
+                    + " kind=" + entry.Kind
+                    + " sessionId=" + (string.IsNullOrWhiteSpace(sessionId) ? "none" : sessionId)
+                    + " deviceId=" + (hasDeviceId ? "present" : "empty")
+                    + " isAnonymous=" + (!hasDeviceId)
+                    + " platform=" + (string.IsNullOrWhiteSpace(platform) ? "none" : platform)
+                    + " sdkPackageVersion=" + (string.IsNullOrWhiteSpace(sdkPackageVersion) ? "none" : sdkPackageVersion)
+                    + " appVersion=" + (string.IsNullOrWhiteSpace(appVersion) ? "none" : appVersion));
+        }
+
         private void FailInitialDeepLink(Exception exception)
         {
             _deepLinkManager.FailInitial(exception);
@@ -3695,6 +3893,31 @@ namespace Attriax.Unity.Internal
         private static string DescribeTaskStatus(Task? task)
         {
             return task == null ? "null" : task.Status.ToString();
+        }
+
+        private static string DescribeEndpointForKind(AttriaxQueuedRequestKind kind)
+        {
+            switch (kind)
+            {
+                case AttriaxQueuedRequestKind.Open:
+                    return "open";
+                case AttriaxQueuedRequestKind.Event:
+                    return "track-event";
+                case AttriaxQueuedRequestKind.Crash:
+                    return "track-crash";
+                case AttriaxQueuedRequestKind.Session:
+                    return "track-session";
+                case AttriaxQueuedRequestKind.User:
+                    return "set-user";
+                case AttriaxQueuedRequestKind.DeepLinkResolve:
+                    return "deep-link-resolve";
+                case AttriaxQueuedRequestKind.UninstallToken:
+                    return "uninstall-token";
+                case AttriaxQueuedRequestKind.Notification:
+                    return "track-notification";
+                default:
+                    return kind.ToString();
+            }
         }
 
         private static string DescribeQueuedRequest(AttriaxQueuedRequest entry, int queueIndex)

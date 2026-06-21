@@ -448,7 +448,7 @@ namespace Attriax.Unity.Internal
                     : options.Source);
         }
 
-        private static GeneratedPlatform MapGeneratedPlatform(AttriaxPlatformType platform)
+        internal static GeneratedPlatform MapGeneratedPlatform(AttriaxPlatformType platform)
         {
             switch (platform)
             {
