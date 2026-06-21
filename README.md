@@ -100,6 +100,127 @@ The Unity runtime supports both manual and automatic crash reporting.
 - Crash payloads include app, device, and session context so dashboard crash
   analytics can be reviewed next to attribution data.
 
+## Push Notification Attribution
+
+Attriax never sends pushes itself. The host app keeps its existing push stack
+(Firebase Cloud Messaging, APNs, Unity Mobile Notifications, or any push plugin)
+and *forwards* notification lifecycle events to the SDK from its own handlers.
+This is manual forwarding by design: the SDK coexists with whatever notification
+plugin you already ship, and never registers competing message receivers.
+
+The `Tracking` facade exposes one general method plus three lifecycle helpers:
+
+```csharp
+attriax.Tracking.RecordNotification(type, notificationId, options);   // general
+attriax.Tracking.RecordNotificationReceived(notificationId, options); // received
+attriax.Tracking.RecordNotificationOpened(notificationId, options);   // opened
+attriax.Tracking.RecordNotificationDismissed(notificationId, options);// dismissed
+```
+
+The three lifecycle types map to `AttriaxNotificationEventType`:
+
+| Type        | When to call it                              | What it measures                                                                 |
+| ----------- | -------------------------------------------- | -------------------------------------------------------------------------------- |
+| `Received`  | Push arrives / is displayed on the device    | Deliverability — how many pushes actually reached the device.                    |
+| `Opened`    | User taps the notification                   | High-value re-engagement attribution — ties downstream conversions/revenue back. |
+| `Dismissed` | User swipes the notification away (see below)| Best-effort negative signal — the message was seen but ignored.                  |
+
+`AttriaxRecordNotificationOptions` carries the attribution context:
+
+- `LinkId` / `CampaignId` — references to an existing Attriax tracked link or
+  campaign, threaded through from your notification payload.
+- `Title` — optional human-readable notification title.
+- `Source` — `Fcm`, `Apns`, or `Other`. Leave it `null` and pass `Payload`, and
+  the source is **inferred from the payload shape** (an `aps` envelope means APNs,
+  a `google.*` / `gcm.*` key means FCM); otherwise the server falls back to `other`.
+- `Payload` — the raw FCM/APNs data map. It is preserved under a `payload` key in
+  the notification metadata so attribution context survives the trip to the server.
+- `Metadata` / `FlushImmediately` — extra metadata and immediate-flush control,
+  exactly like `RecordEvent`.
+
+Notification events route through the same offline-persisted, batched, retried
+queue as `RecordEvent`, and honor the same app-open-first and GDPR-consent
+semantics.
+
+### Where to call it — opened (tap)
+
+Call `RecordNotificationOpened` from the same handler where you route the user
+after they tap a push. Pull `linkId` / `campaignId` out of the payload your
+backend attached when it built the notification:
+
+```csharp
+using System.Collections.Generic;
+using Attriax.Unity;
+
+// Invoked from your FCM/APNs tap handler (or Unity Mobile Notifications, or a push plugin).
+public void OnNotificationTapped(IDictionary<string, object> payload)
+{
+    var notificationId = payload.TryGetValue("notification_id", out var id)
+        ? id?.ToString()
+        : System.Guid.NewGuid().ToString();
+
+    attriax.Tracking.RecordNotificationOpened(
+        notificationId,
+        new AttriaxRecordNotificationOptions
+        {
+            LinkId = payload.TryGetValue("ax_link_id", out var link) ? link?.ToString() : null,
+            CampaignId = payload.TryGetValue("ax_campaign_id", out var camp) ? camp?.ToString() : null,
+            Title = payload.TryGetValue("title", out var title) ? title?.ToString() : null,
+            Payload = payload,   // source inferred from the payload shape (aps -> apns, google.* -> fcm)
+        });
+
+    // ...then deep-link / route the user as you already do.
+}
+```
+
+### Where to call it — received (delivery)
+
+Call `RecordNotificationReceived` from your background/foreground message handler
+when a push is delivered, so deliverability is measured independently of whether
+the user opens it:
+
+```csharp
+// Invoked from your FCM onMessage / APNs willPresent (foreground) handler.
+public void OnNotificationReceived(IDictionary<string, object> payload)
+{
+    var notificationId = payload.TryGetValue("notification_id", out var id)
+        ? id?.ToString()
+        : System.Guid.NewGuid().ToString();
+
+    attriax.Tracking.RecordNotificationReceived(
+        notificationId,
+        new AttriaxRecordNotificationOptions
+        {
+            LinkId = payload.TryGetValue("ax_link_id", out var link) ? link?.ToString() : null,
+            CampaignId = payload.TryGetValue("ax_campaign_id", out var camp) ? camp?.ToString() : null,
+            Source = AttriaxNotificationEventSource.Fcm, // or leave null and let Payload infer it
+            Payload = payload,
+        });
+}
+```
+
+If you bootstrap through `AttriaxBehaviour` instead of holding the instance
+directly, the same calls work through its nullable facade:
+`behaviour.Tracking?.RecordNotificationOpened(notificationId, options);`.
+
+### The `dismissed` caveat
+
+`RecordNotificationDismissed` is a **best-effort** negative signal and is only
+observable when **your app builds the notification itself** and wires up a
+dismiss callback:
+
+- **Android** — only when you post the notification locally and set a
+  `deleteIntent` (the swipe-away / "delete" intent). OS-displayed messages built
+  from a remote `notification` payload do not deliver a dismiss callback to your
+  app.
+- **iOS** — only via a custom notification-category dismiss action the user
+  explicitly triggers; the system does not report a plain swipe-away, and nothing
+  is delivered while the app is terminated.
+
+So treat `dismissed` as opportunistic: record it where the platform gives you a
+real dismiss callback, and never assume "not opened" equals "dismissed." `Received`
+and `Opened` are the reliable signals.
+
 ## Generated SDK Client
 
 From the workspace root:

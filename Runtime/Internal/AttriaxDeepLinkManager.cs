@@ -1,12 +1,18 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Attriax.Unity.Internal
 {
     internal sealed class AttriaxDeepLinkManager
     {
+        // Upper bound for how long an awaited manual conversion waits for a
+        // resolution before failing with a TimeoutException. The underlying
+        // request still follows the normal queue/retry policy.
+        private static readonly TimeSpan ManualConversionTimeout = TimeSpan.FromSeconds(30);
+
         private readonly AttriaxRuntimeState _runtimeState;
         private readonly IAttriaxDeepLinkConversionResolver _conversionResolver;
         private readonly AttriaxEventHub _eventHub;
@@ -94,11 +100,39 @@ namespace Attriax.Unity.Internal
                 return null;
             }
 
-            return await _conversionResolver.ResolveDeepLinkConversionAsync(
-                    options,
-                    null,
-                    DateTimeOffset.UtcNow)
-                .ConfigureAwait(false);
+            var resolutionTask = _conversionResolver.ResolveDeepLinkConversionAsync(
+                options,
+                null,
+                DateTimeOffset.UtcNow);
+
+            // Bound the wait so an awaited manual resolution cannot hang forever
+            // when the resolve request stays unsent (e.g. offline for a long time).
+            // The underlying queued request still follows the normal retry policy;
+            // only the task returned to the caller is time-bounded.
+            using (var timeoutCts = new CancellationTokenSource())
+            {
+                var delayTask = Task.Delay(ManualConversionTimeout, timeoutCts.Token);
+                var completed = await Task.WhenAny(resolutionTask, delayTask).ConfigureAwait(false);
+                if (completed != resolutionTask)
+                {
+                    // Observe any later failure so it does not surface as an
+                    // unobserved task exception once we stop awaiting it.
+                    ObserveFaultedResolution(resolutionTask);
+                    throw new TimeoutException("Manual deep-link resolution did not complete in time.");
+                }
+
+                timeoutCts.Cancel();
+                return await resolutionTask.ConfigureAwait(false);
+            }
+        }
+
+        private static void ObserveFaultedResolution(Task resolutionTask)
+        {
+            resolutionTask.ContinueWith(
+                task => { _ = task.Exception; },
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
         }
 
         public Task CaptureInitialUrlAsync(string? url)

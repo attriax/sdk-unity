@@ -40,6 +40,10 @@ namespace Attriax.Unity.Tests
             Assert.That(typeof(AttriaxTracking).GetMethod("RecordAdEvent", PublicInstanceDeclaredOnly), Is.Not.Null);
             Assert.That(typeof(AttriaxTracking).GetMethod("RecordError", PublicInstanceDeclaredOnly), Is.Not.Null);
             Assert.That(typeof(AttriaxTracking).GetMethod("RecordPageView", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordNotification", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordNotificationReceived", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordNotificationOpened", PublicInstanceDeclaredOnly), Is.Not.Null);
+            Assert.That(typeof(AttriaxTracking).GetMethod("RecordNotificationDismissed", PublicInstanceDeclaredOnly), Is.Not.Null);
             Assert.That(typeof(AttriaxTracking).GetMethod("RegisterFirebaseMessagingTokenAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
             Assert.That(typeof(AttriaxTracking).GetMethod("RegisterApplePushTokenAsync", PublicInstanceDeclaredOnly), Is.Not.Null);
             Assert.That(typeof(AttriaxTracking).GetMethod("SetUser", PublicInstanceDeclaredOnly), Is.Not.Null);

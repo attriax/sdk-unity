@@ -29,6 +29,7 @@ using SdkCrashDto = Attriax.Unity.Generated.Model.SdkCrashDto;
 using SdkCreateDynamicLinkDto = Attriax.Unity.Generated.Model.SdkCreateDynamicLinkDto;
 using SdkCreateDynamicLinkResponseDto = Attriax.Unity.Generated.Model.SdkCreateDynamicLinkResponseDto;
 using SdkEventDto = Attriax.Unity.Generated.Model.SdkEventDto;
+using SdkNotificationDto = Attriax.Unity.Generated.Model.SdkNotificationDto;
 using SdkGdprConsentStatusDto = Attriax.Unity.Generated.Model.SdkGdprConsentStatusDto;
 using SdkRegisterUninstallTokenDto = Attriax.Unity.Generated.Model.SdkRegisterUninstallTokenDto;
 using SdkRevenueReceiptValidateResponseDto = Attriax.Unity.Generated.Model.SdkRevenueReceiptValidateResponseDto;
@@ -111,6 +112,11 @@ namespace Attriax.Unity.Internal
         public Task SendTrackCrashAsync(AttriaxCrashRequest request)
         {
             return ExecuteCommandAsync(() => _sdkApi.SdkControllerRecordCrashV1Async(MapCrashRequest(request)));
+        }
+
+        public Task SendTrackNotificationAsync(SdkNotificationDto request)
+        {
+            return ExecuteCommandAsync(() => _sdkApi.SdkControllerRecordNotificationV1Async(request));
         }
 
         public async Task SendBatchAsync(
@@ -523,7 +529,13 @@ namespace Attriax.Unity.Internal
             string payloadText,
             Multimap<string, string>? headers)
         {
-            var retriable = statusCode == 429 || statusCode >= 500;
+            // Retry rate-limiting (429), all 5xx, plus the two 4xx codes that are
+            // explicitly transient: 408 (Request Timeout) and 425 (Too Early).
+            // Every other 4xx is a client error and is dropped.
+            var retriable = statusCode == 408 ||
+                statusCode == 425 ||
+                statusCode == 429 ||
+                statusCode >= 500;
             var message = string.Format(CultureInfo.InvariantCulture, "Attriax API request failed with status {0}.", statusCode);
 
             if (!string.IsNullOrWhiteSpace(payloadText))

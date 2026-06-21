@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using SdkEventDto = Attriax.Unity.Generated.Model.SdkEventDto;
+using SdkNotificationDto = Attriax.Unity.Generated.Model.SdkNotificationDto;
 using SdkRegisterUninstallTokenDto = Attriax.Unity.Generated.Model.SdkRegisterUninstallTokenDto;
 using SdkSessionDto = Attriax.Unity.Generated.Model.SdkSessionDto;
 using SdkUserDto = Attriax.Unity.Generated.Model.SdkUserDto;
@@ -560,6 +561,7 @@ namespace Attriax.Unity.Internal
         User,
         DeepLinkResolve,
         UninstallToken,
+        Notification,
     }
 
     [Serializable]
@@ -595,6 +597,8 @@ namespace Attriax.Unity.Internal
         public SdkV1DeepLinkResolveDto? DeepLinkResolveRequest { get; set; }
 
         public SdkRegisterUninstallTokenDto? UninstallTokenRequest { get; set; }
+
+        public SdkNotificationDto? NotificationRequest { get; set; }
 
         public static AttriaxQueuedRequest CreateOpen(SdkV1OpenDto request)
         {
@@ -673,6 +677,17 @@ namespace Attriax.Unity.Internal
             };
         }
 
+        public static AttriaxQueuedRequest CreateNotification(SdkNotificationDto request)
+        {
+            return new AttriaxQueuedRequest
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Kind = AttriaxQueuedRequestKind.Notification,
+                CreatedAt = DateTimeOffset.UtcNow,
+                NotificationRequest = request,
+            };
+        }
+
         public SdkV1OpenDto RequireOpenRequest()
         {
             return OpenRequest ?? throw MissingPayload("open");
@@ -708,6 +723,11 @@ namespace Attriax.Unity.Internal
             return UninstallTokenRequest ?? throw MissingPayload("uninstall token");
         }
 
+        public SdkNotificationDto RequireNotificationRequest()
+        {
+            return NotificationRequest ?? throw MissingPayload("notification");
+        }
+
         private static AttriaxApiError MissingPayload(string label)
         {
             return new AttriaxApiError(
@@ -715,87 +735,6 @@ namespace Attriax.Unity.Internal
                 null,
                 false,
                 true);
-        }
-    }
-
-    internal static class AttriaxQueueRetryPolicy
-    {
-        private const int MaxRetryAttempts = 8;
-        private static readonly TimeSpan MaxRetryAge = TimeSpan.FromDays(7);
-
-        public static bool IsWaitingForRetryWindow(AttriaxQueuedRequest request, DateTimeOffset now)
-        {
-            return request.NextRetryAt.HasValue && request.NextRetryAt.Value > now;
-        }
-
-        public static string? GetTerminalDropReason(AttriaxQueuedRequest request, DateTimeOffset now)
-        {
-            if (request.Kind == AttriaxQueuedRequestKind.DeepLinkResolve)
-            {
-                return null;
-            }
-
-            if (request.AttemptCount >= MaxRetryAttempts)
-            {
-                return "max_attempts_exceeded";
-            }
-
-            if (now - request.CreatedAt > MaxRetryAge)
-            {
-                return "max_age_exceeded";
-            }
-
-            return null;
-        }
-
-        public static AttriaxQueuedRequest MarkForRetry(
-            AttriaxQueuedRequest request,
-            AttriaxApiError error,
-            DateTimeOffset attemptedAt,
-            int defaultRetryDelayMs)
-        {
-            request.AttemptCount += 1;
-            request.LastAttemptAt = attemptedAt;
-            request.LastErrorClass = BuildRetryErrorClass(error);
-            request.LastHttpStatusCode = error.StatusCode;
-            request.NextRetryAt = ResolveRetryAt(error, attemptedAt, defaultRetryDelayMs);
-            return request;
-        }
-
-        private static string BuildRetryErrorClass(AttriaxApiError error)
-        {
-            if (error.StatusCode.HasValue)
-            {
-                return "http_" + error.StatusCode.Value.ToString();
-            }
-
-            if (error.InnerException is TimeoutException)
-            {
-                return "timeout";
-            }
-
-            if (error.InnerException != null)
-            {
-                return error.InnerException.GetType().Name;
-            }
-
-            return error.GetType().Name;
-        }
-
-        private static DateTimeOffset ResolveRetryAt(
-            AttriaxApiError error,
-            DateTimeOffset attemptedAt,
-            int defaultRetryDelayMs)
-        {
-            if (error.RetryAfterAt.HasValue && error.RetryAfterAt.Value > attemptedAt)
-            {
-                return error.RetryAfterAt.Value;
-            }
-
-            var retryDelayMs = defaultRetryDelayMs > 0
-                ? defaultRetryDelayMs
-                : 60000;
-            return attemptedAt.AddMilliseconds(retryDelayMs);
         }
     }
 

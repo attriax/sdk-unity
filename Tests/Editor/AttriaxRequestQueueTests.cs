@@ -138,18 +138,16 @@ namespace Attriax.Unity.Tests
             var retryAfterAt = attemptedAt.AddSeconds(45);
             queue.ReplaceAt(
                 0,
-                AttriaxQueueRetryPolicy.MarkForRetry(
+                AttriaxRequestRetryPolicy.MarkForRetry(
                     queue.PeekAt(0),
                     new AttriaxApiError("rate limited", 429, true, false, retryAfterAt: retryAfterAt),
-                    attemptedAt,
-                    30000));
+                    attemptedAt));
             queue.ReplaceAt(
                 1,
-                AttriaxQueueRetryPolicy.MarkForRetry(
+                AttriaxRequestRetryPolicy.MarkForRetry(
                     queue.PeekAt(1),
                     new AttriaxApiError("server unavailable", 503, true, false),
-                    attemptedAt,
-                    60000));
+                    attemptedAt));
 
             var reloaded = new AttriaxRequestQueue(storageKey, 8);
             var first = reloaded.PeekAt(0);
@@ -159,12 +157,50 @@ namespace Attriax.Unity.Tests
             Assert.That(first.LastAttemptAt, Is.EqualTo(attemptedAt));
             Assert.That(first.LastErrorClass, Is.EqualTo("http_429"));
             Assert.That(first.LastHttpStatusCode, Is.EqualTo(429));
+            // A server-provided Retry-After always wins over the computed backoff.
             Assert.That(first.NextRetryAt, Is.EqualTo(retryAfterAt));
             Assert.That(second.AttemptCount, Is.EqualTo(1));
             Assert.That(second.LastErrorClass, Is.EqualTo("http_503"));
             Assert.That(second.LastHttpStatusCode, Is.EqualTo(503));
-            Assert.That(second.NextRetryAt, Is.EqualTo(attemptedAt.AddSeconds(60)));
-            Assert.That(reloaded.PeekEarliestRetryAt(), Is.EqualTo(retryAfterAt));
+            // 503 with no Retry-After falls back to the first-attempt exponential
+            // backoff: 2s base plus up to 20% (400ms) deterministic jitter.
+            Assert.That(second.NextRetryAt.HasValue, Is.True);
+            Assert.That(
+                second.NextRetryAt!.Value,
+                Is.GreaterThanOrEqualTo(attemptedAt.AddMilliseconds(2000)));
+            Assert.That(
+                second.NextRetryAt!.Value,
+                Is.LessThanOrEqualTo(attemptedAt.AddMilliseconds(2400)));
+            // The backed-off 503 (~2s) is now sooner than the 45s Retry-After.
+            Assert.That(reloaded.PeekEarliestRetryAt(), Is.EqualTo(second.NextRetryAt));
+        }
+
+        [Test]
+        public void RetryBackoffGrowsExponentiallyAndStaysWithinCap()
+        {
+            var request = AttriaxQueuedRequest.CreateEvent(CreateEventRequest("event-1"));
+            var attemptedAt = new DateTimeOffset(2026, 5, 25, 5, 0, 0, TimeSpan.Zero);
+            var error = new AttriaxApiError("server unavailable", 503, true, false);
+
+            for (var attempt = 1; attempt <= 10; attempt += 1)
+            {
+                request = AttriaxRequestRetryPolicy.MarkForRetry(request, error, attemptedAt);
+
+                Assert.That(request.AttemptCount, Is.EqualTo(attempt));
+                Assert.That(request.NextRetryAt.HasValue, Is.True);
+
+                var exponent = Math.Min(attempt - 1, 20);
+                var cappedMs = Math.Min(300000d, 2000d * (1L << exponent));
+                var lowerBound = attemptedAt.AddMilliseconds(cappedMs);
+                var upperBound = attemptedAt.AddMilliseconds(cappedMs + Math.Floor(cappedMs * 0.2));
+
+                Assert.That(request.NextRetryAt!.Value, Is.GreaterThanOrEqualTo(lowerBound));
+                Assert.That(request.NextRetryAt!.Value, Is.LessThanOrEqualTo(upperBound));
+                // Never exceeds the 5-minute cap plus its own 20% jitter ceiling.
+                Assert.That(
+                    request.NextRetryAt!.Value,
+                    Is.LessThanOrEqualTo(attemptedAt.AddMilliseconds(300000 + 60000)));
+            }
         }
 
         [Test]
@@ -187,16 +223,16 @@ namespace Attriax.Unity.Tests
             deepLinkRequest.AttemptCount = 8;
 
             Assert.That(
-                AttriaxQueueRetryPolicy.GetTerminalDropReason(eventRequest, now),
+                AttriaxRequestRetryPolicy.GetTerminalDropReason(eventRequest, now),
                 Is.EqualTo("max_attempts_exceeded"));
             Assert.That(
-                AttriaxQueueRetryPolicy.GetTerminalDropReason(deepLinkRequest, now),
+                AttriaxRequestRetryPolicy.GetTerminalDropReason(deepLinkRequest, now),
                 Is.Null);
 
             eventRequest.AttemptCount = 0;
             eventRequest.CreatedAt = now.AddDays(-8);
             Assert.That(
-                AttriaxQueueRetryPolicy.GetTerminalDropReason(eventRequest, now),
+                AttriaxRequestRetryPolicy.GetTerminalDropReason(eventRequest, now),
                 Is.EqualTo("max_age_exceeded"));
         }
 
@@ -230,6 +266,25 @@ namespace Attriax.Unity.Tests
                 AttriaxPlayerPrefs.DeleteKey(storageKey);
                 AttriaxPlayerPrefs.Save();
             }
+        }
+
+        [Test]
+        public void NotificationRequestRoundTripsThroughPersistence()
+        {
+            var storageKey = NewStorageKey();
+            var queue = new AttriaxRequestQueue(storageKey, 8);
+
+            _ = queue.Enqueue(AttriaxQueuedRequest.CreateNotification(CreateNotificationRequest("notif-1")));
+
+            var reloaded = new AttriaxRequestQueue(storageKey, 8);
+            var entry = reloaded.Peek();
+
+            Assert.That(entry.Kind, Is.EqualTo(AttriaxQueuedRequestKind.Notification));
+            var notification = entry.RequireNotificationRequest();
+            Assert.That(notification.notificationId, Is.EqualTo("notif-1"));
+            Assert.That(notification.deviceId, Is.EqualTo("device-1"));
+            Assert.That(notification.type, Is.EqualTo(NotificationEventType.Opened));
+            Assert.That(notification.source, Is.EqualTo(NotificationEventSource.Apns));
         }
 
         private AttriaxRequestQueue CreateQueue()
@@ -315,6 +370,20 @@ namespace Attriax.Unity.Tests
                 platform: Platform.UnityEditor,
                 provider: AppUserUninstallTokenProvider.Fcm,
                 token: "fcm-token");
+        }
+
+        private static SdkNotificationDto CreateNotificationRequest(
+            string notificationId,
+            string deviceId = "device-1")
+        {
+            return new SdkNotificationDto(
+                projectToken: "ax_test",
+                deviceId: deviceId,
+                deviceIdSource: "sdk",
+                notificationId: notificationId,
+                platform: Platform.UnityEditor,
+                source: NotificationEventSource.Apns,
+                type: NotificationEventType.Opened);
         }
     }
 }

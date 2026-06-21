@@ -160,6 +160,71 @@ namespace Attriax.Unity.Internal
                         _requestFlush(true);
         }
 
+        public async Task RecordNotificationAsync(
+            AttriaxNotificationEventType type,
+            string notificationId,
+            AttriaxRecordNotificationOptions options)
+        {
+            if (options == null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
+
+            if (!_runtimeState.IsEnabled || !_runtimeState.AreEventsEnabled)
+            {
+                _debugLog("Skipping notification because tracking is disabled.", notificationId);
+                return;
+            }
+
+            if (!ShouldDispatchAnalytics)
+            {
+                _debugLog(
+                    "Queueing notification locally because analytics dispatch is currently disabled.",
+                    notificationId);
+            }
+
+            var decision = TrackingDecisionFor(AttriaxTrackingSignal.Analytics);
+            if (!decision.Capture)
+            {
+                _debugLog("Skipping notification because GDPR consent blocked capture.", notificationId);
+                return;
+            }
+
+            var normalizedNotificationId = notificationId?.Trim();
+            if (string.IsNullOrEmpty(normalizedNotificationId))
+            {
+                throw new ArgumentException("notificationId must not be empty.", nameof(notificationId));
+            }
+
+            var occurredAt = DateTimeOffset.UtcNow;
+            var session = ShouldTrackSessionActivity
+                ? _sessionManager.PrepareTrackedActivity(occurredAt).CurrentSession
+                : null;
+            var snapshot = _sessionManager.ContextSnapshot;
+
+            var source = options.Source ?? InferNotificationSource(options.Payload);
+            var metadata = MergeNotificationMetadata(options.Metadata, options.Payload);
+
+            await _requestManager.Enqueue(
+                    AttriaxQueuedRequest.CreateNotification(
+                        AttriaxGeneratedRequestFactory.BuildTrackNotificationRequest(
+                            _projectToken,
+                            decision.AttachDeviceIdentity ? _runtimeState.DeviceId : null,
+                            decision.AttachDeviceIdentity ? _runtimeState.DeviceIdSource : null,
+                            type,
+                            normalizedNotificationId,
+                            snapshot.Platform,
+                            options.LinkId,
+                            options.CampaignId,
+                            options.Title,
+                            source,
+                            session?.Id,
+                            metadata,
+                            occurredAt)))
+                .ConfigureAwait(false);
+            _requestFlush(ShouldFlushEventImmediately(options.FlushImmediately ?? false));
+        }
+
         public Task TrackPageViewAsync(string pageName, AttriaxPageViewOptions options)
         {
             var eventData = new Dictionary<string, object>();
@@ -344,6 +409,74 @@ namespace Attriax.Unity.Internal
                 default:
                     return false;
             }
+        }
+
+        /// <summary>
+        /// Preserves the raw FCM/APNs payload under a <c>payload</c> key inside the
+        /// notification metadata so attribution context survives the trip to the
+        /// server. Explicit metadata entries take precedence. Mirrors Flutter's
+        /// <c>_mergeNotificationMetadata</c>.
+        /// </summary>
+        private static IDictionary<string, object>? MergeNotificationMetadata(
+            IDictionary<string, object>? metadata,
+            IDictionary<string, object>? payload)
+        {
+            var hasPayload = payload != null && payload.Count > 0;
+            var hasMetadata = metadata != null && metadata.Count > 0;
+            if (!hasPayload && !hasMetadata)
+            {
+                return metadata;
+            }
+
+            var merged = new Dictionary<string, object>();
+            if (hasPayload)
+            {
+                merged["payload"] = new Dictionary<string, object>(payload);
+            }
+
+            if (hasMetadata)
+            {
+                foreach (var pair in metadata)
+                {
+                    merged[pair.Key] = pair.Value;
+                }
+            }
+
+            return merged;
+        }
+
+        /// <summary>
+        /// Best-effort inference of the delivery channel from a raw FCM/APNs payload.
+        /// APNs payloads carry an <c>aps</c> envelope; FCM payloads carry a
+        /// <c>google.message_id</c> / <c>gcm.message_id</c> (or any <c>google.</c> /
+        /// <c>gcm.</c> prefixed key). Returns null when undecidable so the server can
+        /// fall back to <c>other</c>. Mirrors Flutter's <c>_inferNotificationSource</c>.
+        /// </summary>
+        private static AttriaxNotificationEventSource? InferNotificationSource(
+            IDictionary<string, object>? payload)
+        {
+            if (payload == null || payload.Count == 0)
+            {
+                return null;
+            }
+
+            if (payload.ContainsKey("aps"))
+            {
+                return AttriaxNotificationEventSource.Apns;
+            }
+
+            foreach (var key in payload.Keys)
+            {
+                if (key == "google.message_id" ||
+                    key == "gcm.message_id" ||
+                    key.StartsWith("google.", StringComparison.Ordinal) ||
+                    key.StartsWith("gcm.", StringComparison.Ordinal))
+                {
+                    return AttriaxNotificationEventSource.Fcm;
+                }
+            }
+
+            return null;
         }
 
         private static IDictionary<string, object>? MergeCrashMetadata(

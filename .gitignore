@@ -23,3 +23,9 @@
 /dist/*.log
 /dist/unity-editmode-test-results.xml
 /.generated-sdk-client-tmp/
+
+# Unity test results (EditMode/PlayMode artifacts, regenerated on every run)
+/[Tt]est[Rr]esults/
+/[Tt]est[Rr]esults.meta
+/[Tt]est[Rr]esults-*.xml
+/[Tt]est[Rr]esults-*.xml.meta

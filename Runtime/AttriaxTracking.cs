@@ -94,6 +94,59 @@ namespace Attriax.Unity
         }
 
         /// <summary>
+        /// Records a push-notification lifecycle event for attribution.
+        ///
+        /// Attriax never sends pushes itself: call this from the host app's own
+        /// FCM/APNs handler, threading through any Attriax linkId/campaignId reference
+        /// embedded in the notification payload. Pass the raw FCM/APNs data map as
+        /// <see cref="AttriaxRecordNotificationOptions.Payload"/> and it is preserved
+        /// under a <c>payload</c> key in the notification metadata.
+        ///
+        /// Routes through the same offline-persisted, batched, retried queue as
+        /// <see cref="RecordEvent"/>, and honors the same app-open-first / consent semantics.
+        /// </summary>
+        public void RecordNotification(
+            AttriaxNotificationEventType type,
+            string notificationId,
+            AttriaxRecordNotificationOptions? options = null)
+        {
+            FireAndForget(_attriax.RecordNotificationAsync(
+                type,
+                notificationId,
+                options ?? new AttriaxRecordNotificationOptions()));
+        }
+
+        /// <summary>
+        /// Records that a push notification was received / displayed.
+        /// </summary>
+        public void RecordNotificationReceived(
+            string notificationId,
+            AttriaxRecordNotificationOptions? options = null)
+        {
+            RecordNotification(AttriaxNotificationEventType.Received, notificationId, options);
+        }
+
+        /// <summary>
+        /// Records that a push notification was opened (tapped).
+        /// </summary>
+        public void RecordNotificationOpened(
+            string notificationId,
+            AttriaxRecordNotificationOptions? options = null)
+        {
+            RecordNotification(AttriaxNotificationEventType.Opened, notificationId, options);
+        }
+
+        /// <summary>
+        /// Records that a push notification was dismissed without opening.
+        /// </summary>
+        public void RecordNotificationDismissed(
+            string notificationId,
+            AttriaxRecordNotificationOptions? options = null)
+        {
+            RecordNotification(AttriaxNotificationEventType.Dismissed, notificationId, options);
+        }
+
+        /// <summary>
         /// Registers the current Firebase Cloud Messaging token for uninstall tracking.
         /// Call this after your app receives an FCM token and again whenever Firebase rotates it.
         /// Pass <c>null</c> or whitespace to clear the currently registered FCM uninstall token for this device.

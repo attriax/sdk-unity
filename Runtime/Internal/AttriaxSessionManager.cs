@@ -360,27 +360,11 @@ namespace Attriax.Unity.Internal
 
         private bool ShouldContinueSession(AttriaxSessionSnapshot session, DateTimeOffset occurredAt)
         {
-            var context = _contextManager.Snapshot;
-            if (!string.Equals(session.DeviceId, _runtimeState.DeviceId, StringComparison.Ordinal) ||
-                session.Platform != context.Platform)
-            {
-                return false;
-            }
-
-            if (!string.Equals(session.AppPackageName, context.App.PackageName, StringComparison.Ordinal) ||
-                !string.Equals(session.AppVersion, context.App.Version, StringComparison.Ordinal) ||
-                !string.Equals(session.AppBuildNumber, context.App.BuildNumber, StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            if (occurredAt < session.StartedAt)
-            {
-                return false;
-            }
-
-            var continuationWindowMs = Math.Max(session.HeartbeatIntervalMs, 1000) * 2d;
-            return (occurredAt - session.LastActivityAt).TotalMilliseconds <= continuationWindowMs;
+            return AttriaxSessionContinuationPolicy.ShouldContinue(
+                session,
+                _runtimeState.DeviceId,
+                _contextManager.Snapshot,
+                occurredAt);
         }
 
         private AttriaxSessionSnapshot? RecordExistingSessionActivity(DateTimeOffset occurredAt)
@@ -409,7 +393,8 @@ namespace Attriax.Unity.Internal
 
         private DateTimeOffset InferSessionEndAt(AttriaxSessionSnapshot session)
         {
-            return session.LastActivityAt.AddMilliseconds(Math.Max(session.HeartbeatIntervalMs, 1000) * 2d);
+            return session.LastActivityAt.AddMilliseconds(
+                AttriaxSessionContinuationPolicy.ResolveContinuationWindowMs(session.HeartbeatIntervalMs));
         }
 
         private AttriaxSessionSnapshot? ReadPersistedSessionSnapshot()

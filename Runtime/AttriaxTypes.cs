@@ -937,6 +937,98 @@ namespace Attriax.Unity
     }
 
     /// <summary>
+    /// Push-notification lifecycle stages attributed by the Attriax SDKs.
+    /// Attriax never sends pushes itself — the host application's own FCM/APNs
+    /// handler reports these events and passes through any Attriax link/campaign
+    /// reference embedded in the notification payload.
+    /// </summary>
+    public enum AttriaxNotificationEventType
+    {
+        /// <summary>
+        /// The notification was delivered to / displayed on the device.
+        /// </summary>
+        Received,
+
+        /// <summary>
+        /// The user opened (tapped) the notification.
+        /// </summary>
+        Opened,
+
+        /// <summary>
+        /// The user dismissed the notification without opening it.
+        /// </summary>
+        Dismissed,
+    }
+
+    /// <summary>
+    /// Delivery channel a push notification arrived through.
+    /// </summary>
+    public enum AttriaxNotificationEventSource
+    {
+        /// <summary>
+        /// Firebase Cloud Messaging (Android and cross-platform).
+        /// </summary>
+        Fcm,
+
+        /// <summary>
+        /// Apple Push Notification service (iOS / macOS).
+        /// </summary>
+        Apns,
+
+        /// <summary>
+        /// Any other / unknown delivery channel.
+        /// </summary>
+        Other,
+    }
+
+    /// <summary>
+    /// Options for a push-notification lifecycle attribution event.
+    /// </summary>
+    public sealed class AttriaxRecordNotificationOptions
+    {
+        /// <summary>
+        /// Optional reference to an existing Attriax tracked link embedded in the
+        /// notification payload.
+        /// </summary>
+        public string? LinkId { get; set; }
+
+        /// <summary>
+        /// Optional reference to an existing Attriax campaign this notification relates to.
+        /// </summary>
+        public string? CampaignId { get; set; }
+
+        /// <summary>
+        /// Optional human-readable notification title.
+        /// </summary>
+        public string? Title { get; set; }
+
+        /// <summary>
+        /// Delivery channel the notification arrived through. When left null and a
+        /// <see cref="Payload"/> is supplied, the source is inferred from the payload
+        /// shape (an <c>aps</c> envelope means APNs, a <c>google.*</c>/<c>gcm.*</c> key
+        /// means FCM); otherwise the server falls back to <c>other</c>.
+        /// </summary>
+        public AttriaxNotificationEventSource? Source { get; set; }
+
+        /// <summary>
+        /// Raw FCM/APNs data map. Preserved under a <c>payload</c> key inside the
+        /// notification metadata so attribution context survives the trip to the server.
+        /// Explicit <see cref="Metadata"/> entries take precedence.
+        /// </summary>
+        public IDictionary<string, object>? Payload { get; set; }
+
+        /// <summary>
+        /// Additional metadata to attach to the notification event.
+        /// </summary>
+        public IDictionary<string, object>? Metadata { get; set; }
+
+        /// <summary>
+        /// Forces an immediate flush of the offline queue after enqueueing.
+        /// </summary>
+        public bool? FlushImmediately { get; set; }
+    }
+
+    /// <summary>
     /// Options for a standardized page-view event.
     /// </summary>
     public sealed class AttriaxPageViewOptions

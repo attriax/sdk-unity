@@ -118,6 +118,13 @@ namespace Attriax.Unity
         /// <summary>
         /// Resolves and records a deep-link conversion event for the provided URI.
         /// </summary>
+        /// <remarks>
+        /// Use this when your app receives a deep-link URI before the SDK captures
+        /// it automatically. A non-empty <see cref="AttriaxDeepLinkConversionOptions.Uri"/>
+        /// is required; calls with an empty URI throw <see cref="ArgumentException"/>.
+        /// When Attriax does not recognize the link, the returned event still
+        /// completes with its found flag set to <see langword="false"/>.
+        /// </remarks>
         public Task<AttriaxDeepLinkEvent?> RecordDeepLinkConversionAsync(
             AttriaxDeepLinkConversionOptions options)
         {

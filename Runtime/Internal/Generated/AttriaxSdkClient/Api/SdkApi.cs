@@ -224,6 +224,24 @@ namespace Attriax.Unity.Generated.Api
         /// 
         /// </summary>
         /// <exception cref="global::Attriax.Unity.Generated.Client.ApiException">Thrown when fails to make API call</exception>
+        /// <param name="sdkNotificationDto"></param>
+        /// <returns>SdkAcknowledgeResponseEnvelopeDto</returns>
+        SdkAcknowledgeResponseEnvelopeDto SdkControllerRecordNotificationV1(SdkNotificationDto sdkNotificationDto);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <remarks>
+        /// 
+        /// </remarks>
+        /// <exception cref="global::Attriax.Unity.Generated.Client.ApiException">Thrown when fails to make API call</exception>
+        /// <param name="sdkNotificationDto"></param>
+        /// <returns>ApiResponse of SdkAcknowledgeResponseEnvelopeDto</returns>
+        ApiResponse<SdkAcknowledgeResponseEnvelopeDto> SdkControllerRecordNotificationV1WithHttpInfo(SdkNotificationDto sdkNotificationDto);
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <exception cref="global::Attriax.Unity.Generated.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="sdkSessionDto"></param>
         /// <returns>SdkAcknowledgeResponseEnvelopeDto</returns>
         SdkAcknowledgeResponseEnvelopeDto SdkControllerRecordSessionV1(SdkSessionDto sdkSessionDto);
@@ -604,6 +622,29 @@ namespace Attriax.Unity.Generated.Api
         /// <param name="cancellationToken">Cancellation Token to cancel the request.</param>
         /// <returns>Task of ApiResponse (SdkAcknowledgeResponseEnvelopeDto)</returns>
         System.Threading.Tasks.Task<ApiResponse<SdkAcknowledgeResponseEnvelopeDto>> SdkControllerRecordEventV1WithHttpInfoAsync(SdkEventDto sdkEventDto, System.Threading.CancellationToken cancellationToken = default);
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <remarks>
+        /// 
+        /// </remarks>
+        /// <exception cref="global::Attriax.Unity.Generated.Client.ApiException">Thrown when fails to make API call</exception>
+        /// <param name="sdkNotificationDto"></param>
+        /// <param name="cancellationToken">Cancellation Token to cancel the request.</param>
+        /// <returns>Task of SdkAcknowledgeResponseEnvelopeDto</returns>
+        System.Threading.Tasks.Task<SdkAcknowledgeResponseEnvelopeDto> SdkControllerRecordNotificationV1Async(SdkNotificationDto sdkNotificationDto, System.Threading.CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <remarks>
+        /// 
+        /// </remarks>
+        /// <exception cref="global::Attriax.Unity.Generated.Client.ApiException">Thrown when fails to make API call</exception>
+        /// <param name="sdkNotificationDto"></param>
+        /// <param name="cancellationToken">Cancellation Token to cancel the request.</param>
+        /// <returns>Task of ApiResponse (SdkAcknowledgeResponseEnvelopeDto)</returns>
+        System.Threading.Tasks.Task<ApiResponse<SdkAcknowledgeResponseEnvelopeDto>> SdkControllerRecordNotificationV1WithHttpInfoAsync(SdkNotificationDto sdkNotificationDto, System.Threading.CancellationToken cancellationToken = default);
         /// <summary>
         /// 
         /// </summary>
@@ -2279,6 +2320,134 @@ namespace Attriax.Unity.Generated.Api
             if (this.ExceptionFactory != null)
             {
                 Exception _exception = this.ExceptionFactory("SdkControllerRecordEventV1", localVarResponse);
+                if (_exception != null) throw _exception;
+            }
+
+            return localVarResponse;
+        }
+
+        /// <summary>
+        ///  
+        /// </summary>
+        /// <exception cref="global::Attriax.Unity.Generated.Client.ApiException">Thrown when fails to make API call</exception>
+        /// <param name="sdkNotificationDto"></param>
+        /// <returns>SdkAcknowledgeResponseEnvelopeDto</returns>
+        public SdkAcknowledgeResponseEnvelopeDto SdkControllerRecordNotificationV1(SdkNotificationDto sdkNotificationDto)
+        {
+            global::Attriax.Unity.Generated.Client.ApiResponse<SdkAcknowledgeResponseEnvelopeDto> localVarResponse = SdkControllerRecordNotificationV1WithHttpInfo(sdkNotificationDto);
+            return localVarResponse.Data;
+        }
+
+        /// <summary>
+        ///  
+        /// </summary>
+        /// <exception cref="global::Attriax.Unity.Generated.Client.ApiException">Thrown when fails to make API call</exception>
+        /// <param name="sdkNotificationDto"></param>
+        /// <returns>ApiResponse of SdkAcknowledgeResponseEnvelopeDto</returns>
+        public global::Attriax.Unity.Generated.Client.ApiResponse<SdkAcknowledgeResponseEnvelopeDto> SdkControllerRecordNotificationV1WithHttpInfo(SdkNotificationDto sdkNotificationDto)
+        {
+            // verify the required parameter 'sdkNotificationDto' is set
+            if (sdkNotificationDto == null)
+                throw new global::Attriax.Unity.Generated.Client.ApiException(400, "Missing required parameter 'sdkNotificationDto' when calling SdkApi->SdkControllerRecordNotificationV1");
+
+            global::Attriax.Unity.Generated.Client.RequestOptions localVarRequestOptions = new global::Attriax.Unity.Generated.Client.RequestOptions();
+
+            string[] _contentTypes = new string[] {
+                "application/json"
+            };
+
+            // to determine the Accept header
+            string[] _accepts = new string[] {
+                "application/json"
+            };
+
+            var localVarContentType = global::Attriax.Unity.Generated.Client.ClientUtils.SelectHeaderContentType(_contentTypes);
+            if (localVarContentType != null) localVarRequestOptions.HeaderParameters.Add("Content-Type", localVarContentType);
+
+            var localVarAccept = global::Attriax.Unity.Generated.Client.ClientUtils.SelectHeaderAccept(_accepts);
+            if (localVarAccept != null) localVarRequestOptions.HeaderParameters.Add("Accept", localVarAccept);
+
+            localVarRequestOptions.Data = sdkNotificationDto;
+
+
+            // make the HTTP request
+            var localVarResponse = this.Client.Post<SdkAcknowledgeResponseEnvelopeDto>("/api/sdk/v1/notifications", localVarRequestOptions, this.Configuration);
+
+            if (this.ExceptionFactory != null)
+            {
+                Exception _exception = this.ExceptionFactory("SdkControllerRecordNotificationV1", localVarResponse);
+                if (_exception != null) throw _exception;
+            }
+
+            return localVarResponse;
+        }
+
+        /// <summary>
+        ///  
+        /// </summary>
+        /// <exception cref="global::Attriax.Unity.Generated.Client.ApiException">Thrown when fails to make API call</exception>
+        /// <param name="sdkNotificationDto"></param>
+        /// <param name="cancellationToken">Cancellation Token to cancel the request.</param>
+        /// <returns>Task of SdkAcknowledgeResponseEnvelopeDto</returns>
+        public async System.Threading.Tasks.Task<SdkAcknowledgeResponseEnvelopeDto> SdkControllerRecordNotificationV1Async(SdkNotificationDto sdkNotificationDto, System.Threading.CancellationToken cancellationToken = default)
+        {
+            var task = SdkControllerRecordNotificationV1WithHttpInfoAsync(sdkNotificationDto, cancellationToken);
+#if UNITY_EDITOR || !UNITY_WEBGL
+            global::Attriax.Unity.Generated.Client.ApiResponse<SdkAcknowledgeResponseEnvelopeDto> localVarResponse = await task.ConfigureAwait(false);
+#else
+            global::Attriax.Unity.Generated.Client.ApiResponse<SdkAcknowledgeResponseEnvelopeDto> localVarResponse = await task;
+#endif
+            return localVarResponse.Data;
+        }
+
+        /// <summary>
+        ///  
+        /// </summary>
+        /// <exception cref="global::Attriax.Unity.Generated.Client.ApiException">Thrown when fails to make API call</exception>
+        /// <param name="sdkNotificationDto"></param>
+        /// <param name="cancellationToken">Cancellation Token to cancel the request.</param>
+        /// <returns>Task of ApiResponse (SdkAcknowledgeResponseEnvelopeDto)</returns>
+        public async System.Threading.Tasks.Task<global::Attriax.Unity.Generated.Client.ApiResponse<SdkAcknowledgeResponseEnvelopeDto>> SdkControllerRecordNotificationV1WithHttpInfoAsync(SdkNotificationDto sdkNotificationDto, System.Threading.CancellationToken cancellationToken = default)
+        {
+            // verify the required parameter 'sdkNotificationDto' is set
+            if (sdkNotificationDto == null)
+                throw new global::Attriax.Unity.Generated.Client.ApiException(400, "Missing required parameter 'sdkNotificationDto' when calling SdkApi->SdkControllerRecordNotificationV1");
+
+
+            global::Attriax.Unity.Generated.Client.RequestOptions localVarRequestOptions = new global::Attriax.Unity.Generated.Client.RequestOptions();
+
+            string[] _contentTypes = new string[] {
+                "application/json"
+            };
+
+            // to determine the Accept header
+            string[] _accepts = new string[] {
+                "application/json"
+            };
+
+
+            var localVarContentType = global::Attriax.Unity.Generated.Client.ClientUtils.SelectHeaderContentType(_contentTypes);
+            if (localVarContentType != null) localVarRequestOptions.HeaderParameters.Add("Content-Type", localVarContentType);
+
+            var localVarAccept = global::Attriax.Unity.Generated.Client.ClientUtils.SelectHeaderAccept(_accepts);
+            if (localVarAccept != null) localVarRequestOptions.HeaderParameters.Add("Accept", localVarAccept);
+
+            localVarRequestOptions.Data = sdkNotificationDto;
+
+
+            // make the HTTP request
+
+            var task = this.AsynchronousClient.PostAsync<SdkAcknowledgeResponseEnvelopeDto>("/api/sdk/v1/notifications", localVarRequestOptions, this.Configuration, cancellationToken);
+
+#if UNITY_EDITOR || !UNITY_WEBGL
+            var localVarResponse = await task.ConfigureAwait(false);
+#else
+            var localVarResponse = await task;
+#endif
+
+            if (this.ExceptionFactory != null)
+            {
+                Exception _exception = this.ExceptionFactory("SdkControllerRecordNotificationV1", localVarResponse);
                 if (_exception != null) throw _exception;
             }
 

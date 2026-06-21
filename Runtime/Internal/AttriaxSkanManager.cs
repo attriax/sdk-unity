@@ -1,24 +1,25 @@
 #nullable enable
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Attriax.Unity;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Attriax.Unity.Internal
 {
+    /// <summary>
+    /// Thin orchestrator for SKAdNetwork conversion handling. It owns the in-memory
+    /// state, persistence, the operation lock, retention-milestone evaluation, and
+    /// window dispatch, delegating the pure computation to <see cref="AttriaxSkanRules"/>,
+    /// <see cref="AttriaxSkanEventResolution"/>, <see cref="AttriaxSkanConversionUpdater"/>
+    /// and <see cref="AttriaxSkanEventAugmenter"/>. This mirrors the Flutter reference's
+    /// <c>attriax_skan_manager.dart</c> decomposition.
+    /// </summary>
     internal sealed class AttriaxSkanManager
     {
         private const string AttriaxRetentionEventName = "_attriax_retention";
-        private const int SkanFineValueBitCount = 6;
-        private const int SkanWindow1MaxDay = 2;
-        private const int SkanWindow2MaxDay = 7;
-        private const int SkanWindow3MaxDay = 35;
-        private const long MicrosPerUnit = 1000000L;
 
         private readonly AttriaxSkanConfig _config;
         private readonly AttriaxPlatformType _platform;
@@ -26,17 +27,19 @@ namespace Attriax.Unity.Internal
         private readonly Func<string?> _readStateJson;
         private readonly Action<string?> _writeStateJson;
         private readonly Action<string, string?> _debugLog;
-        private readonly Func<long, string, DateTimeOffset, Task<long?>>? _convertRevenueToUsdMicrosAsync;
-        private readonly Func<
-            AttriaxPlatformType,
-            int,
-            AttriaxSkanCoarseValue?,
-            bool,
-            Task<AttriaxSkanUpdateResult>> _updateConversionValueAsync;
+        private readonly AttriaxSkanConversionUpdater _conversionUpdater;
+        private readonly AttriaxSkanEventAugmenter _eventAugmenter;
 
         private AttriaxSkanState? _state;
 
-        private bool SupportsSkan => _platform == AttriaxPlatformType.IOS;
+        // Serializes all state-mutating operations. State is read, mutated, and
+        // persisted across await boundaries (FX conversion, native bridge), so
+        // concurrent tracked events would otherwise clobber each other's counter
+        // increments. Public entry points acquire this; internal helpers call the
+        // *Unlocked variants directly to avoid re-entrant deadlock.
+        private readonly SemaphoreSlim _operationLock = new SemaphoreSlim(1, 1);
+
+        private bool SupportsSkan => AttriaxSkanRules.PlatformSupportsSkan(_platform);
 
         internal AttriaxSkanManager(
             AttriaxSkanConfig config,
@@ -59,18 +62,36 @@ namespace Attriax.Unity.Internal
             _readStateJson = readStateJson;
             _writeStateJson = writeStateJson;
             _debugLog = debugLog;
-            _convertRevenueToUsdMicrosAsync = convertRevenueToUsdMicrosAsync;
-            _updateConversionValueAsync = updateConversionValueAsync
-                ?? AttriaxNativeBridge.UpdateSkanConversionValueAsync;
+            _conversionUpdater = new AttriaxSkanConversionUpdater(
+                platform,
+                updateConversionValueAsync ?? AttriaxNativeBridge.UpdateSkanConversionValueAsync,
+                clock);
+            _eventAugmenter = new AttriaxSkanEventAugmenter(
+                clock,
+                convertRevenueToUsdMicrosAsync,
+                debugLog);
         }
 
         internal AttriaxSkanState? State => SupportsSkan ? Clone(_state) : null;
 
         internal async Task InitializeAsync(bool isFirstLaunch)
         {
+            await _operationLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                await InitializeUnlockedAsync(isFirstLaunch).ConfigureAwait(false);
+            }
+            finally
+            {
+                _operationLock.Release();
+            }
+        }
+
+        private async Task InitializeUnlockedAsync(bool isFirstLaunch)
+        {
             if (!SupportsSkan)
             {
-                await ResetAsync().ConfigureAwait(false);
+                await ResetUnlockedAsync().ConfigureAwait(false);
                 return;
             }
 
@@ -112,11 +133,25 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
-            await UpdateConversionValueAsync(0, null, false).ConfigureAwait(false);
+            await UpdateConversionValueUnlockedAsync(0, null, false, markFirstLaunchValueRegistered: true)
+                .ConfigureAwait(false);
             await EvaluateRetentionMilestonesAsync().ConfigureAwait(false);
         }
 
-        internal Task ResetAsync()
+        internal async Task ResetAsync()
+        {
+            await _operationLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                await ResetUnlockedAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                _operationLock.Release();
+            }
+        }
+
+        private Task ResetUnlockedAsync()
         {
             _state = null;
             _writeStateJson(null);
@@ -125,9 +160,22 @@ namespace Attriax.Unity.Internal
 
         internal async Task ApplyAppOpenResultAsync(AttriaxAppOpenResult? result)
         {
+            await _operationLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                await ApplyAppOpenResultUnlockedAsync(result).ConfigureAwait(false);
+            }
+            finally
+            {
+                _operationLock.Release();
+            }
+        }
+
+        private async Task ApplyAppOpenResultUnlockedAsync(AttriaxAppOpenResult? result)
+        {
             if (!SupportsSkan)
             {
-                await ResetAsync().ConfigureAwait(false);
+                await ResetUnlockedAsync().ConfigureAwait(false);
                 return;
             }
 
@@ -173,7 +221,8 @@ namespace Attriax.Unity.Internal
                 nextState.Enabled &&
                 !nextState.FirstLaunchValueRegistered)
             {
-                await UpdateConversionValueAsync(0, null, false).ConfigureAwait(false);
+                await UpdateConversionValueUnlockedAsync(0, null, false, markFirstLaunchValueRegistered: true)
+                    .ConfigureAwait(false);
             }
 
             await EvaluateRetentionMilestonesAsync().ConfigureAwait(false);
@@ -184,111 +233,59 @@ namespace Attriax.Unity.Internal
             AttriaxSkanCoarseValue? coarseValue,
             bool lockWindow)
         {
-            if (!SupportsSkan)
+            await _operationLock.WaitAsync().ConfigureAwait(false);
+            try
             {
-                return BuildResult(
-                    AttriaxSkanUpdateStatus.NotSupported,
-                    "SKAdNetwork updates are only supported on iOS.",
-                    null,
-                    null,
-                    false,
-                    null);
+                return await UpdateConversionValueUnlockedAsync(fineValue, coarseValue, lockWindow, false)
+                    .ConfigureAwait(false);
             }
-
-            var currentState = EnsureState();
-
-            if (!currentState.Enabled)
+            finally
             {
-                return BuildResult(
-                    AttriaxSkanUpdateStatus.Disabled,
-                    "SKAdNetwork is disabled for this SDK instance.",
-                    currentState.FineValue,
-                    currentState.CoarseValue,
-                    currentState.LockWindow,
-                    currentState);
+                _operationLock.Release();
             }
-
-            if (fineValue < 0 || fineValue > 63)
-            {
-                return BuildResult(
-                    AttriaxSkanUpdateStatus.InvalidValue,
-                    "fineValue must be between 0 and 63.",
-                    currentState.FineValue,
-                    currentState.CoarseValue,
-                    currentState.LockWindow,
-                    currentState);
-            }
-
-            var nextFineValue = currentState.FineValue.HasValue
-                ? Math.Max(currentState.FineValue.Value, fineValue)
-                : fineValue;
-            var nextCoarseValue = MaxCoarseValue(
-                currentState.CoarseValue,
-                coarseValue ?? DeriveCoarseValue(nextFineValue));
-            var nextLockWindow = currentState.LockWindow || lockWindow;
-
-            var nextState = Clone(currentState) ?? new AttriaxSkanState();
-            nextState.FineValue = nextFineValue;
-            nextState.CoarseValue = nextCoarseValue;
-            nextState.LockWindow = nextLockWindow;
-            nextState.FirstLaunchValueRegistered =
-                currentState.FirstLaunchValueRegistered || nextFineValue == 0;
-            nextState.LastUpdatedAt = _clock().ToUniversalTime();
-
-            if (currentState.FineValue == nextState.FineValue &&
-                currentState.CoarseValue == nextState.CoarseValue &&
-                currentState.LockWindow == nextState.LockWindow)
-            {
-                return BuildResult(
-                    AttriaxSkanUpdateStatus.AlreadyAtOrAboveValue,
-                    "The requested conversion value does not advance the stored SKAN state.",
-                    currentState.FineValue,
-                    currentState.CoarseValue,
-                    currentState.LockWindow,
-                    currentState);
-            }
-
-            var bridgeResult = await _updateConversionValueAsync(
-                    _platform,
-                    nextFineValue,
-                    nextCoarseValue,
-                    nextLockWindow)
-                .ConfigureAwait(false);
-
-            if (bridgeResult.Status == AttriaxSkanUpdateStatus.Updated ||
-                bridgeResult.Status == AttriaxSkanUpdateStatus.Skipped)
-            {
-                _state = nextState;
-                await PersistStateAsync().ConfigureAwait(false);
-
-                return BuildResult(
-                    bridgeResult.Status,
-                    bridgeResult.Message,
-                    nextState.FineValue,
-                    nextState.CoarseValue,
-                    nextState.LockWindow,
-                    nextState);
-            }
-
-            return BuildResult(
-                bridgeResult.Status,
-                bridgeResult.Message,
-                bridgeResult.FineValue,
-                bridgeResult.CoarseValue,
-                bridgeResult.LockWindow,
-                currentState);
         }
 
-        internal Task<AttriaxSkanUpdateResult?> HandleTrackedEventAsync(
+        private async Task<AttriaxSkanUpdateResult> UpdateConversionValueUnlockedAsync(
+            int fineValue,
+            AttriaxSkanCoarseValue? coarseValue,
+            bool lockWindow,
+            bool markFirstLaunchValueRegistered)
+        {
+            var update = await _conversionUpdater.UpdateAsync(
+                    SupportsSkan ? EnsureState() : null,
+                    fineValue,
+                    coarseValue,
+                    lockWindow,
+                    markFirstLaunchValueRegistered)
+                .ConfigureAwait(false);
+
+            if (update.NextState != null)
+            {
+                _state = update.NextState;
+                await PersistStateAsync().ConfigureAwait(false);
+            }
+
+            return update.Result;
+        }
+
+        internal async Task<AttriaxSkanUpdateResult?> HandleTrackedEventAsync(
             string eventName,
             IDictionary<string, object>? eventData)
         {
             if (!SupportsSkan)
             {
-                return Task.FromResult<AttriaxSkanUpdateResult?>(null);
+                return null;
             }
 
-            return ApplyEventCandidatesAsync(eventName, eventData);
+            await _operationLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                return await ApplyEventCandidatesAsync(eventName, eventData).ConfigureAwait(false);
+            }
+            finally
+            {
+                _operationLock.Release();
+            }
         }
 
         private AttriaxSkanState EnsureState()
@@ -366,47 +363,21 @@ namespace Attriax.Unity.Internal
             IDictionary<string, object> eventData,
             IList<AttriaxSkanWindow1Group>? groups)
         {
-            if (groups == null || groups.Count == 0)
+            var update = AttriaxSkanEventResolution.ResolveWindow1SkanUpdate(
+                currentState,
+                eventName,
+                eventData,
+                groups);
+            if (update == null)
             {
                 return null;
             }
 
-            var nextFineValue = currentState.FineValue ?? 0;
-            var nextCoarseValue = currentState.CoarseValue;
-            var nextLockWindow = currentState.LockWindow;
-            var matchedAnyGroup = false;
-
-            foreach (var group in groups)
-            {
-                if (!IsValidBitRange(group.StartBit, group.BitCount))
-                {
-                    continue;
-                }
-
-                var match = MatchedWindow1Event(group, eventName, eventData);
-                if (match == null)
-                {
-                    continue;
-                }
-
-                matchedAnyGroup = true;
-                var currentSegmentValue = ExtractBitRangeValue(nextFineValue, group.StartBit, group.BitCount);
-                var nextSegmentValue = Math.Max(currentSegmentValue, match.Rank);
-                nextFineValue = ReplaceBitRangeValue(
-                    nextFineValue,
-                    group.StartBit,
-                    group.BitCount,
-                    nextSegmentValue);
-                nextCoarseValue = MaxCoarseValue(nextCoarseValue, match.Event.CoarseValue);
-                nextLockWindow = nextLockWindow || match.Event.LockWindow;
-            }
-
-            if (!matchedAnyGroup)
-            {
-                return null;
-            }
-
-            return await UpdateConversionValueAsync(nextFineValue, nextCoarseValue, nextLockWindow)
+            return await UpdateConversionValueUnlockedAsync(
+                    update.FineValue,
+                    update.CoarseValue,
+                    update.LockWindow,
+                    false)
                 .ConfigureAwait(false);
         }
 
@@ -416,34 +387,21 @@ namespace Attriax.Unity.Internal
             IDictionary<string, object> eventData,
             IList<AttriaxSkanCoarseWindowEvent>? events)
         {
-            if (events == null || events.Count == 0)
+            var update = AttriaxSkanEventResolution.ResolveCoarseWindowSkanUpdate(
+                currentState,
+                eventName,
+                eventData,
+                events);
+            if (update == null)
             {
                 return null;
             }
 
-            AttriaxSkanCoarseValue? nextCoarseValue = currentState.CoarseValue;
-            var nextLockWindow = currentState.LockWindow;
-            var matchedAnyEvent = false;
-
-            foreach (var skanEvent in events)
-            {
-                if (!string.Equals(skanEvent.EventName, eventName, StringComparison.Ordinal) ||
-                    !MatchesConditions(skanEvent.Conditions, eventData))
-                {
-                    continue;
-                }
-
-                matchedAnyEvent = true;
-                nextCoarseValue = MaxCoarseValue(nextCoarseValue, skanEvent.CoarseValue);
-                nextLockWindow = nextLockWindow || skanEvent.LockWindow;
-            }
-
-            if (!matchedAnyEvent)
-            {
-                return null;
-            }
-
-            return await UpdateConversionValueAsync(currentState.FineValue ?? 0, nextCoarseValue, nextLockWindow)
+            return await UpdateConversionValueUnlockedAsync(
+                    update.FineValue,
+                    update.CoarseValue,
+                    update.LockWindow,
+                    false)
                 .ConfigureAwait(false);
         }
 
@@ -454,363 +412,27 @@ namespace Attriax.Unity.Internal
                 return SkanActiveWindow.Window1;
             }
 
-            var currentDay = RetentionDay(state.InstallAnchorAt.Value, _clock().ToUniversalTime());
-            return ActiveWindowForDay(currentDay);
-        }
-
-        private static SkanActiveWindow? ActiveWindowForDay(int day)
-        {
-            if (day < 0)
-            {
-                return null;
-            }
-
-            if (day <= SkanWindow1MaxDay)
-            {
-                return SkanActiveWindow.Window1;
-            }
-
-            if (day <= SkanWindow2MaxDay)
-            {
-                return SkanActiveWindow.Window2;
-            }
-
-            if (day <= SkanWindow3MaxDay)
-            {
-                return SkanActiveWindow.Window3;
-            }
-
-            return null;
-        }
-
-        private static SkanWindow1Match? MatchedWindow1Event(
-            AttriaxSkanWindow1Group group,
-            string eventName,
-            IDictionary<string, object> eventData)
-        {
-            if (group.Events == null || group.Events.Count == 0)
-            {
-                return null;
-            }
-
-            SkanWindow1Match? match = null;
-            for (var index = 0; index < group.Events.Count; index += 1)
-            {
-                var skanEvent = group.Events[index];
-                if (!string.Equals(skanEvent.EventName, eventName, StringComparison.Ordinal) ||
-                    !MatchesConditions(skanEvent.Conditions, eventData))
-                {
-                    continue;
-                }
-
-                match = new SkanWindow1Match(index + 1, skanEvent);
-            }
-
-            return match;
+            var currentDay = AttriaxSkanRules.RetentionDay(state.InstallAnchorAt.Value, _clock().ToUniversalTime());
+            return AttriaxSkanRules.ActiveWindowForDay(currentDay);
         }
 
         private async Task<IDictionary<string, object>> AugmentLocalEventDataAsync(
             string eventName,
             IDictionary<string, object> eventData)
         {
-            if (string.Equals(eventName, "purchase", StringComparison.Ordinal))
+            var augmentation = await _eventAugmenter.AugmentAsync(
+                    eventName,
+                    eventData,
+                    EnsureState())
+                .ConfigureAwait(false);
+
+            if (augmentation.StateChanged)
             {
-                return await AugmentPurchaseEventDataAsync(eventData).ConfigureAwait(false);
+                _state = augmentation.State;
+                await PersistStateAsync().ConfigureAwait(false);
             }
 
-            if (string.Equals(eventName, "ad_show", StringComparison.Ordinal))
-            {
-                return await AugmentAdShowEventDataAsync(eventData).ConfigureAwait(false);
-            }
-
-            return eventData;
-        }
-
-        private async Task<IDictionary<string, object>> AugmentPurchaseEventDataAsync(
-            IDictionary<string, object> eventData)
-        {
-            var currentState = EnsureState();
-            var usdMicros = await ResolvePurchaseUsdMicrosAsync(eventData).ConfigureAwait(false) ?? 0L;
-            currentState.PurchaseRevenueUsdMicros += usdMicros;
-            currentState.PurchaseCount += 1;
-            _state = currentState;
-            await PersistStateAsync().ConfigureAwait(false);
-
-            var payload = new Dictionary<string, object>(eventData)
-            {
-                ["revenue"] = currentState.PurchaseRevenueUsdMicros / (double)MicrosPerUnit,
-                ["count"] = currentState.PurchaseCount,
-            };
-            return payload;
-        }
-
-        private async Task<IDictionary<string, object>> AugmentAdShowEventDataAsync(
-            IDictionary<string, object> eventData)
-        {
-            var currentState = EnsureState();
-            currentState.AdShowCount += 1;
-            _state = currentState;
-            await PersistStateAsync().ConfigureAwait(false);
-
-            var payload = new Dictionary<string, object>(eventData)
-            {
-                ["shown"] = currentState.AdShowCount,
-                ["count"] = currentState.AdShowCount,
-            };
-            return payload;
-        }
-
-        private async Task<long?> ResolvePurchaseUsdMicrosAsync(IDictionary<string, object> eventData)
-        {
-            if (!eventData.TryGetValue("revenue", out var rawRevenue))
-            {
-                return null;
-            }
-
-            var revenue = CoerceNumber(rawRevenue);
-            if (!revenue.HasValue)
-            {
-                return null;
-            }
-
-            var revenueInMicros = ReadBoolean(eventData, "revenueInMicros") ??
-                ReadBoolean(eventData, "revenue_in_micros") ??
-                false;
-            var amountMicros = ToMicros(revenue.Value, revenueInMicros);
-            var currency = ReadString(eventData, "currency")?.ToUpperInvariant() ?? "USD";
-            if (string.Equals(currency, "USD", StringComparison.Ordinal))
-            {
-                return amountMicros;
-            }
-
-            if (_convertRevenueToUsdMicrosAsync == null)
-            {
-                _debugLog("Skipping non-USD purchase revenue for SKAN because no USD conversion gateway is available.", null);
-                return null;
-            }
-
-            try
-            {
-                return await _convertRevenueToUsdMicrosAsync(amountMicros, currency, _clock().ToUniversalTime())
-                    .ConfigureAwait(false);
-            }
-            catch (Exception error)
-            {
-                _debugLog("Failed to convert purchase revenue to USD for SKAN.", error.Message);
-                return 1L;
-            }
-        }
-
-        private static bool MatchesConditions(
-            IList<AttriaxSkanCondition>? conditions,
-            IDictionary<string, object> eventData)
-        {
-            if (conditions == null || conditions.Count == 0)
-            {
-                return true;
-            }
-
-            foreach (var condition in conditions)
-            {
-                var hasValue = eventData.TryGetValue(condition.ParamKey, out var actualValue);
-                if (!ConditionMatches(condition, actualValue, hasValue))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static bool ConditionMatches(
-            AttriaxSkanCondition condition,
-            object? actualValue,
-            bool hasValue)
-        {
-            switch (condition.Operator)
-            {
-                case AttriaxSkanRuleOperator.Exists:
-                    return hasValue && actualValue != null;
-                case AttriaxSkanRuleOperator.Eq:
-                    return hasValue && ValuesEqual(actualValue, condition.Value);
-                case AttriaxSkanRuleOperator.NotEq:
-                    return hasValue && !ValuesEqual(actualValue, condition.Value);
-                case AttriaxSkanRuleOperator.Gt:
-                case AttriaxSkanRuleOperator.Gte:
-                case AttriaxSkanRuleOperator.Lt:
-                case AttriaxSkanRuleOperator.Lte:
-                {
-                    var actualNumber = CoerceNumber(actualValue);
-                    var expectedNumber = CoerceNumber(condition.Value);
-                    if (!hasValue || !actualNumber.HasValue || !expectedNumber.HasValue)
-                    {
-                        return false;
-                    }
-
-                    return condition.Operator switch
-                    {
-                        AttriaxSkanRuleOperator.Gt => actualNumber.Value > expectedNumber.Value,
-                        AttriaxSkanRuleOperator.Gte => actualNumber.Value >= expectedNumber.Value,
-                        AttriaxSkanRuleOperator.Lt => actualNumber.Value < expectedNumber.Value,
-                        AttriaxSkanRuleOperator.Lte => actualNumber.Value <= expectedNumber.Value,
-                        _ => false,
-                    };
-                }
-                case AttriaxSkanRuleOperator.Contains:
-                {
-                    if (!hasValue || actualValue == null || condition.Value == null)
-                    {
-                        return false;
-                    }
-
-                    var actualString = UnwrapJToken(actualValue) as string;
-                    var expectedString = UnwrapJToken(condition.Value) as string;
-                    if (actualString != null && expectedString != null)
-                    {
-                        return actualString.IndexOf(expectedString, StringComparison.OrdinalIgnoreCase) >= 0;
-                    }
-
-                    if (actualValue is JArray array)
-                    {
-                        return array.Any(item => ValuesEqual(item, condition.Value));
-                    }
-
-                    if (actualValue is IEnumerable enumerable && !(actualValue is string))
-                    {
-                        foreach (var item in enumerable)
-                        {
-                            if (ValuesEqual(item, condition.Value))
-                            {
-                                return true;
-                            }
-                        }
-                    }
-
-                    return false;
-                }
-                default:
-                    return false;
-            }
-        }
-
-        private static bool ValuesEqual(object? left, object? right)
-        {
-            left = UnwrapJToken(left);
-            right = UnwrapJToken(right);
-
-            var leftNumber = CoerceNumber(left);
-            var rightNumber = CoerceNumber(right);
-            if (leftNumber.HasValue && rightNumber.HasValue)
-            {
-                return Math.Abs(leftNumber.Value - rightNumber.Value) < double.Epsilon;
-            }
-
-            if (left is bool leftBool && right is bool rightBool)
-            {
-                return leftBool == rightBool;
-            }
-
-            return string.Equals(
-                Convert.ToString(left, CultureInfo.InvariantCulture),
-                Convert.ToString(right, CultureInfo.InvariantCulture),
-                StringComparison.Ordinal);
-        }
-
-        private static double? CoerceNumber(object? value)
-        {
-            value = UnwrapJToken(value);
-            if (value == null)
-            {
-                return null;
-            }
-
-            switch (value)
-            {
-                case byte number:
-                    return number;
-                case sbyte number:
-                    return number;
-                case short number:
-                    return number;
-                case ushort number:
-                    return number;
-                case int number:
-                    return number;
-                case uint number:
-                    return number;
-                case long number:
-                    return number;
-                case ulong number:
-                    return number;
-                case float number:
-                    return number;
-                case double number:
-                    return number;
-                case decimal number:
-                    return (double)number;
-                case string text when double.TryParse(text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed):
-                    return parsed;
-                default:
-                    return null;
-            }
-        }
-
-        private static long ToMicros(double value, bool alreadyMicros)
-        {
-            var scaled = alreadyMicros ? value : value * MicrosPerUnit;
-            return Convert.ToInt64(Math.Round(scaled, MidpointRounding.AwayFromZero));
-        }
-
-        private static string? ReadString(IDictionary<string, object> values, string key)
-        {
-            return values.TryGetValue(key, out var value)
-                ? Convert.ToString(UnwrapJToken(value), CultureInfo.InvariantCulture)?.Trim()
-                : null;
-        }
-
-        private static bool? ReadBoolean(IDictionary<string, object> values, string key)
-        {
-            if (!values.TryGetValue(key, out var rawValue))
-            {
-                return null;
-            }
-
-            rawValue = UnwrapJToken(rawValue);
-            switch (rawValue)
-            {
-                case bool value:
-                    return value;
-                case string text when bool.TryParse(text.Trim(), out var parsed):
-                    return parsed;
-                case string text when text.Trim() == "1":
-                    return true;
-                case string text when text.Trim() == "0":
-                    return false;
-                default:
-                    var number = CoerceNumber(rawValue);
-                    return number.HasValue ? Math.Abs(number.Value) > double.Epsilon : null;
-            }
-        }
-
-        private static bool IsValidBitRange(int startBit, int bitCount)
-        {
-            return startBit >= 0 &&
-                bitCount > 0 &&
-                startBit + bitCount <= SkanFineValueBitCount;
-        }
-
-        private static int ExtractBitRangeValue(int fineValue, int startBit, int bitCount)
-        {
-            var mask = (1 << bitCount) - 1;
-            return (fineValue >> startBit) & mask;
-        }
-
-        private static int ReplaceBitRangeValue(int fineValue, int startBit, int bitCount, int value)
-        {
-            var maxValue = (1 << bitCount) - 1;
-            var clampedValue = value < 0 ? 0 : Math.Min(value, maxValue);
-            var mask = maxValue << startBit;
-            return (fineValue & ~mask) | ((clampedValue << startBit) & mask);
+            return augmentation.EventData;
         }
 
         private async Task<AttriaxSkanUpdateResult?> EvaluateRetentionMilestonesAsync()
@@ -832,8 +454,8 @@ namespace Attriax.Unity.Internal
                 return null;
             }
 
-            var actualDay = RetentionDay(installAnchorAt.Value, _clock().ToUniversalTime());
-            var activeWindow = ActiveWindowForDay(actualDay);
+            var actualDay = AttriaxSkanRules.RetentionDay(installAnchorAt.Value, _clock().ToUniversalTime());
+            var activeWindow = AttriaxSkanRules.ActiveWindowForDay(actualDay);
             var completedDays = new HashSet<int>(currentState.CompletedRetentionDays ?? Array.Empty<int>());
             var stateChanged = false;
 
@@ -862,7 +484,7 @@ namespace Attriax.Unity.Internal
                     continue;
                 }
 
-                var milestoneWindow = ActiveWindowForDay(day);
+                var milestoneWindow = AttriaxSkanRules.ActiveWindowForDay(day);
                 if (!milestoneWindow.HasValue || milestoneWindow.Value < activeWindow.Value)
                 {
                     completedDays.Add(day);
@@ -878,7 +500,7 @@ namespace Attriax.Unity.Internal
                     continue;
                 }
 
-                var milestoneWindow = ActiveWindowForDay(day);
+                var milestoneWindow = AttriaxSkanRules.ActiveWindowForDay(day);
                 if (milestoneWindow != activeWindow)
                 {
                     continue;
@@ -964,7 +586,7 @@ namespace Attriax.Unity.Internal
                     continue;
                 }
 
-                var number = CoerceNumber(condition.Value);
+                var number = AttriaxSkanRules.CoerceNumber(condition.Value);
                 if (!number.HasValue)
                 {
                     continue;
@@ -976,60 +598,6 @@ namespace Attriax.Unity.Internal
                     days.Add(day);
                 }
             }
-        }
-
-        private static int RetentionDay(DateTimeOffset installAnchorAt, DateTimeOffset now)
-        {
-            var normalizedInstallDay = new DateTimeOffset(
-                installAnchorAt.UtcDateTime.Year,
-                installAnchorAt.UtcDateTime.Month,
-                installAnchorAt.UtcDateTime.Day,
-                0,
-                0,
-                0,
-                TimeSpan.Zero);
-            var normalizedCurrentDay = new DateTimeOffset(
-                now.UtcDateTime.Year,
-                now.UtcDateTime.Month,
-                now.UtcDateTime.Day,
-                0,
-                0,
-                0,
-                TimeSpan.Zero);
-            var difference = (normalizedCurrentDay - normalizedInstallDay).Days;
-            return difference < 0 ? 0 : difference;
-        }
-
-        private static AttriaxSkanCoarseValue DeriveCoarseValue(int fineValue)
-        {
-            if (fineValue >= 40)
-            {
-                return AttriaxSkanCoarseValue.High;
-            }
-
-            if (fineValue >= 20)
-            {
-                return AttriaxSkanCoarseValue.Medium;
-            }
-
-            return AttriaxSkanCoarseValue.Low;
-        }
-
-        private static AttriaxSkanCoarseValue? MaxCoarseValue(
-            AttriaxSkanCoarseValue? current,
-            AttriaxSkanCoarseValue? next)
-        {
-            if (!current.HasValue)
-            {
-                return next;
-            }
-
-            if (!next.HasValue)
-            {
-                return current;
-            }
-
-            return current.Value >= next.Value ? current : next;
         }
 
         private AttriaxSkanState? ReadPersistedState()
@@ -1069,54 +637,6 @@ namespace Attriax.Unity.Internal
             }
 
             return JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(value));
-        }
-
-        private static object? UnwrapJToken(object? value)
-        {
-            return value switch
-            {
-                JValue jValue => jValue.Value,
-                _ => value,
-            };
-        }
-
-        private static AttriaxSkanUpdateResult BuildResult(
-            AttriaxSkanUpdateStatus status,
-            string? message,
-            int? fineValue,
-            AttriaxSkanCoarseValue? coarseValue,
-            bool lockWindow,
-            AttriaxSkanState? state)
-        {
-            return new AttriaxSkanUpdateResult
-            {
-                Status = status,
-                Message = message,
-                FineValue = fineValue,
-                CoarseValue = coarseValue,
-                LockWindow = lockWindow,
-                State = Clone(state),
-            };
-        }
-
-        private enum SkanActiveWindow
-        {
-            Window1,
-            Window2,
-            Window3,
-        }
-
-        private sealed class SkanWindow1Match
-        {
-            internal SkanWindow1Match(int rank, AttriaxSkanEvent skanEvent)
-            {
-                Rank = rank;
-                Event = skanEvent;
-            }
-
-            internal int Rank { get; }
-
-            internal AttriaxSkanEvent Event { get; }
         }
     }
 }

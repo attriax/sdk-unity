@@ -36,8 +36,6 @@ namespace Attriax.Unity.Internal
         private const int DefaultFirstLaunchSessionHeartbeatIntervalMs = 30000;
         private const int DefaultEventFlushIntervalMs = 60000;
         private const int DefaultTrackingAuthorizationStatusTimeoutMs = 60000;
-        private const int SdkBatchMaxItemCount = 100;
-        private const int SdkBatchMaxBodyBytes = 48 * 1024;
         private const string InstallReferrerStorageKey = "installReferrer";
         private const string OriginalInstallReferrerDetailsStorageKey = "originalInstallReferrerDetails";
         private const string ReinstallReferrerDetailsStorageKey = "reinstallReferrerDetails";
@@ -47,19 +45,22 @@ namespace Attriax.Unity.Internal
         private const string SessionStorageKey = "session";
         private const string PersistentStorageDeviceIdSource = "persistent_storage";
         private const string SdkApiVersion = "v1";
-        private const string SdkPackageVersion = "0.4.0";
+        private const string SdkPackageVersion = "0.5.0";
 
         private readonly object _initializationGate = new object();
         private readonly AttriaxAppOpenManager _appOpenManager;
         private readonly AttriaxIosAppOpenEnrichmentManager _iosAppOpenEnrichmentManager;
         private readonly AttriaxPlatformInstallReferrerManager _platformInstallReferrerManager;
         private readonly AttriaxConsentManager _consentManager;
+        private AttriaxConsentQueuePolicy? _consentQueuePolicy;
+        private AttriaxUninstallTokenRegistrar? _uninstallTokenRegistrar;
         private readonly AttriaxContextSnapshotBuilder _contextSnapshotBuilder;
         private readonly AttriaxContextManager _contextManager;
         private readonly AttriaxDeepLinkManager _deepLinkManager;
         private readonly AttriaxEventHub _eventHub;
         private readonly AttriaxGeneratedGateway _generatedGateway;
         private readonly Func<AttriaxPlatformType, string, AttriaxResolvedUrlOpenMode, Task<bool>> _openBrowserUrlAsync;
+        private readonly AttriaxDeepLinkBrowserHandler _deepLinkBrowserHandler;
         private readonly AttriaxRequestManager _requestManager;
         private readonly AttriaxRequestQueue _requestQueue;
         private readonly string[] _runtimeScopedStorageKeys;
@@ -140,6 +141,10 @@ namespace Attriax.Unity.Internal
             _config = NormalizeConfig(config);
             _platform = MapPlatform(Application.platform);
             _openBrowserUrlAsync = openBrowserUrlAsync ?? AttriaxNativeBridge.OpenBrowserUrlAsync;
+            _deepLinkBrowserHandler = new AttriaxDeepLinkBrowserHandler(
+                _config.AutomaticBrowserHandling,
+                GetCurrentPlatform,
+                _openBrowserUrlAsync);
             _contextSnapshotBuilder = new AttriaxContextSnapshotBuilder(
                 _config.ToPublic(),
                 SdkApiVersion,
@@ -473,6 +478,15 @@ namespace Attriax.Unity.Internal
             return _trackingManager.RecordErrorAsync(error, options);
         }
 
+        public Task RecordNotificationAsync(
+            AttriaxNotificationEventType type,
+            string notificationId,
+            AttriaxRecordNotificationOptions options)
+        {
+            AssertInitialized();
+            return _trackingManager.RecordNotificationAsync(type, notificationId, options);
+        }
+
         public Task TrackPageViewAsync(string pageName, AttriaxPageViewOptions options)
         {
             AssertInitialized();
@@ -735,6 +749,18 @@ namespace Attriax.Unity.Internal
         {
             AssertInitialized();
 
+            if (options == null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
+
+            if (string.IsNullOrWhiteSpace(options.Uri))
+            {
+                throw new ArgumentException(
+                    "RecordDeepLinkConversionAsync() requires a non-empty URI.",
+                    nameof(options));
+            }
+
             return _deepLinkManager.RecordConversionAsync(options);
         }
 
@@ -760,7 +786,22 @@ namespace Attriax.Unity.Internal
                 .ConfigureAwait(false);
         }
 
-        private async Task RegisterUninstallTokenAsync(
+        // Builds the uninstall-token registrar on first use. The captured delegates
+        // reference instance members, so it must only be accessed after init.
+        private AttriaxUninstallTokenRegistrar UninstallTokenRegistrar =>
+            _uninstallTokenRegistrar ??= new AttriaxUninstallTokenRegistrar(
+                _config.ProjectToken,
+                _consentManager,
+                () => _deviceId,
+                RequireDeviceIdSource,
+                GetCurrentPlatform,
+                request =>
+                {
+                    _ = _requestQueue.Enqueue(AttriaxQueuedRequest.CreateUninstallToken(request));
+                    RequestQueueFlush(true);
+                });
+
+        private Task RegisterUninstallTokenAsync(
             GeneratedUninstallTokenProvider provider,
             string? token,
             IDictionary<string, object>? metadata)
@@ -769,26 +810,11 @@ namespace Attriax.Unity.Internal
 
             if (!_enabled)
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            if (!_consentManager.CanCaptureUninstallTracking)
-            {
-                return;
-            }
-
-            var request = AttriaxGeneratedRequestFactory.BuildRegisterUninstallTokenRequest(
-                _config.ProjectToken,
-                _deviceId,
-                RequireDeviceIdSource(),
-                GetCurrentPlatform(),
-                provider,
-                string.IsNullOrWhiteSpace(token) ? null : token.Trim(),
-                metadata);
-
-            _ = _requestQueue.Enqueue(AttriaxQueuedRequest.CreateUninstallToken(request));
-            RequestQueueFlush(true);
-            await Task.CompletedTask;
+            UninstallTokenRegistrar.Register(provider, token, metadata);
+            return Task.CompletedTask;
         }
 
         private async Task<AttriaxDeepLinkEvent> ResolveDeepLinkConversionAsync(
@@ -1637,7 +1663,7 @@ namespace Attriax.Unity.Internal
                 var now = DateTimeOffset.UtcNow;
                 var entry = _requestQueue.PeekAt(queueIndex);
 
-                if (_config.GdprEnabled && !_consentManager.IsWaitingForConsent && !IsRequestAllowedByResolvedConsent(entry))
+                if (_config.GdprEnabled && !_consentManager.IsWaitingForConsent && !ConsentQueuePolicy.IsRequestAllowedByResolvedConsent(entry))
                 {
                     _requestQueue.RemoveAt(queueIndex);
                     _requestQueue.Reject(entry.Id, new AttriaxApiError(
@@ -1648,7 +1674,7 @@ namespace Attriax.Unity.Internal
                     continue;
                 }
 
-                var retryDropReason = AttriaxQueueRetryPolicy.GetTerminalDropReason(entry, now);
+                var retryDropReason = AttriaxRequestRetryPolicy.GetTerminalDropReason(entry, now);
                 if (retryDropReason != null)
                 {
                     _requestQueue.RemoveAt(queueIndex);
@@ -1660,7 +1686,7 @@ namespace Attriax.Unity.Internal
                     continue;
                 }
 
-                if (AttriaxQueueRetryPolicy.IsWaitingForRetryWindow(entry, now))
+                if (AttriaxRequestRetryPolicy.IsWaitingForRetryWindow(entry, now))
                 {
                     queueIndex += 1;
                     continue;
@@ -1705,11 +1731,10 @@ namespace Attriax.Unity.Internal
                     {
                         _requestQueue.ReplaceAt(
                             queueIndex,
-                            AttriaxQueueRetryPolicy.MarkForRetry(
+                            AttriaxRequestRetryPolicy.MarkForRetry(
                                 entry,
                                 error,
-                                now,
-                                ResolveRetryDelayMs()));
+                                now));
                         queueIndex += 1;
                         continue;
                     }
@@ -1781,7 +1806,7 @@ namespace Attriax.Unity.Internal
 
             try
             {
-                await _generatedGateway.SendBatchAsync(preparedBatch.TransportEntries, SdkBatchMaxItemCount, SdkBatchMaxBodyBytes)
+                await _generatedGateway.SendBatchAsync(preparedBatch.TransportEntries, AttriaxBatchLimits.MaxItemCount, AttriaxBatchLimits.MaxBodyBytes)
                     .ConfigureAwait(false);
                 _requestQueue.RemoveRange(startIndex, preparedBatch.QueuedEntries.Count);
                 foreach (var entry in preparedBatch.QueuedEntries)
@@ -1809,11 +1834,10 @@ namespace Attriax.Unity.Internal
                     {
                         _requestQueue.ReplaceAt(
                             startIndex + index,
-                            AttriaxQueueRetryPolicy.MarkForRetry(
+                            AttriaxRequestRetryPolicy.MarkForRetry(
                                 entries[index],
                                 normalizedError,
-                                attemptedAt,
-                                ResolveRetryDelayMs()));
+                                attemptedAt));
                     }
 
                     return new BatchFlushResult(false, entries.Count);
@@ -1868,8 +1892,8 @@ namespace Attriax.Unity.Internal
             var sendableEntries = new List<AttriaxQueuedRequest>(entries.Count);
             for (var index = 0; index < entries.Count; index += 1)
             {
-                if (AttriaxQueueRetryPolicy.IsWaitingForRetryWindow(entries[index], now)
-                    || AttriaxQueueRetryPolicy.GetTerminalDropReason(entries[index], now) != null)
+                if (AttriaxRequestRetryPolicy.IsWaitingForRetryWindow(entries[index], now)
+                    || AttriaxRequestRetryPolicy.GetTerminalDropReason(entries[index], now) != null)
                 {
                     break;
                 }
@@ -1878,8 +1902,8 @@ namespace Attriax.Unity.Internal
                 var preparedBatch = PrepareBatchEntries(sendableEntries, keepAliveOccurredAt);
                 if (!_generatedGateway.FitsBatch(
                         preparedBatch.TransportEntries,
-                        SdkBatchMaxItemCount,
-                        SdkBatchMaxBodyBytes))
+                        AttriaxBatchLimits.MaxItemCount,
+                        AttriaxBatchLimits.MaxBodyBytes))
                 {
                     sendableEntries.RemoveAt(sendableEntries.Count - 1);
                     break;
@@ -1968,6 +1992,11 @@ namespace Attriax.Unity.Internal
                 case AttriaxQueuedRequestKind.Crash:
                 {
                     await _generatedGateway.SendTrackCrashAsync(entry.RequireCrashRequest()).ConfigureAwait(false);
+                    return null;
+                }
+                case AttriaxQueuedRequestKind.Notification:
+                {
+                    await _generatedGateway.SendTrackNotificationAsync(entry.RequireNotificationRequest()).ConfigureAwait(false);
                     return null;
                 }
                 case AttriaxQueuedRequestKind.Session:
@@ -3122,19 +3151,7 @@ namespace Attriax.Unity.Internal
             _config.SessionTrackingEnabled &&
             SessionTrackingDecision.Capture;
 
-        private bool ShouldMaterializeIdentifiedContext
-        {
-            get
-            {
-                var values = _consentManager.Values;
-                return
-                    !_config.GdprEnabled ||
-                    _consentManager.State == AttriaxGdprConsentState.NotRequired ||
-                    (_consentManager.State == AttriaxGdprConsentState.Granted &&
-                        values != null &&
-                        (values.Analytics || values.Attribution || values.AdEvents));
-            }
-        }
+        private bool ShouldMaterializeIdentifiedContext => _consentManager.AllowsRuntimePersistence;
 
         private AttriaxTrackingDecision SessionTrackingDecision =>
             TrackingDecisionFor(AttriaxTrackingSignal.Session);
@@ -3247,19 +3264,9 @@ namespace Attriax.Unity.Internal
                 found: resolution.Matched && resolution.DeepLink != null);
         }
 
-        private async Task<bool> HandleBrowserActionAsync(AttriaxResolvedUrlAction? browserAction)
+        private Task<bool> HandleBrowserActionAsync(AttriaxResolvedUrlAction? browserAction)
         {
-            if (!_config.AutomaticBrowserHandling || browserAction == null || string.IsNullOrWhiteSpace(browserAction.Url))
-            {
-                return false;
-            }
-
-            var opened = await _openBrowserUrlAsync(
-                GetCurrentPlatform(),
-                browserAction.Url,
-                browserAction.OpenMode).ConfigureAwait(false);
-
-            return opened;
+            return _deepLinkBrowserHandler.HandleAsync(browserAction);
         }
 
         private static AttriaxDeepLinkEvent BuildResolvedDeepLinkEvent(
@@ -3475,6 +3482,16 @@ namespace Attriax.Unity.Internal
             }
         }
 
+        // Pure queued-request consent decisions, lazily built. The captured
+        // delegates reference instance members (TrackingDecisionFor,
+        // ShouldMaterializeIdentifiedContext) so `this` must already be usable;
+        // it is, because the policy is only accessed on the consent-resolution path.
+        private AttriaxConsentQueuePolicy ConsentQueuePolicy =>
+            _consentQueuePolicy ??= new AttriaxConsentQueuePolicy(
+                TrackingDecisionFor,
+                () => ShouldMaterializeIdentifiedContext,
+                IsAdEventName);
+
         private void RewriteAndPurgeQueuedRequestsForConsent()
         {
             if (!_config.GdprEnabled || _consentManager.IsWaitingForConsent)
@@ -3482,60 +3499,23 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
+            var policy = ConsentQueuePolicy;
+
             _requestQueue.RewriteWhere(
-                ShouldIdentifyQueuedRequestForResolvedConsent,
+                policy.ShouldIdentifyQueuedRequestForResolvedConsent,
                 IdentifyQueuedRequestForResolvedConsent);
 
             _requestQueue.RewriteWhere(
-                ShouldAnonymizeQueuedRequest,
+                policy.ShouldAnonymizeQueuedRequest,
                 AnonymizeQueuedRequest);
 
             _requestQueue.DiscardWhere(
-                entry => !IsRequestAllowedByResolvedConsent(entry),
+                entry => !policy.IsRequestAllowedByResolvedConsent(entry),
                 new AttriaxApiError(
                     "Queued request was dropped because GDPR consent blocked this category.",
                     null,
                     false,
                     true));
-        }
-
-        private bool IsRequestAllowedByResolvedConsent(AttriaxQueuedRequest entry)
-        {
-            return TrackingDecisionForQueuedRequest(entry).Capture;
-        }
-
-        private bool ShouldAnonymizeQueuedRequest(AttriaxQueuedRequest entry)
-        {
-            var decision = TrackingDecisionForQueuedRequest(entry);
-            return decision.Capture && !decision.AttachDeviceIdentity && HasQueuedRequestDeviceId(entry);
-        }
-
-        private bool ShouldIdentifyQueuedRequestForResolvedConsent(AttriaxQueuedRequest entry)
-        {
-            if (!ShouldMaterializeIdentifiedContext)
-            {
-                return false;
-            }
-
-            var decision = TrackingDecisionForQueuedRequest(entry);
-            if (!decision.Capture || !decision.AttachDeviceIdentity)
-            {
-                return false;
-            }
-
-            switch (entry.Kind)
-            {
-                case AttriaxQueuedRequestKind.Event:
-                    return string.IsNullOrWhiteSpace(entry.RequireEventRequest().deviceId);
-                case AttriaxQueuedRequestKind.Crash:
-                    return string.IsNullOrWhiteSpace(entry.RequireCrashRequest().DeviceId);
-                case AttriaxQueuedRequestKind.Session:
-                    return string.IsNullOrWhiteSpace(entry.RequireSessionRequest().deviceId);
-                case AttriaxQueuedRequestKind.DeepLinkResolve:
-                    return string.IsNullOrWhiteSpace(entry.RequireDeepLinkResolveRequest().deviceId);
-                default:
-                    return false;
-            }
         }
 
         private void IdentifyQueuedRequestForResolvedConsent(AttriaxQueuedRequest entry)
@@ -3557,6 +3537,10 @@ namespace Attriax.Unity.Internal
                     entry.RequireCrashRequest().DeviceId = _deviceId;
                     entry.RequireCrashRequest().DeviceIdSource = deviceIdSource;
                     break;
+                case AttriaxQueuedRequestKind.Notification:
+                    entry.RequireNotificationRequest().deviceId = _deviceId;
+                    entry.RequireNotificationRequest().deviceIdSource = deviceIdSource;
+                    break;
                 case AttriaxQueuedRequestKind.Session:
                     entry.RequireSessionRequest().deviceId = _deviceId;
                     entry.RequireSessionRequest().deviceIdSource = deviceIdSource;
@@ -3565,48 +3549,6 @@ namespace Attriax.Unity.Internal
                     entry.RequireDeepLinkResolveRequest().deviceId = _deviceId;
                     entry.RequireDeepLinkResolveRequest().deviceIdSource = deviceIdSource;
                     break;
-            }
-        }
-
-        private AttriaxTrackingDecision TrackingDecisionForQueuedRequest(AttriaxQueuedRequest entry)
-        {
-            switch (entry.Kind)
-            {
-                case AttriaxQueuedRequestKind.Event:
-                    return TrackingDecisionFor(
-                        IsAdEventName(entry.RequireEventRequest().eventName)
-                            ? AttriaxTrackingSignal.AdEvents
-                            : AttriaxTrackingSignal.Analytics);
-                case AttriaxQueuedRequestKind.Crash:
-                    return TrackingDecisionFor(AttriaxTrackingSignal.Analytics);
-                case AttriaxQueuedRequestKind.Session:
-                    return TrackingDecisionFor(AttriaxTrackingSignal.Session);
-                case AttriaxQueuedRequestKind.DeepLinkResolve:
-                    return TrackingDecisionFor(AttriaxTrackingSignal.DeepLink);
-                case AttriaxQueuedRequestKind.UninstallToken:
-                    return TrackingDecisionFor(AttriaxTrackingSignal.UninstallTracking);
-                case AttriaxQueuedRequestKind.User:
-                case AttriaxQueuedRequestKind.Open:
-                    return TrackingDecisionFor(AttriaxTrackingSignal.Attribution);
-                default:
-                    return new AttriaxTrackingDecision(false, AttriaxTrackingIdentityMode.Withheld, false);
-            }
-        }
-
-        private static bool HasQueuedRequestDeviceId(AttriaxQueuedRequest entry)
-        {
-            switch (entry.Kind)
-            {
-                case AttriaxQueuedRequestKind.Event:
-                    return !string.IsNullOrWhiteSpace(entry.RequireEventRequest().deviceId);
-                case AttriaxQueuedRequestKind.Crash:
-                    return !string.IsNullOrWhiteSpace(entry.RequireCrashRequest().DeviceId);
-                case AttriaxQueuedRequestKind.Session:
-                    return !string.IsNullOrWhiteSpace(entry.RequireSessionRequest().deviceId);
-                case AttriaxQueuedRequestKind.DeepLinkResolve:
-                    return !string.IsNullOrWhiteSpace(entry.RequireDeepLinkResolveRequest().deviceId);
-                default:
-                    return false;
             }
         }
 
@@ -3621,6 +3563,10 @@ namespace Attriax.Unity.Internal
                 case AttriaxQueuedRequestKind.Crash:
                     entry.RequireCrashRequest().DeviceId = null;
                     entry.RequireCrashRequest().DeviceIdSource = null;
+                    break;
+                case AttriaxQueuedRequestKind.Notification:
+                    entry.RequireNotificationRequest().deviceId = null;
+                    entry.RequireNotificationRequest().deviceIdSource = null;
                     break;
                 case AttriaxQueuedRequestKind.Session:
                     entry.RequireSessionRequest().deviceId = null;

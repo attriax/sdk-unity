@@ -40,7 +40,7 @@ namespace Attriax.Unity.Generated.Model
         /// <param name="productId">productId.</param>
         /// <param name="projectToken">Attriax project token that scopes the SDK request..</param>
         /// <param name="provider">provider.</param>
-        /// <param name="receipt">receipt.</param>
+        /// <param name="receipt">Receipt payload submitted by the app for validation..</param>
         /// <param name="test">test.</param>
         /// <param name="transactionId">transactionId.</param>
         public SdkV1RevenueReceiptValidateDto(string appToken = default, string clientOccurredAt = default, string deviceId = default, string environment = default, string productId = default, string projectToken = default, string provider = default, string receipt = default, bool test = default, string transactionId = default)
@@ -103,8 +103,9 @@ namespace Attriax.Unity.Generated.Model
         public string provider { get; set; }
 
         /// <summary>
-        /// Gets or Sets receipt
+        /// Receipt payload submitted by the app for validation.
         /// </summary>
+        /// <value>Receipt payload submitted by the app for validation.</value>
         [DataMember(Name = "receipt", EmitDefaultValue = false)]
         public string receipt { get; set; }
 

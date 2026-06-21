@@ -384,5 +384,91 @@ namespace Attriax.Unity.Tests
 
             Assert.That(request.sessionRelativeTimeMs, Is.EqualTo(1500m));
         }
+
+        [Test]
+        public void BuildTrackNotificationRequestReturnsGeneratedDtoWithNormalizedFields()
+        {
+            var occurredAt = new DateTimeOffset(2026, 6, 19, 9, 30, 0, TimeSpan.Zero);
+
+            var request = AttriaxGeneratedRequestFactory.BuildTrackNotificationRequest(
+                projectToken: "ax_test",
+                deviceId: "device_1",
+                deviceIdSource: "persistent_storage",
+                type: AttriaxNotificationEventType.Opened,
+                notificationId: "  notif-123  ",
+                platform: AttriaxPlatformType.IOS,
+                linkId: " link-1 ",
+                campaignId: " campaign-1 ",
+                title: " Welcome ",
+                source: AttriaxNotificationEventSource.Apns,
+                sessionId: " session_1 ",
+                metadata: new Dictionary<string, object>
+                {
+                    ["origin"] = "qa",
+                },
+                occurredAt: occurredAt);
+
+            Assert.That(request, Is.TypeOf<SdkNotificationDto>());
+            Assert.That(request.projectToken, Is.EqualTo("ax_test"));
+            Assert.That(request.deviceId, Is.EqualTo("device_1"));
+            Assert.That(request.deviceIdSource, Is.EqualTo("persistent_storage"));
+            Assert.That(request.notificationId, Is.EqualTo("notif-123"));
+            Assert.That(request.platform, Is.EqualTo(Platform.Ios));
+            Assert.That(request.linkId, Is.EqualTo("link-1"));
+            Assert.That(request.campaignId, Is.EqualTo("campaign-1"));
+            Assert.That(request.title, Is.EqualTo("Welcome"));
+            Assert.That(request.sessionId, Is.EqualTo("session_1"));
+            Assert.That(request.source, Is.EqualTo(NotificationEventSource.Apns));
+            Assert.That(request.type, Is.EqualTo(NotificationEventType.Opened));
+            Assert.That(request.occurredAt, Is.EqualTo(occurredAt.UtcDateTime));
+            Assert.That(request.metadata, Is.Not.Null);
+            Assert.That(request.metadata!["origin"], Is.EqualTo("qa"));
+        }
+
+        [Test]
+        public void BuildTrackNotificationRequestAllowsMissingDeviceIdentityAndSource()
+        {
+            var request = AttriaxGeneratedRequestFactory.BuildTrackNotificationRequest(
+                projectToken: "ax_test",
+                deviceId: null,
+                deviceIdSource: null,
+                type: AttriaxNotificationEventType.Received,
+                notificationId: "notif-1",
+                platform: AttriaxPlatformType.Android,
+                linkId: null,
+                campaignId: null,
+                title: null,
+                source: null,
+                sessionId: null,
+                metadata: null,
+                occurredAt: DateTimeOffset.UtcNow);
+
+            Assert.That(request.deviceId, Is.Null);
+            Assert.That(request.deviceIdSource, Is.Null);
+            Assert.That(request.source, Is.Null);
+            Assert.That(request.linkId, Is.Null);
+            Assert.That(request.type, Is.EqualTo(NotificationEventType.Received));
+        }
+
+        [Test]
+        public void BuildTrackNotificationRequestRejectsBlankNotificationId()
+        {
+            Assert.That(
+                () => AttriaxGeneratedRequestFactory.BuildTrackNotificationRequest(
+                    projectToken: "ax_test",
+                    deviceId: "device_1",
+                    deviceIdSource: "persistent_storage",
+                    type: AttriaxNotificationEventType.Dismissed,
+                    notificationId: "   ",
+                    platform: AttriaxPlatformType.Android,
+                    linkId: null,
+                    campaignId: null,
+                    title: null,
+                    source: null,
+                    sessionId: null,
+                    metadata: null,
+                    occurredAt: DateTimeOffset.UtcNow),
+                Throws.ArgumentException);
+        }
     }
 }

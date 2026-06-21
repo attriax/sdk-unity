@@ -146,10 +146,17 @@ namespace Attriax.Unity.Internal
             _state == AttriaxGdprConsentState.Pending ||
             _state == AttriaxGdprConsentState.Unknown;
 
-        public bool ShouldDeferNetworkDispatch =>
-            _gdprEnabled &&
-            IsWaitingForConsent &&
-            !_anonymousTrackingEnabled;
+        public bool ShouldDeferNetworkDispatch => Policy.ShouldDeferNetworkDispatch;
+
+        /// <summary>
+        /// Whether runtime-scoped data may be persisted under the current consent.
+        /// </summary>
+        public bool AllowsRuntimePersistence => Policy.AllowsRuntimePersistence;
+
+        // Immutable snapshot of the current consent gate. Rebuilt per access (a
+        // cheap readonly struct) so it always reflects the latest stored state.
+        private AttriaxConsentPolicy Policy =>
+            new AttriaxConsentPolicy(_gdprEnabled, _state, _values, _anonymousTrackingEnabled);
 
         public bool AllowsAnalyticsTracking => AllowsCategory(values => values.Analytics);
 
@@ -165,43 +172,8 @@ namespace Attriax.Unity.Internal
 
         public bool CanCaptureUninstallTracking => TrackingDecisionFor(AttriaxTrackingSignal.UninstallTracking).Capture;
 
-        public AttriaxTrackingDecision TrackingDecisionFor(AttriaxTrackingSignal signal)
-        {
-            if (!_gdprEnabled)
-            {
-                return new AttriaxTrackingDecision(true, AttriaxTrackingIdentityMode.Identified, false);
-            }
-
-            if (IsWaitingForConsent)
-            {
-                return new AttriaxTrackingDecision(
-                    IsAnonymousCapableSignal(signal),
-                    AttriaxTrackingIdentityMode.Anonymous,
-                    !_anonymousTrackingEnabled);
-            }
-
-            if (_state == AttriaxGdprConsentState.NotRequired)
-            {
-                return new AttriaxTrackingDecision(true, AttriaxTrackingIdentityMode.Identified, false);
-            }
-
-            if (_state != AttriaxGdprConsentState.Granted || _values == null)
-            {
-                return new AttriaxTrackingDecision(false, AttriaxTrackingIdentityMode.Withheld, false);
-            }
-
-            if (IsSignalGranted(signal, _values))
-            {
-                return new AttriaxTrackingDecision(true, AttriaxTrackingIdentityMode.Identified, false);
-            }
-
-            if (_anonymousTrackingEnabled && IsAnonymousCapableSignal(signal))
-            {
-                return new AttriaxTrackingDecision(true, AttriaxTrackingIdentityMode.Anonymous, false);
-            }
-
-            return new AttriaxTrackingDecision(false, AttriaxTrackingIdentityMode.Withheld, false);
-        }
+        public AttriaxTrackingDecision TrackingDecisionFor(AttriaxTrackingSignal signal) =>
+            Policy.TrackingDecisionFor(signal);
 
         public void Init()
         {
@@ -316,26 +288,8 @@ namespace Attriax.Unity.Internal
             _onStateChanged?.Invoke();
         }
 
-        private bool AllowsCategory(Func<AttriaxGdprConsentValues, bool> selector)
-        {
-            if (!_gdprEnabled)
-            {
-                return true;
-            }
-
-            switch (_state)
-            {
-                case AttriaxGdprConsentState.NotRequired:
-                    return true;
-                case AttriaxGdprConsentState.Granted:
-                    return _values != null && selector(_values);
-                case AttriaxGdprConsentState.Pending:
-                case AttriaxGdprConsentState.Unknown:
-                    return false;
-                default:
-                    return false;
-            }
-        }
+        private bool AllowsCategory(Func<AttriaxGdprConsentValues, bool> selector) =>
+            Policy.AllowsCategory(selector);
 
         private bool ShouldRefreshRemoteDecision()
         {
@@ -578,39 +532,6 @@ namespace Attriax.Unity.Internal
                 Attribution = values.Attribution,
                 AdEvents = values.AdEvents,
             };
-        }
-
-        private static bool IsAnonymousCapableSignal(AttriaxTrackingSignal signal)
-        {
-            switch (signal)
-            {
-                case AttriaxTrackingSignal.Analytics:
-                case AttriaxTrackingSignal.AdEvents:
-                case AttriaxTrackingSignal.Session:
-                case AttriaxTrackingSignal.DeepLink:
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        private static bool IsSignalGranted(AttriaxTrackingSignal signal, AttriaxGdprConsentValues values)
-        {
-            switch (signal)
-            {
-                case AttriaxTrackingSignal.Analytics:
-                    return values.Analytics;
-                case AttriaxTrackingSignal.AdEvents:
-                    return values.AdEvents;
-                case AttriaxTrackingSignal.Session:
-                    return values.Analytics || values.AdEvents;
-                case AttriaxTrackingSignal.DeepLink:
-                case AttriaxTrackingSignal.Attribution:
-                case AttriaxTrackingSignal.UninstallTracking:
-                    return values.Attribution;
-                default:
-                    return false;
-            }
         }
 
         private static AttriaxGdprConsentValues? NormalizeGeneratedValues(SdkGdprConsentValuesDto? values)

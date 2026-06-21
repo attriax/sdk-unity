@@ -147,59 +147,16 @@ namespace Attriax.Unity.Internal
 
         private AttriaxDeepLinkReferrerDetails? ResolveSessionOpeningReferrer()
         {
-            return BuildDeepLinkReferrerDetailsForCurrentSession(_initialDeepLinkProvider(), true)
-                ?? BuildDeepLinkReferrerDetailsForCurrentSession(_latestDeepLinkProvider(), true);
+            return AttriaxDeepLinkReferrerMapper.BuildForCurrentSession(
+                       _initialDeepLinkProvider(), _currentSessionProvider(), true)
+                ?? AttriaxDeepLinkReferrerMapper.BuildForCurrentSession(
+                       _latestDeepLinkProvider(), _currentSessionProvider(), true);
         }
 
         private AttriaxDeepLinkReferrerDetails? ResolveLatestDeepLinkReferrer()
         {
-            return BuildDeepLinkReferrerDetailsForCurrentSession(_latestDeepLinkProvider());
-        }
-
-        private AttriaxDeepLinkReferrerDetails? BuildDeepLinkReferrerDetailsForCurrentSession(
-            AttriaxDeepLinkEvent? deepLinkEvent,
-            bool requireSessionOpeningEvent = false)
-        {
-            if (deepLinkEvent == null)
-            {
-                return null;
-            }
-
-            if (requireSessionOpeningEvent && !IsSessionOpeningEvent(deepLinkEvent))
-            {
-                return null;
-            }
-
-            var currentSession = _currentSessionProvider();
-            if (currentSession != null && GetDeepLinkSessionObservedAt(deepLinkEvent) < currentSession.StartedAt)
-            {
-                return null;
-            }
-
-            return new AttriaxDeepLinkReferrerDetails
-            {
-                Uri = deepLinkEvent.Uri,
-                ReceivedAt = deepLinkEvent.RawEvent?.ReceivedAt ?? deepLinkEvent.ClickedAt,
-                ClickedAt = deepLinkEvent.ClickedAt,
-                ConsumedAt = deepLinkEvent.ConsumedAt,
-                Trigger = deepLinkEvent.Trigger,
-                IsAttriaxDomain = deepLinkEvent.IsAttriaxSubDomain,
-                Found = deepLinkEvent.Found,
-                Data = deepLinkEvent.Data,
-                Utm = deepLinkEvent.Utm,
-                BrowserAction = deepLinkEvent.BrowserAction,
-                HandledBySdk = deepLinkEvent.HandledBySdk,
-            };
-        }
-
-        private static bool IsSessionOpeningEvent(AttriaxDeepLinkEvent deepLinkEvent)
-        {
-            return deepLinkEvent.IsColdStart || deepLinkEvent.IsDeferred;
-        }
-
-        private static DateTimeOffset GetDeepLinkSessionObservedAt(AttriaxDeepLinkEvent deepLinkEvent)
-        {
-            return deepLinkEvent.RawEvent?.ReceivedAt ?? deepLinkEvent.ConsumedAt;
+            return AttriaxDeepLinkReferrerMapper.BuildForCurrentSession(
+                _latestDeepLinkProvider(), _currentSessionProvider());
         }
     }
 }

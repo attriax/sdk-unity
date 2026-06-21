@@ -379,7 +379,7 @@ namespace Attriax.Unity.Tests
         }
 
         [Test]
-        public async Task FailedNonUsdRevenueConversionFallsBackToSingleMicrousd()
+        public async Task FailedNonUsdRevenueConversionFallsBackToOneUsd()
         {
             var clock = new DateTimeOffset(2026, 1, 4, 12, 0, 0, TimeSpan.Zero);
             var recorder = new SkanUpdateRecorder();
@@ -410,8 +410,34 @@ namespace Attriax.Unity.Tests
                 });
 
             Assert.That(recorder.Calls.Count, Is.EqualTo(0));
-            Assert.That(manager.State?.PurchaseRevenueUsdMicros, Is.EqualTo(1));
+            // A failed FX lookup optimistically counts as $1 USD = 1,000,000 micros.
+            Assert.That(manager.State?.PurchaseRevenueUsdMicros, Is.EqualTo(1000000));
             Assert.That(manager.State?.PurchaseCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public async Task ManualUpdateWithZeroFineValueDoesNotLatchFirstLaunch()
+        {
+            var clock = new DateTimeOffset(2026, 1, 4, 12, 0, 0, TimeSpan.Zero);
+            var recorder = new SkanUpdateRecorder();
+            var manager = CreateManager(
+                clock,
+                recorder,
+                new AttriaxSkanConfig
+                {
+                    Enabled = true,
+                    RegisterFirstLaunchValue = false,
+                });
+
+            await manager.InitializeAsync(isFirstLaunch: true);
+
+            var result = await manager.UpdateConversionValueAsync(0, null, false);
+
+            Assert.That(result.Status, Is.EqualTo(AttriaxSkanUpdateStatus.Updated));
+            Assert.That(manager.State?.FineValue, Is.EqualTo(0));
+            // A resolved fineValue of 0 must not flip the first-launch registration
+            // latch; only an explicit install-registration update may.
+            Assert.That(manager.State?.FirstLaunchValueRegistered, Is.False);
         }
 
         [Test]

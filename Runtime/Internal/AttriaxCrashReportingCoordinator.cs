@@ -16,9 +16,7 @@ namespace Attriax.Unity.Internal
     /// The Flutter coordinator additionally persists fatal crashes for replay
     /// on the next launch and consumes pending native crash reports. Unity
     /// does not yet have those capabilities, so this coordinator only handles
-    /// the live <c>Application.logMessageReceived</c> path. See
-    /// <c>docs/sdk-unity-flutter-runtime-alignment-plan.md</c> for the
-    /// roadmap.
+    /// the live <c>Application.logMessageReceived</c> path.
     /// </remarks>
     internal sealed class AttriaxCrashReportingCoordinator
     {

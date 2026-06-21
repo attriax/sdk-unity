@@ -10,6 +10,9 @@ using GeneratedPlatform = Attriax.Unity.Generated.Model.Platform;
 using GeneratedSdkVersionContextDto = Attriax.Unity.Generated.Model.SdkVersionContextDto;
 using SdkCreateDynamicLinkDto = Attriax.Unity.Generated.Model.SdkCreateDynamicLinkDto;
 using SdkEventDto = Attriax.Unity.Generated.Model.SdkEventDto;
+using SdkNotificationDto = Attriax.Unity.Generated.Model.SdkNotificationDto;
+using GeneratedNotificationEventType = Attriax.Unity.Generated.Model.NotificationEventType;
+using GeneratedNotificationEventSource = Attriax.Unity.Generated.Model.NotificationEventSource;
 using SdkV1GdprConsentCheckDto = Attriax.Unity.Generated.Model.SdkV1GdprConsentCheckDto;
 using SdkV1GdprConsentValuesDto = Attriax.Unity.Generated.Model.SdkV1GdprConsentValuesDto;
 using SdkV1GdprConsentWriteDto = Attriax.Unity.Generated.Model.SdkV1GdprConsentWriteDto;
@@ -66,8 +69,8 @@ namespace Attriax.Unity.Internal
                 deviceIdSource: deviceIdSource,
                 googlePlayInstantParam: snapshot.GooglePlayInstantParam ?? default,
                 installBeginTimestampSeconds: ToGeneratedNumber(snapshot.InstallBeginTimestampSeconds),
-                installReferrer: TrimOrNull(installReferrerOverride)
-                    ?? TrimOrNull(snapshot.RawPlatformInstallReferrer),
+                installReferrer: AttriaxRawInstallReferrerNormalizer.Normalize(installReferrerOverride)
+                    ?? AttriaxRawInstallReferrerNormalizer.Normalize(snapshot.RawPlatformInstallReferrer),
                 isFirstLaunch: session?.IsFirstLaunch ?? snapshot.IsFirstLaunch,
                 platform: MapGeneratedPlatform(snapshot.Platform),
                 referrerClickTimestampSeconds: ToGeneratedNumber(snapshot.ReferrerClickTimestampSeconds),
@@ -115,12 +118,6 @@ namespace Attriax.Unity.Internal
             return merged;
         }
 
-        private static string? TrimOrNull(string? value)
-        {
-            var trimmed = value?.Trim();
-            return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
-        }
-
         public static SdkEventDto BuildTrackEventRequest(
             string projectToken,
             string? deviceId,
@@ -139,6 +136,77 @@ namespace Attriax.Unity.Internal
                 eventName: eventName,
                 sessionId: session?.Id,
                 sessionRelativeTimeMs: session != null ? GetSessionRelativeTimeMs(session, occurredAt) : 0m);
+        }
+
+        public static SdkNotificationDto BuildTrackNotificationRequest(
+            string projectToken,
+            string? deviceId,
+            string? deviceIdSource,
+            AttriaxNotificationEventType type,
+            string notificationId,
+            AttriaxPlatformType platform,
+            string? linkId,
+            string? campaignId,
+            string? title,
+            AttriaxNotificationEventSource? source,
+            string? sessionId,
+            IDictionary<string, object>? metadata,
+            DateTimeOffset occurredAt)
+        {
+            var normalizedNotificationId = notificationId?.Trim();
+            if (string.IsNullOrEmpty(normalizedNotificationId))
+            {
+                throw new ArgumentException("notificationId must not be empty.", nameof(notificationId));
+            }
+
+            return new SdkNotificationDto(
+                projectToken: projectToken,
+                campaignId: NormalizeOptionalString(campaignId),
+                deviceId: deviceId,
+                deviceIdSource: deviceIdSource,
+                linkId: NormalizeOptionalString(linkId),
+                metadata: AttriaxObjectNormalizer.NormalizeObjectMap(metadata),
+                notificationId: normalizedNotificationId,
+                occurredAt: occurredAt.UtcDateTime,
+                platform: MapGeneratedPlatform(platform),
+                sessionId: NormalizeOptionalString(sessionId),
+                source: MapGeneratedNotificationEventSource(source),
+                title: NormalizeOptionalString(title),
+                type: MapGeneratedNotificationEventType(type));
+        }
+
+        private static GeneratedNotificationEventType MapGeneratedNotificationEventType(
+            AttriaxNotificationEventType type)
+        {
+            switch (type)
+            {
+                case AttriaxNotificationEventType.Received:
+                    return GeneratedNotificationEventType.Received;
+                case AttriaxNotificationEventType.Opened:
+                    return GeneratedNotificationEventType.Opened;
+                case AttriaxNotificationEventType.Dismissed:
+                    return GeneratedNotificationEventType.Dismissed;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported notification event type.");
+            }
+        }
+
+        private static GeneratedNotificationEventSource? MapGeneratedNotificationEventSource(
+            AttriaxNotificationEventSource? source)
+        {
+            switch (source)
+            {
+                case null:
+                    return null;
+                case AttriaxNotificationEventSource.Fcm:
+                    return GeneratedNotificationEventSource.Fcm;
+                case AttriaxNotificationEventSource.Apns:
+                    return GeneratedNotificationEventSource.Apns;
+                case AttriaxNotificationEventSource.Other:
+                    return GeneratedNotificationEventSource.Other;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(source), source, "Unsupported notification event source.");
+            }
         }
 
         public static AttriaxCrashRequest BuildTrackCrashRequest(
