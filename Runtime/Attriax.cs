@@ -37,6 +37,26 @@ namespace Attriax.Unity
 
             lock (ActiveInstances)
             {
+                // Warn (do not block) when a second live instance is constructed for the
+                // same project token. Two live runtimes share the same token-keyed
+                // persistence namespace (device id, session, queue), so they can stamp
+                // inconsistent identity/session state and fork dashboard rows. This is
+                // most common in the Editor with "Enter Play Mode without Domain Reload",
+                // where a prior instance survives across play sessions.
+                if (ActiveInstances.TryGetValue(config.ProjectToken, out var existingRef) &&
+                    existingRef.TryGetTarget(out var existingInstance) &&
+                    existingInstance != null &&
+                    !ReferenceEquals(existingInstance, this))
+                {
+                    Debug.LogWarning(
+                        "[Attriax][WARNING] A second Attriax instance was created for project token '"
+                        + config.ProjectToken
+                        + "' while a previous instance is still live. They share token-keyed persisted "
+                        + "state (device id, session, queue) and may report inconsistent identity. "
+                        + "Dispose the previous instance, reuse Attriax.Configured, or enable Domain Reload "
+                        + "in the Editor to avoid forked sessions.");
+                }
+
                 ActiveInstances[config.ProjectToken] = new WeakReference<Attriax>(this);
             }
         }

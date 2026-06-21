@@ -26,8 +26,6 @@ namespace Attriax.Unity.Internal
         IAttriaxAppOpenPipeline,
         IAttriaxSessionLifecycleQueue
     {
-        private static readonly Action<string, string?> NoopDebugLog = static (_, _) => { };
-
         private const string DefaultApiBaseUrl = "https://api.attriax.com";
         private const string DefaultStorageKeyPrefix = "attriax:unity";
         private const int DefaultRequestTimeoutMs = 12000;
@@ -159,7 +157,7 @@ namespace Attriax.Unity.Internal
                 _runtimeState,
                 this,
                 _eventHub);
-            _generatedGateway = new AttriaxGeneratedGateway(_config.ApiBaseUrl, _config.RequestTimeoutMs);
+            _generatedGateway = new AttriaxGeneratedGateway(_config.ApiBaseUrl, _config.RequestTimeoutMs, BuildSdkUserAgent());
             _storageNamespace = BuildStorageNamespace(_config.ProjectToken);
             _installReferrerStore = new AttriaxInstallReferrerStore(Key);
             _runtimeSettingsStore = new AttriaxRuntimeSettingsStore(
@@ -192,7 +190,7 @@ namespace Attriax.Unity.Internal
             _consentManager = new AttriaxConsentManager(
                 new AttriaxPlayerPrefsConsentStore(
                     Key(GdprConsentStorageKey),
-                    NoopDebugLog),
+                    DebugLog),
                 _config.ProjectToken,
                 _config.GdprEnabled,
                 _config.AnonymousTracking,
@@ -200,7 +198,7 @@ namespace Attriax.Unity.Internal
                 ResolveCurrentTimezone,
                 _generatedGateway,
                 HandleConsentStateChanged,
-                NoopDebugLog);
+                DebugLog);
             _skanManager = new AttriaxSkanManager(
                 _config.Skan ?? new AttriaxSkanConfig(),
                 _platform,
@@ -221,7 +219,7 @@ namespace Attriax.Unity.Internal
 
                     AttriaxPlayerPrefs.Save();
                 },
-                NoopDebugLog,
+                DebugLog,
                 (amountMicros, currency, occurredAt) => _generatedGateway.ConvertRevenueToUsdMicrosAsync(
                     _config.ProjectToken,
                     amountMicros,
@@ -241,9 +239,9 @@ namespace Attriax.Unity.Internal
                 _config.SessionHeartbeatIntervalMs,
                 new AttriaxPlayerPrefsSessionStore(
                     Key(SessionStorageKey),
-                    NoopDebugLog),
+                    DebugLog),
                 this,
-                NoopDebugLog);
+                DebugLog);
             _appOpenManager = new AttriaxAppOpenManager(
                 _runtimeState,
                 this,
@@ -282,7 +280,7 @@ namespace Attriax.Unity.Internal
                 _requestManager,
                 _skanManager,
                 RequestQueueFlush,
-                NoopDebugLog);
+                DebugLog);
             _crashReportingCoordinator = new AttriaxCrashReportingCoordinator(
                 _config.ToPublic(),
                 () => !_disposed && _initialized && _enabled,
@@ -1770,6 +1768,7 @@ namespace Attriax.Unity.Internal
             }
 
             SetSynchronizationState(AttriaxSynchronizationState.Synchronized);
+            DebugLog("Queue flush complete", "remaining=" + _requestQueue.Count);
             }
             catch (Exception error)
             {
@@ -3056,6 +3055,25 @@ namespace Attriax.Unity.Internal
             return string.Format(CultureInfo.InvariantCulture, "{0}:{1}:{2}", _config.StorageKeyPrefix, _storageNamespace, name);
         }
 
+        // Builds the outbound HTTP User-Agent for native/editor requests. Must NOT match
+        // the backend's `isbot` heuristics (the OpenAPI-generated default, "OpenAPI-
+        // Generator/...", does and forced BOT classification). The "(Unity ...)" suffix is
+        // load-bearing: bare "attriax-unity-sdk/<v>" still trips isbot, but the
+        // parenthesized platform comment keeps it human-classified.
+        private static string BuildSdkUserAgent()
+        {
+            var executionEnvironment = Application.isEditor ? "unity_editor" : "unity_player";
+            var unityVersion = string.IsNullOrWhiteSpace(Application.unityVersion)
+                ? "unknown"
+                : Application.unityVersion;
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "attriax-unity-sdk/{0} (Unity {1}; {2})",
+                SdkPackageVersion,
+                unityVersion,
+                executionEnvironment);
+        }
+
         private static string BuildStorageNamespace(string projectToken)
         {
             using (var sha = SHA256.Create())
@@ -3444,12 +3462,19 @@ namespace Attriax.Unity.Internal
 
         private async Task HandleConsentStateChangedWithIdentifiedContextAsync()
         {
+            DebugLog(
+                "Consent resolved; materializing identified context",
+                "waitingForConsent=" + _consentManager.IsWaitingForConsent
+                    + " allowsAttribution=" + _consentManager.AllowsAttributionTracking);
+
             SyncRuntimePersistenceMode();
             await EnsureIdentifiedContextAsync().ConfigureAwait(false);
 
             // Parity guard: ensure the current session context is synced with the now-identified
             // device identity so the same sessionId is preserved across the anonymous-to-identified
             // transition. This lets the backend match and merge anonymous activity by sessionId.
+            // EnsureIdentifiedContextAsync already calls SyncCurrentSessionContext, but we re-stamp
+            // here as well in case the identified device id was resolved after that call returned.
             _sessionManager.SyncCurrentSessionContext();
 
             var updatedSession = _sessionManager.CurrentSession;
@@ -3459,12 +3484,19 @@ namespace Attriax.Unity.Internal
                 _sessionManager.HandleSdkEnabled(DateTimeOffset.UtcNow);
             }
 
+            // Identify any queued anonymous (null device id) records in place — including the
+            // anonymous session-start — so the same sessionId keeps a single identity on the
+            // backend instead of forking into a second app user.
             _activationCoordinator.HandleConsentStateChanged(_enabled, RuntimeActivationState);
 
             if (!_consentManager.IsWaitingForConsent && ShouldTrackSessionActivity)
             {
                 var currentSession = _sessionManager.CurrentSession;
-                if (currentSession != null)
+                // Only emit the identity keep-alive heartbeat once the live session actually
+                // carries the resolved device id. Emitting with a still-empty device id would
+                // create a second, anonymous app user for this sessionId (the fork we are
+                // eliminating). Mirrors the Flutter reference's `deviceId == null` guard.
+                if (currentSession != null && !string.IsNullOrWhiteSpace(currentSession.DeviceId))
                 {
                     var decision = TrackingDecisionFor(AttriaxTrackingSignal.Session);
                     _ = _requestQueue.Enqueue(
@@ -3477,6 +3509,10 @@ namespace Attriax.Unity.Internal
                                 SdkSessionLifecycleKind.Heartbeat,
                                 DateTimeOffset.UtcNow,
                                 null)));
+                    DebugLog(
+                        "Identity keep-alive heartbeat queued",
+                        "sessionId=" + currentSession.Id
+                            + " attachDeviceIdentity=" + decision.AttachDeviceIdentity);
                     RequestQueueFlush(true);
                 }
             }

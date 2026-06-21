@@ -107,17 +107,31 @@ namespace Attriax.Unity.Internal
             }
 
             var context = _contextManager.Snapshot;
-            if (string.Equals(_currentSession.DeviceId, _runtimeState.DeviceId, StringComparison.Ordinal))
+            // Dirty-check every context-derived field the live session carries (mirrors
+            // the Flutter reference's syncCurrentSessionContext): device id, platform,
+            // and sdk package version must all already match before we can skip the
+            // re-stamp. Checking device id alone let a stale platform/sdk version ride
+            // along on subsequent emissions, forking the dashboard session row.
+            if (string.Equals(_currentSession.DeviceId, _runtimeState.DeviceId, StringComparison.Ordinal) &&
+                _currentSession.Platform == context.Platform &&
+                string.Equals(_currentSession.SdkPackageVersion, context.Sdk.PackageVersion, StringComparison.Ordinal))
             {
                 return;
             }
 
             _currentSession.DeviceId = _runtimeState.DeviceId;
+            _currentSession.Platform = context.Platform;
             _currentSession.Locale = context.Device.Language ?? _currentSession.Locale;
             _currentSession.AppVersion = context.App.Version ?? _currentSession.AppVersion;
             _currentSession.AppBuildNumber = context.App.BuildNumber ?? _currentSession.AppBuildNumber;
             _currentSession.AppPackageName = context.App.PackageName ?? _currentSession.AppPackageName;
+            _currentSession.SdkPackageVersion = context.Sdk.PackageVersion ?? _currentSession.SdkPackageVersion;
             PersistSessionSnapshot(_currentSession);
+            _debugLog?.Invoke(
+                "Session context synced",
+                "id=" + _currentSession.Id
+                    + " platform=" + _currentSession.Platform
+                    + " hasDeviceId=" + !string.IsNullOrWhiteSpace(_currentSession.DeviceId));
         }
 
         public void HandlePause(DateTimeOffset occurredAt)
@@ -322,6 +336,9 @@ namespace Attriax.Unity.Internal
 
                 _currentSession = existingSession;
                 PersistSessionSnapshot(existingSession);
+                _debugLog?.Invoke(
+                    "Session continued",
+                    "id=" + existingSession.Id + " hasDeviceId=" + !string.IsNullOrWhiteSpace(existingSession.DeviceId));
                 return new AttriaxSessionRestoreResult(existingSession, false, null);
             }
 
@@ -333,6 +350,12 @@ namespace Attriax.Unity.Internal
                 _pendingRecoveredSessionEnd = existingSession;
             }
 
+            _debugLog?.Invoke(
+                "Session started",
+                "id=" + currentSession.Id
+                    + " platform=" + currentSession.Platform
+                    + " isFirstLaunch=" + currentSession.IsFirstLaunch
+                    + " hasDeviceId=" + !string.IsNullOrWhiteSpace(currentSession.DeviceId));
             return new AttriaxSessionRestoreResult(currentSession, true, existingSession);
         }
 

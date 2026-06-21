@@ -45,6 +45,14 @@ namespace Attriax.Unity.Internal
             _deepLinkManager.BeginInitialProbe(options.CaptureInitialUrl);
             _settingsState.WriteHasLaunched(true);
             AttachLifecycle();
+            DebugLog(
+                "Initialization complete",
+                "platform=" + _resolvedPlatform
+                    + " enabled=" + _enabled
+                    + " isFirstLaunch=" + _isFirstLaunch
+                    + " identifiedContext=" + ShouldMaterializeIdentifiedContext
+                    + " waitingForConsent=" + _consentManager.IsWaitingForConsent
+                    + " hasDeviceId=" + !string.IsNullOrWhiteSpace(_deviceId));
         }
 
         internal void BootstrapCompleteDisabledState()

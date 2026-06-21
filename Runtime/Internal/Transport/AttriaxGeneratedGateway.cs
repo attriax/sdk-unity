@@ -67,13 +67,25 @@ namespace Attriax.Unity.Internal
 
         private readonly GeneratedSdkApi _sdkApi;
 
-        public AttriaxGeneratedGateway(string apiBaseUrl, int requestTimeoutMs)
+        public AttriaxGeneratedGateway(string apiBaseUrl, int requestTimeoutMs, string? userAgent = null)
         {
             var configuration = new GeneratedConfiguration
             {
                 BasePath = BuildGeneratedApiBaseUrl(apiBaseUrl),
                 Timeout = TimeSpan.FromMilliseconds(requestTimeoutMs),
             };
+
+            // Override the OpenAPI-generated default User-Agent. The generated default
+            // ("OpenAPI-Generator/<v>/csharp", URL-encoded) is classified as a bot by the
+            // backend's `isbot` user-agent check, which flagged every Unity Editor/native
+            // request as BOT traffic. A descriptive, non-bot Attriax UA keeps native runs
+            // human-classified (parity with Flutter/native, which never advertise the
+            // generator UA). WebGL builds do not set this header at all (the browser UA is
+            // used), so this only affects Editor + native players.
+            if (!string.IsNullOrWhiteSpace(userAgent))
+            {
+                configuration.UserAgent = userAgent;
+            }
 
             _sdkApi = new GeneratedSdkApi(configuration);
         }
