@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using SdkEventDto = Attriax.Unity.Generated.Model.SdkEventDto;
 using SdkNotificationDto = Attriax.Unity.Generated.Model.SdkNotificationDto;
 using SdkRegisterUninstallTokenDto = Attriax.Unity.Generated.Model.SdkRegisterUninstallTokenDto;
@@ -18,7 +17,10 @@ namespace Attriax.Unity.Internal
 {
     internal sealed class AttriaxRequestQueue
     {
-        private const int QueueSchemaVersion = 4;
+        // Bumped to 5 with the appToken -> projectToken rename: queues persisted
+        // by older builds use an incompatible token field and are intentionally
+        // discarded on load (there are no production Unity installs to migrate).
+        private const int QueueSchemaVersion = 5;
 
         private readonly string _storageKey;
         private readonly int _maxQueueSize;
@@ -434,13 +436,7 @@ namespace Attriax.Unity.Internal
 
             try
             {
-                var parsed = JToken.Parse(raw);
-                if (parsed is JObject envelopeObject)
-                {
-                    NormalizeLegacyProjectTokens(envelopeObject);
-                }
-
-                var envelope = parsed.ToObject<QueueEnvelope>();
+                var envelope = JsonConvert.DeserializeObject<QueueEnvelope>(raw);
                 if (envelope == null || envelope.Version != QueueSchemaVersion || envelope.Entries == null)
                 {
                     return new List<AttriaxQueuedRequest>();
@@ -452,61 +448,6 @@ namespace Attriax.Unity.Internal
             {
                 return new List<AttriaxQueuedRequest>();
             }
-        }
-
-        // Queues persisted by Unity SDK builds that predate the projectToken
-        // rename stored the token under the deprecated `appToken` key (the queue
-        // schema version was not bumped at the rename, so those entries are
-        // restored rather than discarded). Normalize them to `projectToken` once
-        // on load so restored requests carry the field the transport, batching,
-        // and consent paths expect. New queues already use `projectToken`, so
-        // this is a no-op for them.
-        private static void NormalizeLegacyProjectTokens(JObject envelope)
-        {
-            if (envelope["Entries"] is not JArray entries)
-            {
-                return;
-            }
-
-            foreach (var entry in entries)
-            {
-                if (entry is not JObject entryObject)
-                {
-                    continue;
-                }
-
-                // The only direct child objects of an entry are its request
-                // payloads (OpenRequest, EventRequest, ...). The token is always
-                // a top-level field on those payloads, so this never descends
-                // into nested metadata/eventData maps.
-                foreach (var property in entryObject.Properties())
-                {
-                    if (property.Value is JObject request)
-                    {
-                        MigrateLegacyProjectToken(request);
-                    }
-                }
-            }
-        }
-
-        private static void MigrateLegacyProjectToken(JObject request)
-        {
-            var legacyAppToken = request["appToken"];
-            if (legacyAppToken is not { Type: JTokenType.String }
-                || string.IsNullOrWhiteSpace(legacyAppToken.Value<string>()))
-            {
-                return;
-            }
-
-            var projectToken = request["projectToken"];
-            if (projectToken is { Type: JTokenType.String }
-                && !string.IsNullOrWhiteSpace(projectToken.Value<string>()))
-            {
-                return;
-            }
-
-            request["projectToken"] = legacyAppToken.Value<string>();
-            request.Remove("appToken");
         }
 
         private void WriteQueueUnderLock()

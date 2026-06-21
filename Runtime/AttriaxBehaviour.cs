@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Attriax.Unity.Internal;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace Attriax.Unity
 {
@@ -16,7 +15,6 @@ namespace Attriax.Unity
     public sealed class AttriaxBehaviour : MonoBehaviour
     {
         [Header("Attriax")]
-        [FormerlySerializedAs("_appToken")]
         [SerializeField] private string _projectToken = string.Empty;
         [SerializeField] private string _apiBaseUrl = string.Empty;
         [SerializeField] private bool _initializeOnAwake = true;

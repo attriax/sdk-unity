@@ -1,6 +1,5 @@
 #nullable enable
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace Attriax.Unity
 {
@@ -18,7 +17,6 @@ namespace Attriax.Unity
         /// </summary>
         public const string ResourcesPath = "Attriax/AttriaxSettings";
 
-        [FormerlySerializedAs("_appToken")]
         [SerializeField] private string _projectToken = string.Empty;
         [SerializeField] private string _apiBaseUrl = "https://api.attriax.com";
         [SerializeField] private string _appVersion = string.Empty;
