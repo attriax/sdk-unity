@@ -7,6 +7,20 @@
 /[Uu]ser[Ss]ettings/
 /[Mm]emoryCaptures/
 
+# Stray .meta files Unity generates for the transient project folders above when
+# this package is opened as a standalone Unity project. If committed, consumers
+# that embed this package (e.g. tester-unity) try to import those folders and hit
+# import loops / SourceAssetDB time-mismatch errors. Never track these.
+/[Ll]ibrary.meta
+/[Tt]emp.meta
+/[Oo]bj.meta
+/[Bb]uild.meta
+/[Bb]uilds.meta
+/[Ll]ogs.meta
+/[Uu]ser[Ss]ettings.meta
+/[Mm]emoryCaptures.meta
+/dist.meta
+
 *.csproj
 *.unityproj
 *.sln
