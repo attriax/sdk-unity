@@ -65,30 +65,49 @@ namespace Attriax.Unity.Internal
             },
         };
 
+        // Stable fallback used only if the runtime ever hands the gateway an empty
+        // User-Agent. It must never be the OpenAPI generator default — see below.
+        private const string FallbackUserAgent = "attriax-unity-sdk (Unity unknown; unity_unknown)";
+
         private readonly GeneratedSdkApi _sdkApi;
 
         public AttriaxGeneratedGateway(string apiBaseUrl, int requestTimeoutMs, string? userAgent = null)
         {
+            // Resolve the User-Agent up front so EVERY request this single, long-lived
+            // gateway emits — including the very first bootstrap/config call — carries the
+            // SAME Attriax UA. This is load-bearing for stable anonymous identity: the
+            // backend hashes anonymous users on appId+ip+userAgent+dailySalt, so any UA
+            // drift across a run mints multiple anonymous users for one player (parity with
+            // sdk-js, which relies on one stable fetch client and never varies the UA).
+            UserAgent = string.IsNullOrWhiteSpace(userAgent) ? FallbackUserAgent : userAgent;
+
             var configuration = new GeneratedConfiguration
             {
                 BasePath = BuildGeneratedApiBaseUrl(apiBaseUrl),
                 Timeout = TimeSpan.FromMilliseconds(requestTimeoutMs),
             };
 
-            // Override the OpenAPI-generated default User-Agent. The generated default
+            // ALWAYS override the OpenAPI-generated default User-Agent. The generated default
             // ("OpenAPI-Generator/<v>/csharp", URL-encoded) is classified as a bot by the
             // backend's `isbot` user-agent check, which flagged every Unity Editor/native
-            // request as BOT traffic. A descriptive, non-bot Attriax UA keeps native runs
-            // human-classified (parity with Flutter/native, which never advertise the
-            // generator UA). WebGL builds do not set this header at all (the browser UA is
-            // used), so this only affects Editor + native players.
-            if (!string.IsNullOrWhiteSpace(userAgent))
-            {
-                configuration.UserAgent = userAgent;
-            }
+            // request as BOT traffic. It must never reach the wire — not even on the first
+            // request — so we unconditionally replace it (no "only when non-empty" guard,
+            // which previously let the generator default leak when no UA was supplied). A
+            // descriptive, non-bot Attriax UA keeps native runs human-classified (parity
+            // with Flutter/native, which never advertise the generator UA). WebGL builds do
+            // not set this header at all (the browser UA is used), so this only affects
+            // Editor + native players.
+            configuration.UserAgent = UserAgent;
 
             _sdkApi = new GeneratedSdkApi(configuration);
         }
+
+        /// <summary>
+        /// The exact User-Agent every outbound request from this gateway carries (on
+        /// Editor + native players). Surfaced so the gated outbound-payload trace can print
+        /// it, making any UA drift visible in a single Editor run.
+        /// </summary>
+        public string UserAgent { get; }
 
         public void Dispose()
         {

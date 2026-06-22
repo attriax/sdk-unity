@@ -3801,6 +3801,11 @@ namespace Attriax.Unity.Internal
             }
 
             var hasDeviceId = !string.IsNullOrWhiteSpace(deviceId);
+            // userAgent is printed so a single Editor run surfaces any UA drift across
+            // requests: every line of one run must show the identical Attriax UA (the
+            // backend hashes anonymous identity on appId+ip+userAgent, so a varying UA
+            // would fork one run into multiple anonymous users).
+            var userAgent = _generatedGateway.UserAgent;
             DebugLog(
                 "Outbound payload",
                 "endpoint=" + endpoint
@@ -3810,7 +3815,8 @@ namespace Attriax.Unity.Internal
                     + " isAnonymous=" + (!hasDeviceId)
                     + " platform=" + (string.IsNullOrWhiteSpace(platform) ? "none" : platform)
                     + " sdkPackageVersion=" + (string.IsNullOrWhiteSpace(sdkPackageVersion) ? "none" : sdkPackageVersion)
-                    + " appVersion=" + (string.IsNullOrWhiteSpace(appVersion) ? "none" : appVersion));
+                    + " appVersion=" + (string.IsNullOrWhiteSpace(appVersion) ? "none" : appVersion)
+                    + " userAgent=" + (string.IsNullOrWhiteSpace(userAgent) ? "none" : userAgent));
         }
 
         private void FailInitialDeepLink(Exception exception)
