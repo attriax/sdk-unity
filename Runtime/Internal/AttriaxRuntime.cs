@@ -1631,26 +1631,6 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
-            // Hold the flush while an identified-context transition is materializing.
-            // When GDPR consent resolves to an identity-bearing state (NotRequired or
-            // Granted) the device id is materialized and the queued anonymous requests
-            // are re-identified on a background task (HandleConsentStateChanged ->
-            // HandleConsentStateChangedWithIdentifiedContextAsync). Until that task
-            // finishes, _deviceId is still empty and RestampQueuedRequestsForLiveContext
-            // bails (it requires a live device id), so a flush racing the transition
-            // would ship queued analytics/session requests device-less / anonymous even
-            // though their resolved decision is Identified. This mirrors the Flutter
-            // reference, where _applyConsentStateChange awaits
-            // _ensureIdentifiedContextForCurrentConsent() and the queue re-identify pass
-            // BEFORE _applyRuntimeState(enabled: true) re-activates the synchronizer
-            // (attriax_runtime.dart:1035-1097). The transition schedules its own flush
-            // once identity is live, so deferring here never strands the queue.
-            if (_identifiedConsentTransitionTask != null)
-            {
-                SetSynchronizationState(AttriaxSynchronizationState.Deferred);
-                return;
-            }
-
             if (!IsOnline())
             {
                 SetSynchronizationState(AttriaxSynchronizationState.Offline);
@@ -3516,16 +3496,6 @@ namespace Attriax.Unity.Internal
                 if (ReferenceEquals(_identifiedConsentTransitionTask, transitionTask))
                 {
                     _identifiedConsentTransitionTask = null;
-
-                    // Drain the queue now that the identified-context transition has
-                    // finished. FlushInternalAsync defers while this task is in flight
-                    // (so it never dispatches the still-anonymous queue mid-transition);
-                    // any flush that deferred for that reason must be retried here, after
-                    // the field is cleared, or the re-identified requests would sit in the
-                    // queue until the next unrelated flush trigger. Runs whether the
-                    // transition succeeded (device id is live) or failed (no identity to
-                    // attach — the queue then ships anonymously, as before).
-                    RequestQueueFlush(true);
                 }
             }
         }

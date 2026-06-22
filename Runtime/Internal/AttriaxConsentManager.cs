@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
 using Attriax.Unity.Generated.Model;
@@ -111,8 +112,15 @@ namespace Attriax.Unity.Internal
         private DateTime? _checkedAt;
         private bool _pendingSync;
         private bool _didRestore;
+        private int _consentGeneration;
         private Task<bool>? _needsConsentTask;
         private Task? _pendingSyncTask;
+
+        // Last-logged decision detail per signal, so the gated decision-point trace
+        // emits once per OUTCOME CHANGE instead of on every TrackingDecisionFor call
+        // (which fires every session tick — hundreds of identical lines per frame).
+        private readonly Dictionary<AttriaxTrackingSignal, string> _lastLoggedDecisionDetail =
+            new Dictionary<AttriaxTrackingSignal, string>();
 
         public AttriaxConsentManager(
             IAttriaxConsentStore store,
@@ -195,15 +203,29 @@ namespace Attriax.Unity.Internal
             var categoryGranted = values != null &&
                 AttriaxConsentPolicy.IsSignalGranted(signal, values);
 
-            _debugLog(
-                "Tracking decision",
+            var detail =
                 "signal=" + signal
                     + " state=" + _state
                     + " categoryGranted=" + categoryGranted
                     + " anonymousTracking=" + _anonymousTrackingEnabled
                     + " identityMode=" + decision.IdentityMode
                     + " attachDeviceIdentity=" + decision.AttachDeviceIdentity
-                    + " capture=" + decision.Capture);
+                    + " capture=" + decision.Capture;
+
+            // TrackingDecisionFor runs every session tick, so the unconditional trace
+            // flooded the log with hundreds of identical lines per frame. Emit only when
+            // this signal's resolved decision actually changes from what was last logged
+            // (e.g. analytics flipping Anonymous -> Identified); identical consecutive
+            // decisions are suppressed.
+            if (_lastLoggedDecisionDetail.TryGetValue(signal, out var lastDetail) &&
+                lastDetail == detail)
+            {
+                return;
+            }
+
+            _lastLoggedDecisionDetail[signal] = detail;
+
+            _debugLog("Tracking decision", detail);
         }
 
         // Null-safe category formatter for the gated consent-lifecycle traces.
@@ -235,6 +257,7 @@ namespace Attriax.Unity.Internal
             _checkedAt = null;
             _pendingSync = false;
             _didRestore = false;
+            _consentGeneration++;
             _needsConsentTask = null;
             _pendingSyncTask = null;
         }
@@ -301,6 +324,7 @@ namespace Attriax.Unity.Internal
                 _countryCode,
                 "manual",
                 true);
+            _consentGeneration++;
             _ = PersistAndFlushAsync();
         }
 
@@ -314,6 +338,7 @@ namespace Attriax.Unity.Internal
                 _countryCode,
                 "manual",
                 true);
+            _consentGeneration++;
             _ = PersistAndFlushAsync();
         }
 
@@ -326,6 +351,7 @@ namespace Attriax.Unity.Internal
                 null,
                 null,
                 true);
+            _consentGeneration++;
             _ = PersistAndFlushAsync();
         }
 
@@ -367,12 +393,28 @@ namespace Attriax.Unity.Internal
                 try
                 {
                     var identity = _ensureConsentIdentity();
+                    // Capture the generation before the network await: a SetConsent
+                    // that lands during the check must not be downgraded by the
+                    // (now stale) check echo.
+                    var gen = _consentGeneration;
                     var status = await _gateway.CheckGdprConsentAsync(
                             AttriaxGeneratedRequestFactory.BuildGdprConsentCheckRequest(
                                 _projectToken,
                                 identity.ConsentId))
                         .ConfigureAwait(false);
-                    ApplyRemoteStatus(status, false);
+                    if (_consentGeneration == gen)
+                    {
+                        ApplyRemoteStatus(status, false);
+                    }
+                    else
+                    {
+                        _debugLog(
+                            "Consent check echo discarded (stale generation)",
+                            "checkedGen=" + gen + " currentGen=" + _consentGeneration);
+                        // A newer local SetConsent landed during the check; ensure its
+                        // intent is upserted rather than dropped.
+                        _ = FlushPendingSyncInternalAsync();
+                    }
                     return IsWaitingForConsent;
                 }
                 catch (Exception error)
@@ -494,31 +536,56 @@ namespace Attriax.Unity.Internal
 
         private async Task SyncPendingStateAsync()
         {
-            try
+            // Convergence loop. SetConsent #2 can coalesce into the in-flight task
+            // created by SetConsent #1 (see FlushPendingSyncInternalAsync). The
+            // generation guard ensures that when an upsert returns we never let its
+            // (now stale) echo downgrade values set by a newer local SetConsent that
+            // landed during the await: we capture the generation BEFORE the await,
+            // and if it advanced we discard the echo and re-sync the current intent.
+            while (true)
             {
-                var identity = _ensureConsentIdentity();
-                _debugLog(
-                    "Consent upsert request",
-                    "state=" + _state + " " + DescribeValues(_values));
-                var status = await _gateway.UpsertGdprConsentAsync(
-                        AttriaxGeneratedRequestFactory.BuildGdprConsentWriteRequest(
-                            _projectToken,
-                            identity.ConsentId,
-                            _checkedAt ?? DateTime.UtcNow,
-                            _countryCode,
-                            _regionSource,
-                            StateToGenerated(_state),
-                            _values))
-                    .ConfigureAwait(false);
-                ApplyRemoteStatus(status, false);
-            }
-            catch (Exception error)
-            {
-                _debugLog(
-                    "Failed to sync GDPR consent state to Attriax. The SDK will retry later.",
-                    error.Message);
-                _pendingSync = true;
-                PersistCurrentState();
+                var gen = _consentGeneration;
+                try
+                {
+                    var identity = _ensureConsentIdentity();
+                    _debugLog(
+                        "Consent upsert request",
+                        "state=" + _state + " " + DescribeValues(_values));
+                    var status = await _gateway.UpsertGdprConsentAsync(
+                            AttriaxGeneratedRequestFactory.BuildGdprConsentWriteRequest(
+                                _projectToken,
+                                identity.ConsentId,
+                                _checkedAt ?? DateTime.UtcNow,
+                                _countryCode,
+                                _regionSource,
+                                StateToGenerated(_state),
+                                _values))
+                        .ConfigureAwait(false);
+
+                    if (_consentGeneration != gen)
+                    {
+                        // A newer local SetConsent landed while we were syncing. The
+                        // echo we just received reflects the OLD intent — applying it
+                        // would clobber the newer values. Discard it and re-sync the
+                        // now-current state until the generation is stable.
+                        _debugLog(
+                            "Consent upsert echo discarded (stale generation)",
+                            "syncedGen=" + gen + " currentGen=" + _consentGeneration);
+                        continue;
+                    }
+
+                    ApplyRemoteStatus(status, false);
+                    return;
+                }
+                catch (Exception error)
+                {
+                    _debugLog(
+                        "Failed to sync GDPR consent state to Attriax. The SDK will retry later.",
+                        error.Message);
+                    _pendingSync = true;
+                    PersistCurrentState();
+                    return;
+                }
             }
         }
 
