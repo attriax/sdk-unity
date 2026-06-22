@@ -172,8 +172,54 @@ namespace Attriax.Unity.Internal
 
         public bool CanCaptureUninstallTracking => TrackingDecisionFor(AttriaxTrackingSignal.UninstallTracking).Capture;
 
-        public AttriaxTrackingDecision TrackingDecisionFor(AttriaxTrackingSignal signal) =>
-            Policy.TrackingDecisionFor(signal);
+        public AttriaxTrackingDecision TrackingDecisionFor(AttriaxTrackingSignal signal)
+        {
+            var decision = Policy.TrackingDecisionFor(signal);
+            DebugLogTrackingDecision(signal, decision);
+            return decision;
+        }
+
+        // Gated decision-point trace. Emitted at the single chokepoint where every
+        // per-signal IdentityMode / AttachDeviceIdentity is resolved, so a single
+        // Editor run answers "why is this signal Anonymous?" without guesswork.
+        // Prints the signal, the consent state, the granted-state of the signal's
+        // backing category, AnonymousTracking, and the resolved decision. One line
+        // per decision. Pairs with the runtime's "Outbound payload" dispatch trace:
+        // this explains the identity a request was BUILT with; that one shows what
+        // actually shipped.
+        private void DebugLogTrackingDecision(
+            AttriaxTrackingSignal signal,
+            AttriaxTrackingDecision decision)
+        {
+            var values = _values;
+            var categoryGranted = values != null &&
+                AttriaxConsentPolicy.IsSignalGranted(signal, values);
+
+            _debugLog(
+                "Tracking decision",
+                "signal=" + signal
+                    + " state=" + _state
+                    + " categoryGranted=" + categoryGranted
+                    + " anonymousTracking=" + _anonymousTrackingEnabled
+                    + " identityMode=" + decision.IdentityMode
+                    + " attachDeviceIdentity=" + decision.AttachDeviceIdentity
+                    + " capture=" + decision.Capture);
+        }
+
+        // Null-safe category formatter for the gated consent-lifecycle traces.
+        // Prints analytics/attribution/adEvents as "none" when the values object
+        // is absent (state without per-category grants), otherwise the bool value.
+        private static string DescribeValues(AttriaxGdprConsentValues? values)
+        {
+            if (values == null)
+            {
+                return "analytics=none attribution=none adEvents=none";
+            }
+
+            return "analytics=" + values.Analytics
+                + " attribution=" + values.Attribution
+                + " adEvents=" + values.AdEvents;
+        }
 
         public void Init()
         {
@@ -238,6 +284,11 @@ namespace Attriax.Unity.Internal
 
         public void SetConsent(bool analytics, bool attribution, bool adEvents)
         {
+            _debugLog(
+                "Consent SetConsent called",
+                "analytics=" + analytics
+                    + " attribution=" + attribution
+                    + " adEvents=" + adEvents);
             ApplyState(
                 AttriaxGdprConsentState.Granted,
                 new AttriaxGdprConsentValues
@@ -255,6 +306,7 @@ namespace Attriax.Unity.Internal
 
         public void SetNotRequired()
         {
+            _debugLog("Consent SetNotRequired called", null);
             ApplyState(
                 AttriaxGdprConsentState.NotRequired,
                 null,
@@ -367,6 +419,7 @@ namespace Attriax.Unity.Internal
             var stored = _store.ReadConsentState();
             if (stored == null)
             {
+                _debugLog("Consent restored", "hadStored=false");
                 _didRestore = true;
                 return;
             }
@@ -377,6 +430,13 @@ namespace Attriax.Unity.Internal
             _regionSource = NormalizeString(stored.RegionSource);
             _checkedAt = NormalizeDate(stored.CheckedAt);
             _pendingSync = stored.PendingSync;
+
+            _debugLog(
+                "Consent restored",
+                "hadStored=true state=" + _state
+                    + " " + DescribeValues(_values)
+                    + " regionSource=" + (_regionSource ?? "none")
+                    + " pendingSync=" + _pendingSync);
 
             _didRestore = true;
         }
@@ -437,6 +497,9 @@ namespace Attriax.Unity.Internal
             try
             {
                 var identity = _ensureConsentIdentity();
+                _debugLog(
+                    "Consent upsert request",
+                    "state=" + _state + " " + DescribeValues(_values));
                 var status = await _gateway.UpsertGdprConsentAsync(
                         AttriaxGeneratedRequestFactory.BuildGdprConsentWriteRequest(
                             _projectToken,
@@ -461,6 +524,17 @@ namespace Attriax.Unity.Internal
 
         private void ApplyRemoteStatus(SdkGdprConsentStatusDto status, bool pendingSync)
         {
+            var remoteValues = status.values;
+            _debugLog(
+                "Consent remote status",
+                "state=" + status.state
+                    + (remoteValues == null
+                        ? " analytics=none attribution=none adEvents=none"
+                        : " analytics=" + remoteValues.analytics
+                            + " attribution=" + remoteValues.attribution
+                            + " adEvents=" + remoteValues.adEvents)
+                    + " regionSource=" + (status.regionSource ?? "none"));
+
             var mappedState = StateFromGenerated(status.state);
             var mappedValues = NormalizeGeneratedValues(status.values);
             if (mappedState == AttriaxGdprConsentState.Granted && mappedValues == null)
@@ -497,6 +571,14 @@ namespace Attriax.Unity.Internal
                 !string.Equals(nextRegionSource, _regionSource, StringComparison.Ordinal) ||
                 nextCheckedAt != _checkedAt ||
                 pendingSync != _pendingSync;
+
+            _debugLog(
+                "Consent applied",
+                "regionSource=" + (nextRegionSource ?? "none")
+                    + " state=" + state
+                    + " " + DescribeValues(nextValues)
+                    + " pendingSync=" + pendingSync
+                    + " changed=" + changed);
 
             _state = state;
             _values = nextValues;

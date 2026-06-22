@@ -1631,6 +1631,26 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
+            // Hold the flush while an identified-context transition is materializing.
+            // When GDPR consent resolves to an identity-bearing state (NotRequired or
+            // Granted) the device id is materialized and the queued anonymous requests
+            // are re-identified on a background task (HandleConsentStateChanged ->
+            // HandleConsentStateChangedWithIdentifiedContextAsync). Until that task
+            // finishes, _deviceId is still empty and RestampQueuedRequestsForLiveContext
+            // bails (it requires a live device id), so a flush racing the transition
+            // would ship queued analytics/session requests device-less / anonymous even
+            // though their resolved decision is Identified. This mirrors the Flutter
+            // reference, where _applyConsentStateChange awaits
+            // _ensureIdentifiedContextForCurrentConsent() and the queue re-identify pass
+            // BEFORE _applyRuntimeState(enabled: true) re-activates the synchronizer
+            // (attriax_runtime.dart:1035-1097). The transition schedules its own flush
+            // once identity is live, so deferring here never strands the queue.
+            if (_identifiedConsentTransitionTask != null)
+            {
+                SetSynchronizationState(AttriaxSynchronizationState.Deferred);
+                return;
+            }
+
             if (!IsOnline())
             {
                 SetSynchronizationState(AttriaxSynchronizationState.Offline);
@@ -1982,10 +2002,26 @@ namespace Attriax.Unity.Internal
                 return null;
             }
 
+            // This keep-alive is constructed during batch assembly, AFTER
+            // RestampQueuedRequestsForLiveContext has already run, so it never passes
+            // through the dispatch-time re-stamp chokepoint. Sync the live session
+            // snapshot first so its DeviceId/platform/version reflect the resolved
+            // identity (no-ops once already in sync, and when the device id is still
+            // empty). Then gate identity on the snapshot actually carrying a device id,
+            // mirroring the Flutter reference's buildHeartbeatKeepAliveRequest guard
+            // (`attachDeviceIdentity && session.deviceId != null`,
+            // attriax_session_manager.dart:274-275). Without this the keep-alive could
+            // ship platform/version but a null device id — the internally inconsistent
+            // session row the dashboard forks on.
+            _sessionManager.SyncCurrentSessionContext();
+
+            var attachDeviceIdentity =
+                SessionTrackingDecision.AttachDeviceIdentity &&
+                !string.IsNullOrWhiteSpace(currentSession.DeviceId);
             var keepAliveRequest = AttriaxGeneratedRequestFactory.BuildTrackSessionRequest(
                 _config.ProjectToken,
-                SessionTrackingDecision.AttachDeviceIdentity ? currentSession.DeviceId : null,
-                SessionTrackingDecision.AttachDeviceIdentity ? RequireDeviceIdSource() : null,
+                attachDeviceIdentity ? currentSession.DeviceId : null,
+                attachDeviceIdentity ? RequireDeviceIdSource() : null,
                 currentSession,
                 SdkSessionLifecycleKind.Heartbeat,
                 occurredAt,
@@ -3480,6 +3516,16 @@ namespace Attriax.Unity.Internal
                 if (ReferenceEquals(_identifiedConsentTransitionTask, transitionTask))
                 {
                     _identifiedConsentTransitionTask = null;
+
+                    // Drain the queue now that the identified-context transition has
+                    // finished. FlushInternalAsync defers while this task is in flight
+                    // (so it never dispatches the still-anonymous queue mid-transition);
+                    // any flush that deferred for that reason must be retried here, after
+                    // the field is cleared, or the re-identified requests would sit in the
+                    // queue until the next unrelated flush trigger. Runs whether the
+                    // transition succeeded (device id is live) or failed (no identity to
+                    // attach — the queue then ships anonymously, as before).
+                    RequestQueueFlush(true);
                 }
             }
         }
@@ -3675,6 +3721,15 @@ namespace Attriax.Unity.Internal
                 case AttriaxQueuedRequestKind.Event:
                 case AttriaxQueuedRequestKind.Session:
                 case AttriaxQueuedRequestKind.User:
+                // Uninstall-token registrations snapshot the device id at build time
+                // (AttriaxUninstallTokenRegistrar reads `() => _deviceId`). When the
+                // FCM/APNs token arrives before the identified device id has resolved,
+                // the queued request is stuck device-less and no other repair path
+                // touches it (it is absent from IdentifyQueuedRequestForResolvedConsent
+                // too). The Flutter reference never emits a device-less uninstall token
+                // — its registrar throws if the device id is null — so re-stamp it here
+                // from the live identity to reach the same identified outcome.
+                case AttriaxQueuedRequestKind.UninstallToken:
                     break;
                 default:
                     return false;
@@ -3744,6 +3799,13 @@ namespace Attriax.Unity.Internal
                     request.deviceIdSource = deviceIdSource;
                     break;
                 }
+                case AttriaxQueuedRequestKind.UninstallToken:
+                {
+                    var request = entry.RequireUninstallTokenRequest();
+                    request.deviceId = deviceId;
+                    request.deviceIdSource = deviceIdSource;
+                    break;
+                }
             }
         }
 
@@ -3796,6 +3858,13 @@ namespace Attriax.Unity.Internal
                     platform = request.platform.ToString();
                     appVersion = request.app?.version;
                     sdkPackageVersion = request.sdk?.packageVersion;
+                    break;
+                }
+                case AttriaxQueuedRequestKind.UninstallToken:
+                {
+                    var request = entry.RequireUninstallTokenRequest();
+                    deviceId = request.deviceId;
+                    platform = request.platform.ToString();
                     break;
                 }
             }
