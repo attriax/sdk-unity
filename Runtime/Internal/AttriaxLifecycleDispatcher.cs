@@ -183,11 +183,17 @@ namespace Attriax.Unity.Internal
             return result;
         }
 
+        // Fire-and-forget main-thread post for non-blocking work (e.g. debug logging).
+        // Unlike InvokeOnMainThread it NEVER waits on a ManualResetEventSlim, so a
+        // background thread holding a lock can post and return immediately without
+        // risking a deadlock against the main thread contending for that same lock.
+        // During teardown (no bound context / dispatcher destroyed) it no-ops safely
+        // instead of throwing, because a logger must never crash or block its caller.
         public static void PostToMainThread(Action action)
         {
             if (action == null)
             {
-                throw new ArgumentNullException(nameof(action));
+                return;
             }
 
             BindToCurrentThread();
@@ -200,8 +206,7 @@ namespace Attriax.Unity.Internal
             var context = _mainThreadContext;
             if (context == null)
             {
-                throw new InvalidOperationException(
-                    "Attriax could not access the Unity main thread. Initialize the runtime on the Unity thread before using background continuations.");
+                return;
             }
 
             context.Post(_ =>

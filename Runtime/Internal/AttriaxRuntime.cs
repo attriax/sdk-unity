@@ -3949,14 +3949,21 @@ namespace Attriax.Unity.Internal
             var prefix = "[Attriax] [" + DateTimeOffset.UtcNow.ToString("O") + "] [thread "
                 + System.Threading.Thread.CurrentThread.ManagedThreadId + "] ";
 
+            // Logging MUST NOT block the calling thread on the main thread. A blocking
+            // marshal (InvokeOnMainThread + Wait) deadlocks when invoked from a
+            // background thread that holds AttriaxRequestQueue._gate (e.g. inside
+            // RewriteWhere -> consent decision trace) while the main thread is
+            // contending for that same _gate via HandleTick -> RequestQueue.Count.
+            // Fire-and-forget the log so _gate is released immediately; the line still
+            // runs on the main thread so the consumer's Unity log handler stays safe.
             if (string.IsNullOrWhiteSpace(detail))
             {
-                AttriaxLifecycleDispatcher.InvokeOnMainThread(
+                AttriaxLifecycleDispatcher.PostToMainThread(
                     () => UnityEngine.Debug.Log(prefix + message));
                 return;
             }
 
-            AttriaxLifecycleDispatcher.InvokeOnMainThread(
+            AttriaxLifecycleDispatcher.PostToMainThread(
                 () => UnityEngine.Debug.Log(prefix + message + " " + detail));
         }
 
