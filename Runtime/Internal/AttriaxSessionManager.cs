@@ -127,11 +127,6 @@ namespace Attriax.Unity.Internal
             _currentSession.AppPackageName = context.App.PackageName ?? _currentSession.AppPackageName;
             _currentSession.SdkPackageVersion = context.Sdk.PackageVersion ?? _currentSession.SdkPackageVersion;
             PersistSessionSnapshot(_currentSession);
-            _debugLog?.Invoke(
-                "Session context synced",
-                "id=" + _currentSession.Id
-                    + " platform=" + _currentSession.Platform
-                    + " hasDeviceId=" + !string.IsNullOrWhiteSpace(_currentSession.DeviceId));
         }
 
         public void HandlePause(DateTimeOffset occurredAt)

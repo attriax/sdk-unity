@@ -1815,16 +1815,6 @@ namespace Attriax.Unity.Internal
 
             var preparedBatch = PrepareBatchEntries(entries, DateTimeOffset.UtcNow);
 
-            if (_config.EnableDebugLogs)
-            {
-                foreach (var transportEntry in preparedBatch.TransportEntries)
-                {
-                    DebugLogOutboundPayload(
-                        "batch:" + DescribeEndpointForKind(transportEntry.Kind),
-                        transportEntry);
-                }
-            }
-
             try
             {
                 await _generatedGateway.SendBatchAsync(preparedBatch.TransportEntries, AttriaxBatchLimits.MaxItemCount, AttriaxBatchLimits.MaxBodyBytes)
@@ -2011,8 +2001,6 @@ namespace Attriax.Unity.Internal
 
         private async Task<object> PerformQueuedRequestAsync(AttriaxQueuedRequest entry)
         {
-            DebugLogOutboundPayload("single:" + DescribeEndpointForKind(entry.Kind), entry);
-
             switch (entry.Kind)
             {
                 case AttriaxQueuedRequestKind.Open:
@@ -3549,10 +3537,6 @@ namespace Attriax.Unity.Internal
                                 SdkSessionLifecycleKind.Heartbeat,
                                 DateTimeOffset.UtcNow,
                                 null)));
-                    DebugLog(
-                        "Identity keep-alive heartbeat queued",
-                        "sessionId=" + currentSession.Id
-                            + " attachDeviceIdentity=" + decision.AttachDeviceIdentity);
                     RequestQueueFlush(true);
                 }
             }
@@ -3779,85 +3763,6 @@ namespace Attriax.Unity.Internal
             }
         }
 
-        // Gated outbound-payload trace emitted at the actual send/flush boundary so a
-        // single Editor run is enough to verify identity/context consistency across all
-        // request paths. One line per dispatched request.
-        private void DebugLogOutboundPayload(string endpoint, AttriaxQueuedRequest entry)
-        {
-            if (!_config.EnableDebugLogs)
-            {
-                return;
-            }
-
-            string sessionId = null;
-            string deviceId = null;
-            string platform = null;
-            string appVersion = null;
-            string sdkPackageVersion = null;
-
-            switch (entry.Kind)
-            {
-                case AttriaxQueuedRequestKind.Event:
-                {
-                    var request = entry.RequireEventRequest();
-                    sessionId = request.sessionId;
-                    deviceId = request.deviceId;
-                    break;
-                }
-                case AttriaxQueuedRequestKind.Session:
-                {
-                    var request = entry.RequireSessionRequest();
-                    sessionId = request.sessionId;
-                    deviceId = request.deviceId;
-                    platform = request.platform?.ToString();
-                    appVersion = request.appVersion;
-                    sdkPackageVersion = request.sdkPackageVersion;
-                    break;
-                }
-                case AttriaxQueuedRequestKind.User:
-                {
-                    var request = entry.RequireUserRequest();
-                    deviceId = request.deviceId;
-                    break;
-                }
-                case AttriaxQueuedRequestKind.Open:
-                {
-                    var request = entry.RequireOpenRequest();
-                    sessionId = request.sessionId;
-                    deviceId = request.deviceId;
-                    platform = request.platform.ToString();
-                    appVersion = request.app?.version;
-                    sdkPackageVersion = request.sdk?.packageVersion;
-                    break;
-                }
-                case AttriaxQueuedRequestKind.UninstallToken:
-                {
-                    var request = entry.RequireUninstallTokenRequest();
-                    deviceId = request.deviceId;
-                    platform = request.platform.ToString();
-                    break;
-                }
-            }
-
-            var hasDeviceId = !string.IsNullOrWhiteSpace(deviceId);
-            // userAgent is printed so a single Editor run surfaces any UA drift across
-            // requests: every line of one run must show the identical Attriax UA (the
-            // backend hashes anonymous identity on appId+ip+userAgent, so a varying UA
-            // would fork one run into multiple anonymous users).
-            var userAgent = _generatedGateway.UserAgent;
-            DebugLog(
-                "Outbound payload",
-                "endpoint=" + endpoint
-                    + " kind=" + entry.Kind
-                    + " sessionId=" + (string.IsNullOrWhiteSpace(sessionId) ? "none" : sessionId)
-                    + " deviceId=" + (hasDeviceId ? "present" : "empty")
-                    + " isAnonymous=" + (!hasDeviceId)
-                    + " platform=" + (string.IsNullOrWhiteSpace(platform) ? "none" : platform)
-                    + " sdkPackageVersion=" + (string.IsNullOrWhiteSpace(sdkPackageVersion) ? "none" : sdkPackageVersion)
-                    + " appVersion=" + (string.IsNullOrWhiteSpace(appVersion) ? "none" : appVersion)
-                    + " userAgent=" + (string.IsNullOrWhiteSpace(userAgent) ? "none" : userAgent));
-        }
-
         private void FailInitialDeepLink(Exception exception)
         {
             _deepLinkManager.FailInitial(exception);
@@ -3945,31 +3850,6 @@ namespace Attriax.Unity.Internal
         private static string DescribeTaskStatus(Task? task)
         {
             return task == null ? "null" : task.Status.ToString();
-        }
-
-        private static string DescribeEndpointForKind(AttriaxQueuedRequestKind kind)
-        {
-            switch (kind)
-            {
-                case AttriaxQueuedRequestKind.Open:
-                    return "open";
-                case AttriaxQueuedRequestKind.Event:
-                    return "track-event";
-                case AttriaxQueuedRequestKind.Crash:
-                    return "track-crash";
-                case AttriaxQueuedRequestKind.Session:
-                    return "track-session";
-                case AttriaxQueuedRequestKind.User:
-                    return "set-user";
-                case AttriaxQueuedRequestKind.DeepLinkResolve:
-                    return "deep-link-resolve";
-                case AttriaxQueuedRequestKind.UninstallToken:
-                    return "uninstall-token";
-                case AttriaxQueuedRequestKind.Notification:
-                    return "track-notification";
-                default:
-                    return kind.ToString();
-            }
         }
 
         private static string DescribeQueuedRequest(AttriaxQueuedRequest entry, int queueIndex)

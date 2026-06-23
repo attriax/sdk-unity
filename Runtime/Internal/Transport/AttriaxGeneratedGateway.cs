@@ -104,8 +104,8 @@ namespace Attriax.Unity.Internal
 
         /// <summary>
         /// The exact User-Agent every outbound request from this gateway carries (on
-        /// Editor + native players). Surfaced so the gated outbound-payload trace can print
-        /// it, making any UA drift visible in a single Editor run.
+        /// Editor + native players). Resolved once at construction and applied to the
+        /// generated client so it stays stable for the lifetime of the gateway.
         /// </summary>
         public string UserAgent { get; }
 
