@@ -23,7 +23,7 @@ namespace Attriax.Unity.Tests
             var entries = CreateEventEntries(100);
             entries.Add(CreateHeartbeatEntry());
 
-            var fits = gateway.FitsBatch(entries, 100, 48 * 1024);
+            var fits = gateway.FitsBatch(entries, 100, 256 * 1024);
 
             Assert.That(fits, Is.False);
         }
@@ -35,7 +35,7 @@ namespace Attriax.Unity.Tests
             var entries = CreateEventEntries(99);
             entries.Add(CreateHeartbeatEntry());
 
-            var fits = gateway.FitsBatch(entries, 100, 48 * 1024);
+            var fits = gateway.FitsBatch(entries, 100, 256 * 1024);
 
             Assert.That(fits, Is.True);
         }

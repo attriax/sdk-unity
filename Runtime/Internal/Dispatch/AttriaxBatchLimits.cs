@@ -11,7 +11,7 @@ namespace Attriax.Unity.Internal
         /// <summary>Maximum number of items packed into one batch.</summary>
         public const int MaxItemCount = 100;
 
-        /// <summary>Maximum encoded body size for one batch, in bytes.</summary>
-        public const int MaxBodyBytes = 48 * 1024;
+        /// <summary>Maximum encoded body size for one batch, in bytes (256 KiB, matching the API limit).</summary>
+        public const int MaxBodyBytes = 256 * 1024;
     }
 }

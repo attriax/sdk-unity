@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Raise the batch body-size cap from 48 KB to 256 KB per request to match the higher `/api/sdk/v1/batch` limit; oversized-batch splitting and single-item drop behavior are unchanged.
+
 ## 0.5.0
 
 - Breaking: tracking event methods are now fire-and-forget and return `void` instead of `Task`. `TrackEventAsync`, `RecordPurchaseAsync`, `RecordRefundAsync`, `RecordAdRevenueAsync`, `RecordAdEventAsync`, `RecordErrorAsync`, `TrackPageViewAsync`, `SetUserAsync`, `SetUserPropertyAsync`, `SetUserPropertiesAsync`, and `ClearUserPropertiesAsync` become `RecordEvent`, `RecordPurchase`, `RecordRefund`, `RecordAdRevenue`, `RecordAdEvent`, `RecordError`, `RecordPageView`, `SetUser`, `SetUserProperty`, `SetUserProperties`, and `ClearUserProperties`, queuing in the background and logging failures instead of surfacing them.
