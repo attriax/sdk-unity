@@ -23,9 +23,9 @@ namespace Attriax.Unity.Internal
             _settingsState.SetEnabled(enabled);
         }
 
-        private void RefreshAppOpenDispatchGate()
+        private void RefreshAppOpenLaunchPrioritization()
         {
-            _shouldGateRequestsOnSuccessfulAppOpen = ShouldGateRequestsOnSuccessfulAppOpen;
+            _shouldPrioritizeAppOpenLaunch = ShouldPrioritizeAppOpenLaunch;
         }
 
         private void ClearDeferredFlush()

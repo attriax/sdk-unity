@@ -25,15 +25,17 @@ namespace Attriax.Unity.Internal
         private readonly string _storageKey;
         private readonly int _maxQueueSize;
         private readonly object _gate = new object();
+        private readonly Action<string, string?>? _debugLog;
         private readonly List<AttriaxQueuedRequest> _entries;
         private readonly Dictionary<string, PendingRequest> _pendingRequests = new Dictionary<string, PendingRequest>();
         private string _pendingSerializedQueue = string.Empty;
         private int _pendingQueueWriteRequested;
 
-        public AttriaxRequestQueue(string storageKey, int maxQueueSize)
+        public AttriaxRequestQueue(string storageKey, int maxQueueSize, Action<string, string?>? debugLog = null)
         {
             _storageKey = storageKey;
             _maxQueueSize = maxQueueSize;
+            _debugLog = debugLog;
             _entries = ReadQueue();
         }
 
@@ -439,6 +441,15 @@ namespace Attriax.Unity.Internal
                 var envelope = JsonConvert.DeserializeObject<QueueEnvelope>(raw);
                 if (envelope == null || envelope.Version != QueueSchemaVersion || envelope.Entries == null)
                 {
+                    // Old-schema or structurally-invalid persisted queue: discarded by
+                    // design (there are no production installs to migrate). Report why
+                    // via the non-blocking debug log so an on-upgrade discard is not
+                    // silent. Entry count is available when the envelope parsed.
+                    _debugLog?.Invoke(
+                        "Discarded persisted request queue (schema mismatch)",
+                        "expectedVersion=" + QueueSchemaVersion
+                            + ", foundVersion=" + (envelope != null ? envelope.Version.ToString() : "null")
+                            + ", entries=" + (envelope?.Entries != null ? envelope.Entries.Count.ToString() : "null"));
                     return new List<AttriaxQueuedRequest>();
                 }
 
@@ -446,6 +457,11 @@ namespace Attriax.Unity.Internal
             }
             catch (Exception error)
             {
+                // Corrupt/unparseable persisted queue: discard it rather than crash.
+                // Entry count is unavailable because deserialization failed.
+                _debugLog?.Invoke(
+                    "Discarded persisted request queue (parse error)",
+                    error.Message);
                 return new List<AttriaxQueuedRequest>();
             }
         }

@@ -25,7 +25,7 @@ namespace Attriax.Unity.Internal
     internal sealed class AttriaxRuntimeActivationCoordinator
     {
         private readonly Action<bool> _persistEnabled;
-        private readonly Action _refreshAppOpenDispatchGate;
+        private readonly Action _refreshAppOpenLaunchPrioritization;
         private readonly Action _clearDeferredFlush;
         private readonly Action _handleSdkDisabled;
         private readonly Action _handleSdkEnabled;
@@ -41,7 +41,7 @@ namespace Attriax.Unity.Internal
 
         public AttriaxRuntimeActivationCoordinator(
             Action<bool> persistEnabled,
-            Action refreshAppOpenDispatchGate,
+            Action refreshAppOpenLaunchPrioritization,
             Action clearDeferredFlush,
             Action handleSdkDisabled,
             Action handleSdkEnabled,
@@ -56,7 +56,7 @@ namespace Attriax.Unity.Internal
             Func<bool> isInitialized)
         {
             _persistEnabled = persistEnabled ?? throw new ArgumentNullException(nameof(persistEnabled));
-            _refreshAppOpenDispatchGate = refreshAppOpenDispatchGate ?? throw new ArgumentNullException(nameof(refreshAppOpenDispatchGate));
+            _refreshAppOpenLaunchPrioritization = refreshAppOpenLaunchPrioritization ?? throw new ArgumentNullException(nameof(refreshAppOpenLaunchPrioritization));
             _clearDeferredFlush = clearDeferredFlush ?? throw new ArgumentNullException(nameof(clearDeferredFlush));
             _handleSdkDisabled = handleSdkDisabled ?? throw new ArgumentNullException(nameof(handleSdkDisabled));
             _handleSdkEnabled = handleSdkEnabled ?? throw new ArgumentNullException(nameof(handleSdkEnabled));
@@ -74,7 +74,7 @@ namespace Attriax.Unity.Internal
         public void Apply(bool enabled, AttriaxRuntimeActivationState state)
         {
             _persistEnabled(enabled);
-            _refreshAppOpenDispatchGate();
+            _refreshAppOpenLaunchPrioritization();
 
             if (!enabled)
             {
@@ -98,7 +98,7 @@ namespace Attriax.Unity.Internal
 
         public void HandleConsentStateChanged(bool enabled, AttriaxRuntimeActivationState state)
         {
-            _refreshAppOpenDispatchGate();
+            _refreshAppOpenLaunchPrioritization();
             _syncRuntimePersistenceMode();
 
             if (!_isInitialized())

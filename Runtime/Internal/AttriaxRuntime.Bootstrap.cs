@@ -41,7 +41,7 @@ namespace Attriax.Unity.Internal
                 _enabled && _consentManager.AllowsAttributionTracking);
             _sessionManager.Initialize(DateTimeOffset.UtcNow);
             _initialized = true;
-            _shouldGateRequestsOnSuccessfulAppOpen = ShouldGateRequestsOnSuccessfulAppOpen;
+            _shouldPrioritizeAppOpenLaunch = ShouldPrioritizeAppOpenLaunch;
             _deepLinkManager.BeginInitialProbe(options.CaptureInitialUrl);
             _settingsState.WriteHasLaunched(true);
             AttachLifecycle();

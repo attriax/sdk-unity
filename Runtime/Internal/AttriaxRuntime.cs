@@ -85,7 +85,17 @@ namespace Attriax.Unity.Internal
         private bool _lifecycleAttached;
         private bool _disposed;
         private int _backgroundTaskGeneration;
-        private bool _shouldGateRequestsOnSuccessfulAppOpen;
+        // Whether an app-open (attribution) request is expected under the current
+        // consent/enablement state, so launch preparation is scheduled and the
+        // request is prioritized to the front of the flush. App-open is best-effort:
+        // this NO LONGER gates dispatch of other queued requests on its success
+        // (aligned with sdk-flutter / sdk-js — see attriax_app_open_monitor.dart).
+        private bool _shouldPrioritizeAppOpenLaunch;
+        // Set when a flush drops a non-retriable, non-drop (hard) failure and keeps
+        // going. Surfaced as the terminal Failed state at the end of the flush so a
+        // hard failure is still observable even though it no longer aborts the flush
+        // (mirrors sdk-js FlushAccumulator.hadHardFailure).
+        private bool _lastFlushHadHardFailure;
         private Task? _identifiedConsentTransitionTask;
         private AttriaxPlatformType _resolvedPlatform = AttriaxPlatformType.Unknown;
         private readonly AttriaxPlatformType _platform;
@@ -183,7 +193,7 @@ namespace Attriax.Unity.Internal
                 _runtimeScopedStorageKeys,
                 ResolveInitialRuntimePersistenceMode());
             _requestManager = new AttriaxRequestManager();
-            _requestQueue = new AttriaxRequestQueue(Key("queue"), _config.MaxQueueSize);
+            _requestQueue = new AttriaxRequestQueue(Key("queue"), _config.MaxQueueSize, DebugLog);
             _requestManager.BindQueue(_requestQueue);
             _settingsState = new AttriaxRuntimeSettingsState(_runtimeSettingsStore, _runtimeState);
             _settingsState.RestoreFromStore();
@@ -288,7 +298,7 @@ namespace Attriax.Unity.Internal
                 ObserveBackgroundTask);
             _activationCoordinator = new AttriaxRuntimeActivationCoordinator(
                 PersistEnabledState,
-                RefreshAppOpenDispatchGate,
+                RefreshAppOpenLaunchPrioritization,
                 ClearDeferredFlush,
                 _sessionManager.HandleSdkDisabled,
                 () => _sessionManager.HandleSdkEnabled(DateTimeOffset.UtcNow),
@@ -301,7 +311,7 @@ namespace Attriax.Unity.Internal
                 RequestImmediateQueueFlush,
                 SetSynchronizationState,
                 () => _initialized);
-            _shouldGateRequestsOnSuccessfulAppOpen = ShouldGateRequestsOnSuccessfulAppOpen;
+            _shouldPrioritizeAppOpenLaunch = ShouldPrioritizeAppOpenLaunch;
         }
 
         public AttriaxConfig Config => _config.ToPublic();
@@ -1550,7 +1560,10 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
-            if (_shouldGateRequestsOnSuccessfulAppOpen && !_appOpenManager.HasSuccessfulResult)
+            // Ensure the app-open request is prepared/enqueued so it can be prioritized
+            // to the front of the flush. This only schedules launch preparation; it does
+            // NOT block dispatch of the other queued requests on app-open success.
+            if (_shouldPrioritizeAppOpenLaunch && !_appOpenManager.HasSuccessfulResult)
             {
                 ScheduleLaunchPreparationIfNeeded();
             }
@@ -1619,6 +1632,7 @@ namespace Attriax.Unity.Internal
         {
             try
             {
+            _lastFlushHadHardFailure = false;
             if (_disposed || !_enabled)
             {
                 SetSynchronizationState(AttriaxSynchronizationState.Disabled);
@@ -1702,12 +1716,6 @@ namespace Attriax.Unity.Internal
                     continue;
                 }
 
-                if (!CanDispatchRequest(entry))
-                {
-                    queueIndex += 1;
-                    continue;
-                }
-
                 if (IsBatchableRequest(entry))
                 {
                     var batchEntries = CollectSendableBatchEntries(queueIndex, now);
@@ -1749,15 +1757,28 @@ namespace Attriax.Unity.Internal
                         continue;
                     }
 
-                    SetSynchronizationState(AttriaxSynchronizationState.Failed);
+                    // Non-retriable, non-drop failures (e.g. a malformed response)
+                    // cannot succeed on retry. Remove the entry and reject its pending
+                    // completion, then continue the flush rather than returning with it
+                    // still queued — a queued failure would wedge the head of the line
+                    // for up to the whole retention window. Mirrors sdk-flutter
+                    // (attriax_request_dispatcher.dart default arm) and sdk-js
+                    // (synchronizer.ts dispatchSingleEntry hard-failure arm). The
+                    // failure is surfaced as the terminal Failed state at the tail.
+                    _lastFlushHadHardFailure = true;
+                    _requestQueue.RemoveAt(queueIndex);
                     _requestQueue.Reject(entry.Id, error);
-                    return;
+                    continue;
                 }
                 catch (Exception error)
                 {
-                    SetSynchronizationState(AttriaxSynchronizationState.Failed);
+                    // Unexpected exception: same reasoning as the non-retriable arm
+                    // above — drop the entry and keep the flush moving instead of
+                    // leaving it wedged at the head of the queue.
+                    _lastFlushHadHardFailure = true;
+                    _requestQueue.RemoveAt(queueIndex);
                     _requestQueue.Reject(entry.Id, error);
-                    return;
+                    continue;
                 }
             }
 
@@ -1779,6 +1800,17 @@ namespace Attriax.Unity.Internal
                 return;
             }
 
+            // Queue fully drained. If a hard (non-retriable, non-drop) failure was
+            // dropped during this flush, surface Failed rather than Synchronized so the
+            // failure stays observable — the flush was no longer aborted at the failure
+            // site (mirrors sdk-js applying hadHardFailure only when nothing is pending).
+            if (_lastFlushHadHardFailure)
+            {
+                SetSynchronizationState(AttriaxSynchronizationState.Failed);
+                DebugLog("Queue flush complete with a dropped hard failure", "remaining=" + _requestQueue.Count);
+                return;
+            }
+
             SetSynchronizationState(AttriaxSynchronizationState.Synchronized);
             DebugLog("Queue flush complete", "remaining=" + _requestQueue.Count);
             }
@@ -1788,20 +1820,6 @@ namespace Attriax.Unity.Internal
                 UnityEngine.Debug.LogError(
                     "[Attriax] Request-flush loop terminated by an unexpected error: " + error);
             }
-        }
-
-        private bool CanDispatchRequest(AttriaxQueuedRequest entry)
-        {
-            if (!_shouldGateRequestsOnSuccessfulAppOpen)
-            {
-                return true;
-            }
-
-            var canDispatch = entry.Kind == AttriaxQueuedRequestKind.Open
-                || entry.Kind == AttriaxQueuedRequestKind.DeepLinkResolve
-                || _appOpenManager.HasSuccessfulResult;
-
-            return canDispatch;
         }
 
         private async Task<BatchFlushResult> FlushBatchEntriesAsync(
@@ -1885,9 +1903,15 @@ namespace Attriax.Unity.Internal
                     return new BatchFlushResult(false, 0);
                 }
 
-                SetSynchronizationState(AttriaxSynchronizationState.Failed);
+                // Non-retriable, non-drop single-item batch failure: remove the entry
+                // and reject its pending completion, then let the flush continue
+                // instead of aborting with the entry still queued (head-of-line wedge).
+                // Mirrors the single-request path above and the reference SDKs. The
+                // failure is surfaced as the terminal Failed state at the flush tail.
+                _lastFlushHadHardFailure = true;
+                _requestQueue.RemoveAt(startIndex);
                 _requestQueue.Reject(singleEntry.Id, normalizedError);
-                return new BatchFlushResult(true, 1);
+                return new BatchFlushResult(false, 0);
             }
         }
 
@@ -3207,7 +3231,7 @@ namespace Attriax.Unity.Internal
             return _consentManager.TrackingDecisionFor(signal);
         }
 
-        private bool ShouldGateRequestsOnSuccessfulAppOpen =>
+        private bool ShouldPrioritizeAppOpenLaunch =>
             _enabled && _consentManager.AllowsAttributionTracking;
 
         private bool ShouldDispatchAnalyticsInCurrentMode()

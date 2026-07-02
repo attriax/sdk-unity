@@ -22,7 +22,7 @@ namespace Attriax.Unity.Tests
             Assert.That(harness.Calls, Is.EqualTo(new[]
             {
                 "persistEnabled:True",
-                "refreshDispatchGate",
+                "refreshLaunchPrioritization",
                 "handleSdkEnabled",
                 "prepareReferrers",
                 "scheduleLaunchPreparation",
@@ -45,7 +45,7 @@ namespace Attriax.Unity.Tests
 
             Assert.That(harness.Calls, Is.EqualTo(new[]
             {
-                "refreshDispatchGate",
+                "refreshLaunchPrioritization",
                 "syncRuntimePersistence",
                 "rewriteQueueForConsent",
                 "scheduleLaunchPreparation",
@@ -71,7 +71,7 @@ namespace Attriax.Unity.Tests
 
             Assert.That(harness.Calls, Is.EqualTo(new[]
             {
-                "refreshDispatchGate",
+                "refreshLaunchPrioritization",
                 "syncRuntimePersistence",
                 "rewriteQueueForConsent",
                 "scheduleLaunchPreparation",
@@ -94,7 +94,7 @@ namespace Attriax.Unity.Tests
 
             Assert.That(harness.Calls, Is.EqualTo(new[]
             {
-                "refreshDispatchGate",
+                "refreshLaunchPrioritization",
                 "syncRuntimePersistence",
                 "rewriteQueueForConsent",
                 "scheduleLaunchPreparation",
@@ -119,7 +119,7 @@ namespace Attriax.Unity.Tests
             Assert.That(harness.Calls, Is.EqualTo(new[]
             {
                 "persistEnabled:True",
-                "refreshDispatchGate",
+                "refreshLaunchPrioritization",
                 "handleSdkEnabled",
                 "prepareReferrers",
                 "scheduleLaunchPreparation",
@@ -135,7 +135,7 @@ namespace Attriax.Unity.Tests
             {
                 Coordinator = new AttriaxRuntimeActivationCoordinator(
                     persistEnabled: enabled => Calls.Add("persistEnabled:" + enabled),
-                    refreshAppOpenDispatchGate: () => Calls.Add("refreshDispatchGate"),
+                    refreshAppOpenLaunchPrioritization: () => Calls.Add("refreshLaunchPrioritization"),
                     clearDeferredFlush: () => Calls.Add("clearDeferredFlush"),
                     handleSdkDisabled: () => Calls.Add("handleSdkDisabled"),
                     handleSdkEnabled: () => Calls.Add("handleSdkEnabled"),
