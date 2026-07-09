@@ -520,6 +520,25 @@ namespace Attriax.Unity
         /// Leave null to use the default dashboard-driven SKAN behavior.
         /// </summary>
         public AttriaxSkanConfig? Skan { get; set; }
+
+        /// <summary>
+        /// CCPA "do not sell / share" election (Epic 10.1).
+        /// Sent TOP-LEVEL on the app-open and identify requests (mirrors the ATT
+        /// status), NOT nested under device context. <c>null</c> (the default)
+        /// omits the field entirely; an explicit <c>true</c> durably suppresses
+        /// this user's outbound and an explicit <c>false</c> may clear a prior
+        /// server-side latch. Can also be changed at runtime via
+        /// <c>consent.Ccpa.SetConsent</c> (engine <c>setCcpaConsent</c>).
+        /// </summary>
+        public bool? DoNotSell { get; set; }
+
+        /// <summary>
+        /// Raw IAB US-Privacy (USP) string, e.g. <c>1YYN</c> (Epic 10.1).
+        /// Sent TOP-LEVEL alongside <see cref="DoNotSell"/>; its sale opt-out flag
+        /// also drives the backend do-not-sell latch. <c>null</c>/empty omits the
+        /// field. Capped at 16 chars on the wire.
+        /// </summary>
+        public string? UsPrivacy { get; set; }
     }
 
     /// <summary>
