@@ -14,6 +14,12 @@
 #if __has_include(<AppTrackingTransparency/AppTrackingTransparency.h>)
 #import <AppTrackingTransparency/AppTrackingTransparency.h>
 #endif
+// The KMP core engine, shipped as the AttriaxCore XCFramework (iosMain actuals). Guarded
+// so this file still compiles in a Unity project that has not yet embedded the framework.
+#if __has_include(<AttriaxCore/AttriaxCore.h>)
+#import <AttriaxCore/AttriaxCore.h>
+#define ATTRIAX_HAS_KMP_ENGINE 1
+#endif
 
 static char *AttriaxUnityMakeCString(NSString *value) {
     if (value == nil) {
@@ -620,3 +626,191 @@ extern "C" char *AttriaxUnity_RequestTrackingAuthorization(void) {
         return AttriaxUnityMakeCString(@"not_supported");
     }
 }
+
+// ============================================================================
+//  KMP engine C-ABI bridge (Phase 6, iOS binding).
+// ============================================================================
+//
+//  Holds the KMP `Attriax` engine — built via the ObjC-exported `AttriaxApple`
+//  factory in the embedded AttriaxCore XCFramework — behind a `[DllImport("__Internal")]`
+//  C surface that Unity's `IAttriaxEnginePlatform` (iOS impl) P/Invokes. The engine
+//  handle is an opaque `void*` (a bridging-retained `AttriaxCoreAttriax*`); the sync
+//  callback returns via a C function pointer registered from C# as an
+//  `[AOT.MonoPInvokeCallback]` static method.
+//
+//  ⚠️  CODE-ONLY / UNVERIFIED: the Unity Editor on this project crashes at init
+//  (PackageManager forbidden-folder issue), and there is no iOS-Unity Xcode export
+//  path on this Mac, so this bridge is NOT compiled or run here. It is written against
+//  the verified ObjC API of the shipped XCFramework (same API the Flutter Swift plugin
+//  drives), but MUST be built + device-verified on the Windows/Unity box. The core
+//  lifecycle + tracking + sync-state are implemented; the remaining commands follow the
+//  identical `[[engine tracking] ...]` / `[[engine consent] ...]` pattern.
+
+#ifdef ATTRIAX_HAS_KMP_ENGINE
+
+typedef void (*AttriaxUnitySyncCallback)(const char *stateName);
+
+// A single sync-state listener that forwards KMP transitions to the C# callback.
+@interface AttriaxUnitySyncListener : NSObject <AttriaxCoreAttriaxSynchronizationStateListener>
+@property (nonatomic, assign) AttriaxUnitySyncCallback callback;
+@end
+
+@implementation AttriaxUnitySyncListener
+- (void)onSynchronizationStateChangedState:(AttriaxCoreAttriaxSynchronizationState *)state {
+    if (self.callback != NULL) {
+        self.callback([state.name UTF8String]);
+    }
+}
+@end
+
+static NSString *AttriaxUnityCfgStr(NSDictionary *d, NSString *k) {
+    id v = d[k];
+    return [v isKindOfClass:[NSString class]] ? (NSString *)v : nil;
+}
+static BOOL AttriaxUnityCfgBool(NSDictionary *d, NSString *k, BOOL def) {
+    id v = d[k];
+    return [v isKindOfClass:[NSNumber class]] ? [v boolValue] : def;
+}
+static int64_t AttriaxUnityCfgI64(NSDictionary *d, NSString *k, int64_t def) {
+    id v = d[k];
+    return [v isKindOfClass:[NSNumber class]] ? [v longLongValue] : def;
+}
+static int32_t AttriaxUnityCfgI32(NSDictionary *d, NSString *k, int32_t def) {
+    id v = d[k];
+    return [v isKindOfClass:[NSNumber class]] ? [v intValue] : def;
+}
+static AttriaxCoreBoolean *AttriaxUnityCfgKBool(NSDictionary *d, NSString *k) {
+    id v = d[k];
+    return [v isKindOfClass:[NSNumber class]] ? [[AttriaxCoreBoolean alloc] initWithBool:[v boolValue]] : nil;
+}
+
+static AttriaxCoreAttriax *AttriaxUnityEngineFromHandle(void *handle) {
+    return handle == NULL ? nil : (__bridge AttriaxCoreAttriax *)handle;
+}
+
+/// Build the engine from a JSON config (keys match the Flutter MethodChannel / KMP
+/// C-ABI). Returns an opaque retained handle, or NULL on a bad config.
+extern "C" void *AttriaxUnityEngine_Create(const char *configJson, const char *userAgent) {
+    @autoreleasepool {
+        NSString *json = configJson != NULL ? [NSString stringWithUTF8String:configJson] : @"{}";
+        NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
+        NSDictionary *d = data != nil
+            ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil]
+            : nil;
+        if (![d isKindOfClass:[NSDictionary class]]) {
+            d = @{};
+        }
+
+        BOOL attestationEnabled = AttriaxUnityCfgBool(d, @"attestationEnabled", NO);
+        id<AttriaxCoreAttriaxAttestationProvider> attestationProvider = nil;
+        if (attestationEnabled) {
+            attestationProvider = [[AttriaxCoreAttriaxAppAttestProvider alloc]
+                initWithDefaults:[[NSUserDefaults alloc] initWithSuiteName:@"com.attriax.sdk.prefs"] ?: NSUserDefaults.standardUserDefaults];
+        }
+
+        AttriaxCoreAttriaxConfig *config = [[AttriaxCoreAttriaxConfig alloc]
+            initWithProjectToken:AttriaxUnityCfgStr(d, @"projectToken") ?: @""
+            apiBaseUrl:AttriaxUnityCfgStr(d, @"apiBaseUrl") ?: @"https://api.attriax.com"
+            appVersion:AttriaxUnityCfgStr(d, @"appVersion")
+            appBuildNumber:AttriaxUnityCfgStr(d, @"appBuildNumber")
+            appPackageName:AttriaxUnityCfgStr(d, @"appPackageName")
+            sdkMetadata:[d[@"sdkMetadata"] isKindOfClass:[NSDictionary class]] ? d[@"sdkMetadata"] : nil
+            deviceContext:nil
+            enableDebugLogs:AttriaxUnityCfgBool(d, @"enableDebugLogs", NO)
+            requestTimeoutMs:AttriaxUnityCfgI64(d, @"requestTimeoutMs", 12000)
+            maxQueueSize:AttriaxUnityCfgI32(d, @"maxQueueSize", 500)
+            eventFlushIntervalMs:AttriaxUnityCfgI64(d, @"eventFlushIntervalMs", 60000)
+            flushEventsImmediatelyOnFirstLaunch:AttriaxUnityCfgBool(d, @"flushEventsImmediatelyOnFirstLaunch", YES)
+            collectAdvertisingId:AttriaxUnityCfgBool(d, @"collectAdvertisingId", YES)
+            automaticCrashReportingEnabled:AttriaxUnityCfgBool(d, @"automaticCrashReportingEnabled", YES)
+            gdprEnabled:AttriaxUnityCfgBool(d, @"gdprEnabled", NO)
+            anonymousTracking:AttriaxUnityCfgBool(d, @"anonymousTracking", YES)
+            sessionTrackingEnabled:AttriaxUnityCfgBool(d, @"sessionTrackingEnabled", YES)
+            sessionHeartbeatIntervalMs:AttriaxUnityCfgI64(d, @"sessionHeartbeatIntervalMs", 300000)
+            firstLaunchSessionHeartbeatIntervalMs:AttriaxUnityCfgI64(d, @"firstLaunchSessionHeartbeatIntervalMs", 30000)
+            installReferrerEnabled:AttriaxUnityCfgBool(d, @"installReferrerEnabled", YES)
+            attestationEnabled:attestationEnabled
+            attestationProvider:attestationProvider
+            pinnedCertificateSha256Fingerprints:[d[@"pinnedCertificateSha256Fingerprints"] isKindOfClass:[NSArray class]] ? d[@"pinnedCertificateSha256Fingerprints"] : @[]
+            automaticBrowserHandling:AttriaxUnityCfgBool(d, @"automaticBrowserHandling", YES)
+            attStatus:nil
+            requestTrackingAuthorizationOnInit:AttriaxUnityCfgBool(d, @"requestTrackingAuthorizationOnInit", NO)
+            trackingAuthorizationStatusTimeoutMs:AttriaxUnityCfgI64(d, @"trackingAuthorizationStatusTimeoutMs", 60000)
+            skan:nil
+            asaTokenCaptureEnabled:AttriaxUnityCfgBool(d, @"asaTokenCaptureEnabled", YES)
+            doNotSell:AttriaxUnityCfgKBool(d, @"doNotSell")
+            usPrivacy:AttriaxUnityCfgStr(d, @"usPrivacy")];
+
+        NSString *ua = userAgent != NULL ? [NSString stringWithUTF8String:userAgent] : nil;
+        // userAgent nil → the KMP layer resolves the real WKWebView Safari UA off-thread.
+        AttriaxCoreAttriax *engine = [[AttriaxCoreAttriaxApple shared] createConfig:config userAgent:ua];
+        return (void *)CFBridgingRetain(engine);
+    }
+}
+
+extern "C" void AttriaxUnityEngine_Init(void *handle) {
+    @autoreleasepool { [AttriaxUnityEngineFromHandle(handle) doInit]; }
+}
+extern "C" void AttriaxUnityEngine_Flush(void *handle) {
+    @autoreleasepool { [AttriaxUnityEngineFromHandle(handle) flush]; }
+}
+extern "C" void AttriaxUnityEngine_Reset(void *handle) {
+    @autoreleasepool { [AttriaxUnityEngineFromHandle(handle) reset]; }
+}
+extern "C" void AttriaxUnityEngine_Dispose(void *handle) {
+    @autoreleasepool { [AttriaxUnityEngineFromHandle(handle) dispose]; }
+}
+
+extern "C" void AttriaxUnityEngine_RecordEvent(void *handle, const char *name, const char *eventDataJson, bool flushImmediately) {
+    @autoreleasepool {
+        AttriaxCoreAttriax *engine = AttriaxUnityEngineFromHandle(handle);
+        if (engine == nil) { return; }
+        NSDictionary *eventData = nil;
+        if (eventDataJson != NULL) {
+            NSData *data = [[NSString stringWithUTF8String:eventDataJson] dataUsingEncoding:NSUTF8StringEncoding];
+            id parsed = data != nil ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+            if ([parsed isKindOfClass:[NSDictionary class]]) { eventData = parsed; }
+        }
+        [engine recordEventName:(name != NULL ? [NSString stringWithUTF8String:name] : @"")
+                      eventData:eventData
+               flushImmediately:flushImmediately];
+    }
+}
+
+extern "C" char *AttriaxUnityEngine_GetDeviceId(void *handle) {
+    @autoreleasepool { return AttriaxUnityMakeCString(AttriaxUnityEngineFromHandle(handle).deviceId); }
+}
+extern "C" bool AttriaxUnityEngine_GetIsInitialized(void *handle) {
+    @autoreleasepool { return AttriaxUnityEngineFromHandle(handle).isInitialized; }
+}
+extern "C" char *AttriaxUnityEngine_SubmitAsaToken(void *handle, const char *token) {
+    @autoreleasepool {
+        [AttriaxUnityEngineFromHandle(handle) submitAsaTokenToken:(token != NULL ? [NSString stringWithUTF8String:token] : @"")];
+        return NULL;
+    }
+}
+
+// Registers the C# sync-state callback. The listener is retained for the engine's life.
+extern "C" void AttriaxUnityEngine_SetSyncCallback(void *handle, AttriaxUnitySyncCallback callback) {
+    @autoreleasepool {
+        AttriaxCoreAttriax *engine = AttriaxUnityEngineFromHandle(handle);
+        if (engine == nil) { return; }
+        static AttriaxUnitySyncListener *listener = nil;
+        if (listener == nil) { listener = [[AttriaxUnitySyncListener alloc] init]; }
+        listener.callback = callback;
+        [engine.synchronization addStateListenerListener:listener];
+    }
+}
+
+extern "C" void AttriaxUnityEngine_Destroy(void *handle) {
+    if (handle != NULL) { CFBridgingRelease(handle); }
+}
+
+// TODO(windows-verify): the remaining IAttriaxEnginePlatform commands — the tracking
+// record* family, setUser*, consent (gdpr/ccpa/att), skan.updateConversionValue, and the
+// deep-link listeners — map 1:1 to `[[engine tracking] ...]`, `[[engine consent] gdpr]`,
+// `[[engine skan] ...]`, `[[engine deepLinks] ...]` exactly as the Flutter Swift plugin
+// does. They are omitted here only because this bridge cannot be compiled/verified on this
+// machine (Unity Editor blocked); add them following the identical pattern on the Unity box.
+
+#endif // ATTRIAX_HAS_KMP_ENGINE
