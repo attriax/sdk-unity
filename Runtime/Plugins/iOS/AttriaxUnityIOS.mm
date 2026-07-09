@@ -62,20 +62,50 @@ static NSString *AttriaxUnitySerializeDictionary(NSDictionary *dictionary) {
     return [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
 }
 
+// iOS has no SecTask entitlement API (that is macOS-only). Entitlements are read
+// best-effort from the embedded provisioning profile, which exists for development,
+// ad-hoc, and enterprise builds. App Store builds strip it, so these fields are
+// simply absent there — the KMP engine treats them as optional metadata.
+static NSDictionary *AttriaxUnityEmbeddedEntitlements(void) {
+    static NSDictionary *cached = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSString *path = [NSBundle.mainBundle pathForResource:@"embedded" ofType:@"mobileprovision"];
+        if (path == nil) {
+            return;
+        }
+
+        NSData *data = [NSData dataWithContentsOfFile:path];
+        if (data == nil) {
+            return;
+        }
+
+        // The profile is a CMS/PKCS#7 envelope; the embedded plist sits between the
+        // XML prolog and the closing </plist> tag. Slice it out and parse it.
+        NSString *raw = [[NSString alloc] initWithData:data encoding:NSISOLatin1StringEncoding];
+        NSRange start = [raw rangeOfString:@"<?xml"];
+        NSRange end = [raw rangeOfString:@"</plist>"];
+        if (start.location == NSNotFound || end.location == NSNotFound || end.location < start.location) {
+            return;
+        }
+
+        NSRange plistRange = NSMakeRange(start.location, NSMaxRange(end) - start.location);
+        NSData *plistData = [[raw substringWithRange:plistRange] dataUsingEncoding:NSISOLatin1StringEncoding];
+        NSDictionary *profile = [NSPropertyListSerialization propertyListWithData:plistData
+                                                                          options:NSPropertyListImmutable
+                                                                           format:nil
+                                                                            error:nil];
+        id entitlements = profile[@"Entitlements"];
+        if ([entitlements isKindOfClass:[NSDictionary class]]) {
+            cached = (NSDictionary *)entitlements;
+        }
+    });
+
+    return cached;
+}
+
 static id AttriaxUnityReadEntitlementValue(NSString *key) {
-    SecTaskRef task = SecTaskCreateFromSelf(nil);
-    if (task == nil) {
-        return nil;
-    }
-
-    CFErrorRef error = nil;
-    CFTypeRef value = SecTaskCopyValueForEntitlement(task, (__bridge CFStringRef)key, &error);
-    if (error != nil) {
-        CFRelease(error);
-    }
-    CFRelease(task);
-
-    return CFBridgingRelease(value);
+    return AttriaxUnityEmbeddedEntitlements()[key];
 }
 
 static NSString *AttriaxUnityReadEntitlementString(NSString *key) {
