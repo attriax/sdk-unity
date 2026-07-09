@@ -1,4 +1,22 @@
+// The Attriax Unity Android library. Phase 2 native-engine re-wrap: this module now
+// hosts the KMP engine (the `com.attriax:core` AAR) and exposes `AttriaxUnityBridge`
+// (Kotlin) to the Unity C# platform. The AGP classpath is provided by the Unity
+// Gradle template; the Kotlin Gradle plugin is added here (buildscript) so the module
+// compiles Kotlin whether or not the host template already ships Kotlin support.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // Match the Kotlin version the `com.attriax:core` AAR was compiled with (KMP
+        // core: Kotlin 2.0.21) so the consumed metadata stays binary-compatible.
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21'
+    }
+}
+
 apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
 
 android {
     namespace "com.attriax.unity"
@@ -15,6 +33,10 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
 
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+
     lintOptions {
         abortOnError false
     }
@@ -23,9 +45,16 @@ android {
 repositories {
     google()
     mavenCentral()
+    // The KMP core is published to the local Maven repository via
+    // `./gradlew :core:publishToMavenLocal` in sdk-kmp (child-before-root).
+    mavenLocal()
 }
 
 dependencies {
+    // The shared Kotlin Multiplatform engine (Android AAR variant, resolved via Gradle
+    // module metadata from `com.attriax:core` -> `com.attriax:core-android`).
+    implementation 'com.attriax:core:0.5.0'
+
     implementation 'androidx.activity:activity:1.9.0'
     implementation 'androidx.core:core:1.13.1'
     implementation 'com.android.installreferrer:installreferrer:2.2'
