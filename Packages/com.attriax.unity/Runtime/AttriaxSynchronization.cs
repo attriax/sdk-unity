@@ -8,9 +8,9 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxSynchronization
     {
-        private readonly Internal.AttriaxRuntime _runtime;
+        private readonly Internal.IAttriaxEngine _runtime;
 
-        internal AttriaxSynchronization(Internal.AttriaxRuntime runtime)
+        internal AttriaxSynchronization(Internal.IAttriaxEngine runtime)
         {
             _runtime = runtime;
         }

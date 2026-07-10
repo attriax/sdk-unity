@@ -9,9 +9,9 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxRawDeepLinkStream
     {
-        private readonly Internal.AttriaxRuntime _runtime;
+        private readonly Internal.IAttriaxEngine _runtime;
 
-        internal AttriaxRawDeepLinkStream(Internal.AttriaxRuntime runtime)
+        internal AttriaxRawDeepLinkStream(Internal.IAttriaxEngine runtime)
         {
             _runtime = runtime;
         }
@@ -30,9 +30,9 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxDeepLinkStream
     {
-        private readonly Internal.AttriaxRuntime _runtime;
+        private readonly Internal.IAttriaxEngine _runtime;
 
-        internal AttriaxDeepLinkStream(Internal.AttriaxRuntime runtime)
+        internal AttriaxDeepLinkStream(Internal.IAttriaxEngine runtime)
         {
             _runtime = runtime;
         }
@@ -51,9 +51,9 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxDeepLinks
     {
-        private readonly Internal.AttriaxRuntime _runtime;
+        private readonly Internal.IAttriaxEngine _runtime;
 
-        internal AttriaxDeepLinks(Internal.AttriaxRuntime runtime)
+        internal AttriaxDeepLinks(Internal.IAttriaxEngine runtime)
         {
             _runtime = runtime;
             RawStream = new AttriaxRawDeepLinkStream(runtime);

@@ -230,6 +230,39 @@ the KMP surface is synchronous):**
 Mac-gated: Phase 6 (iOS). Everything else runs on the Windows dev box (Android via
 emulator/device; desktop+Editor native; WebGL in a browser).
 
+### Engine-selection seam (landed 2026-07-10 — incremental start of Phase 5)
+
+The facade rewire is being done **incrementally**, with the C# engine kept as the
+default and fallback on every platform, so each native binding can be flipped +
+live-verified one at a time (zero-behavior-change checkpoints) instead of a
+big-bang swap. This first step introduces only the *seam*:
+
+- **`Runtime/Internal/IAttriaxEngine.cs`** — the facade-facing engine surface (the
+  exact public-API-shaped members `AttriaxRuntime` already exposes: option-object
+  commands, synchronous property getters, `Subscribe*` handles, `IDisposable`).
+  The seven public wrappers (`AttriaxTracking`/`Consent`/`DeepLinks`/`Referrer`/
+  `Skan`/`Synchronization` + the top-level `Attriax`) now depend on this interface
+  instead of the concrete `AttriaxRuntime`.
+- **`AttriaxRuntime : IAttriaxEngine`** — implemented with **zero signature
+  changes** (five deep-link getters were widened `internal`→`public` on the
+  already-internal class purely to satisfy implicit interface implementation).
+- **`Runtime/Internal/AttriaxEngineSelector.cs`** — `Create(config)` picks the
+  engine. **Today it returns the managed C# engine on EVERY `RuntimePlatform`.**
+  `TryCreateNativeEngine` holds the per-platform hooks (Android/iOS/desktop+Editor/
+  WebGL), all inactive (`return null`) → C# fallback everywhere.
+
+**Why this seam and not routing facades through `IAttriaxEnginePlatform`
+directly:** `IAttriaxEnginePlatform` is the *wire-shaped* native contract
+(decomposed primitive args, all-async getters, C# events) mirroring the Flutter/KMP
+platform interface. It does **not** match the facade surface, so binding facades to
+it now would require rewriting every facade **and** building the full
+option-object→primitive-arg lowering adapter up front — large churn with real
+behavior-change risk, and premature. Instead the facades bind to `IAttriaxEngine`
+(the surface `AttriaxRuntime` *already* satisfies), and when a platform's native
+engine is ready a thin `AttriaxEnginePlatformAdapter : IAttriaxEngine` will wrap its
+`IAttriaxEnginePlatform` impl and be returned from the matching selector branch.
+`IAttriaxEnginePlatform` is unchanged by this step.
+
 ## Packaging
 
 Unity consumes native libs by folder convention under `Runtime/Plugins/`:

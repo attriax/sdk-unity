@@ -8,9 +8,9 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxReferrer
     {
-        private readonly Internal.AttriaxRuntime _runtime;
+        private readonly Internal.IAttriaxEngine _runtime;
 
-        internal AttriaxReferrer(Internal.AttriaxRuntime runtime)
+        internal AttriaxReferrer(Internal.IAttriaxEngine runtime)
         {
             _runtime = runtime;
         }

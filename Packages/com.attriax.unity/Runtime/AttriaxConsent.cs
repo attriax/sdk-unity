@@ -8,7 +8,7 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxConsent
     {
-        internal AttriaxConsent(Internal.AttriaxRuntime runtime)
+        internal AttriaxConsent(Internal.IAttriaxEngine runtime)
         {
             Gdpr = new AttriaxGdprConsent(runtime);
             Att = new AttriaxAttConsent(runtime);
@@ -30,9 +30,9 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxAttConsent
     {
-        private readonly Internal.AttriaxRuntime _runtime;
+        private readonly Internal.IAttriaxEngine _runtime;
 
-        internal AttriaxAttConsent(Internal.AttriaxRuntime runtime)
+        internal AttriaxAttConsent(Internal.IAttriaxEngine runtime)
         {
             _runtime = runtime;
         }
@@ -60,9 +60,9 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxGdprConsent
     {
-        private readonly Internal.AttriaxRuntime _runtime;
+        private readonly Internal.IAttriaxEngine _runtime;
 
-        internal AttriaxGdprConsent(Internal.AttriaxRuntime runtime)
+        internal AttriaxGdprConsent(Internal.IAttriaxEngine runtime)
         {
             _runtime = runtime;
         }

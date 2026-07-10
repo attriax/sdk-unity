@@ -15,7 +15,7 @@ namespace Attriax.Unity
         private static readonly Dictionary<string, WeakReference<Attriax>> ActiveInstances =
             new Dictionary<string, WeakReference<Attriax>>(StringComparer.Ordinal);
 
-        private readonly AttriaxRuntime _runtime;
+        private readonly IAttriaxEngine _runtime;
 
         /// <summary>
         /// Creates a new SDK instance from an explicit runtime configuration.
@@ -27,7 +27,7 @@ namespace Attriax.Unity
                 throw new ArgumentNullException(nameof(config));
             }
 
-            _runtime = new AttriaxRuntime(config);
+            _runtime = AttriaxEngineSelector.Create(config);
             Consent = new AttriaxConsent(_runtime);
             Synchronization = new AttriaxSynchronization(_runtime);
             Tracking = new AttriaxTracking(_runtime);

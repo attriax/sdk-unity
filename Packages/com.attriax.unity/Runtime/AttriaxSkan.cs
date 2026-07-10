@@ -8,9 +8,9 @@ namespace Attriax.Unity
     /// </summary>
     public sealed class AttriaxSkan
     {
-        private readonly Internal.AttriaxRuntime _runtime;
+        private readonly Internal.IAttriaxEngine _runtime;
 
-        internal AttriaxSkan(Internal.AttriaxRuntime runtime)
+        internal AttriaxSkan(Internal.IAttriaxEngine runtime)
         {
             _runtime = runtime;
         }

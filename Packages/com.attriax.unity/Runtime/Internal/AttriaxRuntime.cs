@@ -21,6 +21,7 @@ using SdkSessionLifecycleKind = Attriax.Unity.Generated.Model.SdkSessionLifecycl
 namespace Attriax.Unity.Internal
 {
     internal sealed partial class AttriaxRuntime :
+        IAttriaxEngine,
         IAttriaxContextRefreshProvider,
         IAttriaxDeepLinkConversionResolver,
         IAttriaxAppOpenPipeline,
@@ -438,14 +439,17 @@ namespace Attriax.Unity.Internal
             await ResetAsync().ConfigureAwait(false);
         }
 
-        internal AttriaxRawDeepLinkEvent? RawInitialDeepLinkValue => RawInitialDeepLink;
-        internal AttriaxDeepLinkEvent? InitialDeepLinkValue => _deepLinkManager.InitialDeepLinkValue;
+        // Exposed via IAttriaxEngine (the facade-selection seam). Public on an
+        // internal class = still assembly-internal; only the accessibility widened
+        // so these implicitly implement the interface alongside the other members.
+        public AttriaxRawDeepLinkEvent? RawInitialDeepLinkValue => RawInitialDeepLink;
+        public AttriaxDeepLinkEvent? InitialDeepLinkValue => _deepLinkManager.InitialDeepLinkValue;
 
-        internal bool InitialDeepLinkResolved => _deepLinkManager.InitialDeepLinkResolved;
+        public bool InitialDeepLinkResolved => _deepLinkManager.InitialDeepLinkResolved;
 
-        internal Task<AttriaxDeepLinkEvent?> WaitForInitialDeepLink => InitialDeepLink;
+        public Task<AttriaxDeepLinkEvent?> WaitForInitialDeepLink => InitialDeepLink;
 
-        internal AttriaxDeepLinkEvent? LatestDeepLink => _deepLinkManager.LatestDeepLink;
+        public AttriaxDeepLinkEvent? LatestDeepLink => _deepLinkManager.LatestDeepLink;
 
         public AttriaxSynchronizationState SynchronizationState => _eventHub.SynchronizationState;
 
