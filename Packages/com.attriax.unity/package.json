@@ -28,6 +28,11 @@
       "displayName": "Basic Integration",
       "description": "Bootstrap and diagnostics scripts for AttriaxBehaviour and configured-singleton Unity integrations.",
       "path": "Samples~/Basic Integration"
+    },
+    {
+      "displayName": "Rich Integration",
+      "description": "Full uGUI demo scene and controller exercising the complete Attriax Unity surface (events, revenue, GDPR, ATT, SKAN, deep links, referrers, receipt validation, push tokens). Requires com.unity.ugui.",
+      "path": "Samples~/Rich Integration"
     }
   ],
   "dependencies": {
