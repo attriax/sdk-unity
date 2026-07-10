@@ -44,8 +44,9 @@ artifacts, and release notes stay easy to review.
 ## Release Steps
 
 1. Ensure the intended public repository is reachable, that the package
-  metadata URLs in `sdk-unity/package.json` resolve, and that the plain Git URL
-  install flow still works.
+  metadata URLs in `sdk-unity/Packages/com.attriax.unity/package.json` resolve,
+  and that the embedded-package Git URL install flow still works
+  (`https://github.com/attriax/sdk-unity.git?path=Packages/com.attriax.unity#<tag>`).
 2. Update `sdk-unity/package.json` and the changelog for the
   new version.
 3. Run `npm run sdk:unity:generate` if the SDK contract or generated client

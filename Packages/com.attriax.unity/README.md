@@ -6,38 +6,40 @@
 behaviorally aligned with Flutter unless a Unity-specific divergence is
 intentional and documented.
 
-The repository root is the publishable UPM package while also carrying the
-minimal Unity project files needed to validate and export the SDK as a
+The publishable UPM package lives under `Packages/com.attriax.unity/`. The
+repository root is a thin Unity project (only `Assets/`, `ProjectSettings/`, and
+`Packages/`) that embeds and validates that package and can export it as a
 traditional `.unitypackage` artifact for teams that still import plugins that
 way.
 
 ## Install From Git
 
-Use the repository URL directly in Unity Package Manager:
+Add the package from Git in Unity Package Manager using the `?path=` suffix that
+points at the embedded package folder:
 
 ```text
-https://github.com/attriax/sdk-unity.git
+https://github.com/attriax/sdk-unity.git?path=Packages/com.attriax.unity
 ```
 
-Or add it in a project manifest:
+Or add it in a project manifest (pin to a released tag):
 
 ```json
 {
   "dependencies": {
-    "com.attriax.unity": "https://github.com/attriax/sdk-unity.git#v0.4.1"
+    "com.attriax.unity": "https://github.com/attriax/sdk-unity.git?path=Packages/com.attriax.unity#v0.4.1"
   }
 }
 ```
 
-The repo root now contains the actual package manifest and runtime folders, so
-the plain Git URL resolves directly without a `?path=` suffix.
+The package is embedded under `Packages/com.attriax.unity/`, so the Git URL must
+carry the `?path=Packages/com.attriax.unity` suffix.
 
 ## Layout
 
-- `Runtime/` — public runtime APIs, shared managers, and generated client code
-- `Runtime/Internal/Generated/AttriaxSdkClient/` — generated internal API client embedded into the runtime package
+- `Packages/com.attriax.unity/Runtime/` — public runtime APIs, shared managers, and generated client code
+- `Packages/com.attriax.unity/Runtime/Internal/Generated/AttriaxSdkClient/` — generated internal API client embedded into the runtime package
 - `Assets/Editor/` — batch export tooling for `.unitypackage` generation
-- `Packages/manifest.json` — local Unity-project wrapper that consumes the root package through `file:..`
+- `Packages/manifest.json` — local Unity-project manifest; the package is auto-discovered as an embedded package under `Packages/com.attriax.unity/`
 - `dist/` — generated artifacts
 
 ## Platform Support

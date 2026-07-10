@@ -80,15 +80,15 @@ namespace Attriax.Unity.Tests
                 [Test]
                 public void MapRuntimeConfigEnvelopeParsesRawJsonWithoutGeneratedEnvelopeTypes()
                 {
-                        var config = AttriaxGeneratedGateway.MapRuntimeConfigEnvelope(JObject.Parse(@"""
+                        var config = AttriaxGeneratedGateway.MapRuntimeConfigEnvelope(JObject.Parse(@"
                                 {
-                                    "success": true,
-                                    "timestamp": "2026-06-03T08:20:00.000Z",
-                                    "data": {
-                                        "clipboardAttributionEnabled": true
+                                    ""success"": true,
+                                    ""timestamp"": ""2026-06-03T08:20:00.000Z"",
+                                    ""data"": {
+                                        ""clipboardAttributionEnabled"": true
                                     }
                                 }
-                                """));
+                                "));
 
                         Assert.That(config.ClipboardAttributionEnabled, Is.True);
                 }
@@ -96,36 +96,36 @@ namespace Attriax.Unity.Tests
                 [Test]
                 public void MapAppOpenResultEnvelopeParsesRawJsonWithoutGeneratedEnvelopeTypes()
                 {
-                        var result = AttriaxGeneratedGateway.MapAppOpenResultEnvelope(JObject.Parse(@"""
+                        var result = AttriaxGeneratedGateway.MapAppOpenResultEnvelope(JObject.Parse(@"
                                 {
-                                    "success": true,
-                                    "timestamp": "2026-06-03T08:20:00.000Z",
-                                    "data": {
-                                        "acceptedAt": "2026-06-03T08:20:00.000Z",
-                                        "installState": "new_install",
-                                        "isFirstLaunch": true,
-                                        "isNewUser": true,
-                                        "requestVersion": "v1",
-                                        "userId": "user_123",
-                                        "deepLink": {
-                                            "path": "/promo",
-                                            "uri": "https://example.com/promo",
-                                            "data": {
-                                                "code": "summer"
+                                    ""success"": true,
+                                    ""timestamp"": ""2026-06-03T08:20:00.000Z"",
+                                    ""data"": {
+                                        ""acceptedAt"": ""2026-06-03T08:20:00.000Z"",
+                                        ""installState"": ""new_install"",
+                                        ""isFirstLaunch"": true,
+                                        ""isNewUser"": true,
+                                        ""requestVersion"": ""v1"",
+                                        ""userId"": ""user_123"",
+                                        ""deepLink"": {
+                                            ""path"": ""/promo"",
+                                            ""uri"": ""https://example.com/promo"",
+                                            ""data"": {
+                                                ""code"": ""summer""
                                             },
-                                            "utm": {
-                                                "source": "newsletter"
+                                            ""utm"": {
+                                                ""source"": ""newsletter""
                                             }
                                         },
-                                        "originalInstallReferrer": {
-                                            "attributionType": "referrer",
-                                            "precision": 0.9,
-                                            "rawPlatformInstallReferrer": "utm_source=newsletter",
-                                            "source": "newsletter"
+                                        ""originalInstallReferrer"": {
+                                            ""attributionType"": ""referrer"",
+                                            ""precision"": 0.9,
+                                            ""rawPlatformInstallReferrer"": ""utm_source=newsletter"",
+                                            ""source"": ""newsletter""
                                         }
                                     }
                                 }
-                                """));
+                                "));
 
                         Assert.That(result.UserId, Is.EqualTo("user_123"));
                         Assert.That(result.IsFirstLaunch, Is.True);

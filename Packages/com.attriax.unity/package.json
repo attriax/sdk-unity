@@ -20,9 +20,9 @@
     "deep-linking",
     "unity"
   ],
-  "documentationUrl": "https://github.com/attriax/sdk-unity/blob/main/README.md",
-  "changelogUrl": "https://github.com/attriax/sdk-unity/blob/main/CHANGELOG.md",
-  "licensesUrl": "https://github.com/attriax/sdk-unity/blob/main/LICENSE",
+  "documentationUrl": "https://github.com/attriax/sdk-unity/blob/main/Packages/com.attriax.unity/README.md",
+  "changelogUrl": "https://github.com/attriax/sdk-unity/blob/main/Packages/com.attriax.unity/CHANGELOG.md",
+  "licensesUrl": "https://github.com/attriax/sdk-unity/blob/main/Packages/com.attriax.unity/LICENSE",
   "samples": [
     {
       "displayName": "Basic Integration",

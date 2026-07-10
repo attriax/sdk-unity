@@ -2,40 +2,49 @@
 
 ## Overview
 
-`sdk-unity/` is the publishable Attriax Unity package and also a minimal Unity
-project wrapper that can export that same source as a traditional
-`.unitypackage` artifact.
+`sdk-unity/` is a thin Unity project (`Assets/`, `ProjectSettings/`, `Packages/`)
+that embeds the publishable Attriax Unity package under
+`Packages/com.attriax.unity/`. Embedding the package under `Packages/` (rather
+than referencing the repo root through `file:..`) is required: Unity 6000.2
+rejects a local package whose folder is the project root or an ancestor of it,
+which crashed the Editor during asset-database init. The same embedded folder is
+what the Git-URL install (`?path=Packages/com.attriax.unity`) and the
+`.unitypackage` export consume.
 
 ## Repository Layout
 
 ```text
 sdk-unity/
 ├── Assets/
-│   └── Editor/                           # Batch export entrypoint for .unitypackage
-├── Runtime/                              # Public API, runtime assembly, shared managers
-│   ├── Internal/                         # Queueing, synchronization, context, lifecycle, generated gateway
-│   │   └── Generated/
-│   │       └── AttriaxSdkClient/         # Generated internal transport client
-│   └── Plugins/
-│       ├── Android/                      # Android native bridge
-│       └── iOS/                          # iOS native bridge
-├── Editor/                               # Editor tooling shipped with the package
-├── Samples~/                             # Public samples imported through Package Manager
-├── Tests/
-│   └── Editor/                           # EditMode regression tests
-├── Packages/manifest.json                # Local Unity-project wrapper consuming the root package
-├── README.md
-├── CHANGELOG.md
-├── package.json
-├── dist/                                 # Generated .unitypackage and batch test results
-├── export-unitypackage.ps1               # Supported Unity export wrapper
-├── SDK_CLIENT_GENERATION.md              # Generated-client workflow
+│   └── Editor/                                   # Batch export entrypoint for .unitypackage
+├── Packages/
+│   ├── manifest.json                             # Unity-project manifest (package auto-discovered as embedded)
+│   └── com.attriax.unity/                        # Embedded, publishable UPM package
+│       ├── package.json
+│       ├── README.md
+│       ├── CHANGELOG.md
+│       ├── LICENSE
+│       ├── Runtime/                              # Public API, runtime assembly, shared managers
+│       │   ├── Internal/                         # Queueing, synchronization, context, lifecycle, generated gateway
+│       │   │   └── Generated/
+│       │   │       └── AttriaxSdkClient/         # Generated internal transport client
+│       │   └── Plugins/
+│       │       ├── Android/                      # Android native bridge
+│       │       └── iOS/                          # iOS native bridge
+│       ├── Editor/                               # Editor tooling shipped with the package
+│       ├── Samples~/                             # Public samples imported through Package Manager
+│       ├── Documentation~/                       # Package documentation (excluded from import)
+│       └── Tests/
+│           └── Editor/                           # EditMode regression tests
+├── dist/                                         # Generated .unitypackage and batch test results
+├── export-unitypackage.ps1                       # Supported Unity export wrapper
+├── SDK_CLIENT_GENERATION.md                      # Generated-client workflow
 └── PUBLISHING.md
 ```
 
 ## Architectural Notes
 
-- `Runtime/Attriax.cs` is the primary public entry
+- `Packages/com.attriax.unity/Runtime/Attriax.cs` is the primary public entry
   point.
 - `AttriaxBehaviour.cs` exposes the MonoBehaviour-owned integration path.
 - `Runtime/Internal/AttriaxRuntime.cs` coordinates queueing, context,
