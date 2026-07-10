@@ -71,13 +71,28 @@ namespace Attriax.Unity.Internal
                     // FUTURE (Phase 6, Mac-gated): iOS KMP XCFramework via P/Invoke.
                     return null;
 
-                case RuntimePlatform.WindowsPlayer:
-                case RuntimePlatform.LinuxPlayer:
-                case RuntimePlatform.OSXPlayer:
                 case RuntimePlatform.WindowsEditor:
+                case RuntimePlatform.WindowsPlayer:
                 case RuntimePlatform.LinuxEditor:
+                case RuntimePlatform.LinuxPlayer:
+#if UNITY_EDITOR_WIN || UNITY_EDITOR_LINUX || (!UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX))
+                    // Phase 3: drive the KMP core through its C-ABI shared library
+                    // (attriax_core.dll / libattriax_core.so) via
+                    // Engine.AttriaxDesktopEnginePlatform, bridged onto IAttriaxEngine by
+                    // the generic Engine.AttriaxEnginePlatformAdapter. The Editor loads the
+                    // same shared lib as the standalone player, so play mode exercises the
+                    // real engine.
+                    return new Engine.AttriaxEnginePlatformAdapter(
+                        config,
+                        new Engine.AttriaxDesktopEnginePlatform());
+#else
+                    return null;
+#endif
+
+                case RuntimePlatform.OSXPlayer:
                 case RuntimePlatform.OSXEditor:
-                    // FUTURE (Phase 3): desktop/Editor KMP shared lib via P/Invoke.
+                    // FUTURE (Mac-gated): the macOS .dylib is not built yet (needs a Mac
+                    // build). Stay on the managed C# engine until it exists.
                     return null;
 
                 case RuntimePlatform.WebGLPlayer:
