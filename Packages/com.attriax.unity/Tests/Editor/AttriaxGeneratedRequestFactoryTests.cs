@@ -310,10 +310,10 @@ namespace Attriax.Unity.Tests
                 },
                 occurredAt: occurredAt);
 
-            Assert.That(request.platform, Is.EqualTo(default(Platform)));
-            Assert.That(request.appVersion, Is.Null);
-            Assert.That(request.appBuildNumber, Is.Null);
-            Assert.That(request.appPackageName, Is.Null);
+            // platform / appVersion / appBuildNumber / appPackageName were removed from
+            // SdkEventDto by the platform/version-omission design (the backend derives
+            // them from the AppUser), so the event payload no longer carries or
+            // duplicates the session's app metadata — only the relative time remains.
             Assert.That(request.sessionRelativeTimeMs, Is.EqualTo(7000m));
         }
 

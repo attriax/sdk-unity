@@ -140,7 +140,7 @@ namespace Attriax.Unity.Tests
                     Metadata = new Dictionary<string, object>(),
                 },
             };
-            var contextManager = new AttriaxContextManager(new StaticContextRefreshProvider(contextSnapshot), (_, _) => { });
+            var contextManager = new AttriaxContextManager(new StaticContextRefreshProvider(contextSnapshot));
             contextManager.SetPreparedContext(
                 new AttriaxPreparedContextRefresh(
                     contextSnapshot,

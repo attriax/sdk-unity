@@ -122,8 +122,7 @@ namespace Attriax.Unity.Tests
                 {
                     loadCount += 1;
                     return Task.FromResult(new AttriaxSdkRuntimeConfig(clipboardAttributionEnabled: true));
-                },
-                debugLog: (_, __) => { });
+                });
 
             var first = await coordinator.EnsureLoadedAsync();
             var second = await coordinator.EnsureLoadedAsync();
@@ -139,7 +138,6 @@ namespace Attriax.Unity.Tests
             AttriaxSdkRuntimeConfig? loaded = null;
             var coordinator = new AttriaxSdkRuntimeConfigCoordinator(
                 loadRuntimeConfigAsync: () => Task.FromResult(new AttriaxSdkRuntimeConfig(clipboardAttributionEnabled: true)),
-                debugLog: (_, __) => { },
                 onLoadedAsync: runtimeConfig =>
                 {
                     loaded = runtimeConfig;

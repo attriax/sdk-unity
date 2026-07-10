@@ -52,9 +52,20 @@ namespace Attriax.Unity.Internal
             switch (Application.platform)
             {
                 case RuntimePlatform.Android:
-                    // FUTURE (Phase 2): KMP core-android AAR via
-                    // Engine.AttriaxAndroidEnginePlatform, adapted to IAttriaxEngine.
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    // Phase 2: drive the KMP core-android AAR through
+                    // Engine.AttriaxAndroidEnginePlatform, bridged onto IAttriaxEngine
+                    // by the generic Engine.AttriaxEnginePlatformAdapter. Compiled only
+                    // into Android player builds — the Editor cannot open on this
+                    // project (PackageManager forbidden-folder crash), so the binding
+                    // stays code-complete + adapter-unit-verified here, with on-device
+                    // live verification pending.
+                    return new Engine.AttriaxEnginePlatformAdapter(
+                        config,
+                        new Engine.AttriaxAndroidEnginePlatform());
+#else
                     return null;
+#endif
 
                 case RuntimePlatform.IPhonePlayer:
                     // FUTURE (Phase 6, Mac-gated): iOS KMP XCFramework via P/Invoke.
