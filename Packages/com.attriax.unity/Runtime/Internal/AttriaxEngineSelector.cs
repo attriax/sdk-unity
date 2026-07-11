@@ -96,8 +96,21 @@ namespace Attriax.Unity.Internal
                     return null;
 
                 case RuntimePlatform.WebGLPlayer:
-                    // FUTURE (Phase 4): sdk-js (@attriax/js) via a .jslib shim.
+#if UNITY_WEBGL && !UNITY_EDITOR
+                    // Phase 4: drive the sdk-js (@attriax/js) engine through the
+                    // Engine.AttriaxWebGLEnginePlatform .jslib bridge, bridged onto
+                    // IAttriaxEngine by the generic Engine.AttriaxEnginePlatformAdapter.
+                    // Compiled only into WebGL player builds — the Editor cannot open on
+                    // this project (PackageManager forbidden-folder crash) and __Internal
+                    // P/Invoke resolves only in a real WebGL build, so the binding stays
+                    // code-complete + adapter-unit-verified here, with in-browser live
+                    // verification pending.
+                    return new Engine.AttriaxEnginePlatformAdapter(
+                        config,
+                        new Engine.AttriaxWebGLEnginePlatform());
+#else
                     return null;
+#endif
 
                 default:
                     return null;
