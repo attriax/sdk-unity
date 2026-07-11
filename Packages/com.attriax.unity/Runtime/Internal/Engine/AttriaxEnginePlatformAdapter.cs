@@ -79,6 +79,10 @@ namespace Attriax.Unity.Internal.Engine
 
         public AttriaxEnginePlatformAdapter(AttriaxConfig config, IAttriaxEnginePlatform platform)
         {
+            // Fail fast with the same contract the managed C# engine enforces, so the
+            // native path rejects a missing token / insecure remote URL at construction
+            // rather than deferring to an opaque native-side failure.
+            AttriaxConfigGuard.Validate(config);
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _platform = platform ?? throw new ArgumentNullException(nameof(platform));
             _anonymousTracking = config.AnonymousTracking;
