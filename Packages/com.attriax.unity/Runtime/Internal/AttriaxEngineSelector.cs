@@ -68,8 +68,21 @@ namespace Attriax.Unity.Internal
 #endif
 
                 case RuntimePlatform.IPhonePlayer:
-                    // FUTURE (Phase 6, Mac-gated): iOS KMP XCFramework via P/Invoke.
+#if UNITY_IOS && !UNITY_EDITOR
+                    // U-5b: drive the KMP core through its flat C-ABI static library
+                    // (libattriax_core.a, statically linked into the IL2CPP app) via
+                    // Engine.AttriaxIosEnginePlatform's [DllImport("__Internal")] P/Invokes,
+                    // bridged onto IAttriaxEngine by the generic
+                    // Engine.AttriaxEnginePlatformAdapter. Compiled only into iOS player
+                    // builds — __Internal resolves only in a real device/simulator build, so
+                    // the binding stays code-complete here with on-device live verification
+                    // pending.
+                    return new Engine.AttriaxEnginePlatformAdapter(
+                        config,
+                        new Engine.AttriaxIosEnginePlatform());
+#else
                     return null;
+#endif
 
                 case RuntimePlatform.WindowsEditor:
                 case RuntimePlatform.WindowsPlayer:
