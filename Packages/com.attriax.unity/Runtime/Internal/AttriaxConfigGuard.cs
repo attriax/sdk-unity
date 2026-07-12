@@ -9,7 +9,7 @@ namespace Attriax.Unity.Internal
     /// required, and an explicitly-set API base URL must use HTTPS (localhost may use
     /// HTTP for development). Both engines call this so <c>new Attriax(config)</c> throws
     /// identically regardless of the backing engine — the managed C# engine
-    /// (<see cref="AttriaxRuntime"/>, whose <c>NormalizeConfig</c> mirrors these exact
+    /// (<c>AttriaxRuntime</c>, whose <c>NormalizeConfig</c> mirrors these exact
     /// checks) and the native engine adapter
     /// (<see cref="Engine.AttriaxEnginePlatformAdapter"/>), which lowers config to the
     /// native core and would otherwise skip this fail-fast validation entirely.

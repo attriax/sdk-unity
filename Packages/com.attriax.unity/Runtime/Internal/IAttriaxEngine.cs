@@ -16,10 +16,10 @@ namespace Attriax.Unity.Internal
     /// <remarks>
     /// <para>
     /// This is deliberately the <em>public-API-shaped</em> surface that the
-    /// managed C# engine (<see cref="AttriaxRuntime"/>) already exposes today —
+    /// managed C# engine (<c>AttriaxRuntime</c>) already exposes today —
     /// rich option objects, synchronous property getters, <c>Task</c>-returning
     /// commands, and <c>Subscribe*</c> handles. Extracting it as an interface
-    /// lets the facades bind to an abstraction that <see cref="AttriaxRuntime"/>
+    /// lets the facades bind to an abstraction that <c>AttriaxRuntime</c>
     /// satisfies with <b>zero signature changes</b>, so behavior is identical.
     /// </para>
     /// <para>
