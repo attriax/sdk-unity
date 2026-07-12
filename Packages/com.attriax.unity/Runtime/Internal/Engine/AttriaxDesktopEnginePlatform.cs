@@ -1,5 +1,5 @@
 #nullable enable
-#if UNITY_EDITOR_WIN || UNITY_EDITOR_LINUX || (!UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX))
+#if UNITY_EDITOR_WIN || UNITY_EDITOR_LINUX || UNITY_EDITOR_OSX || (!UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX || UNITY_STANDALONE_OSX))
 #define ATTRIAX_DESKTOP_ENGINE
 #endif
 #if ATTRIAX_DESKTOP_ENGINE
@@ -70,6 +70,7 @@ namespace Attriax.Unity.Internal.Engine
     {
         private const string WindowsLibraryName = "attriax_core.dll";
         private const string LinuxLibraryName = "libattriax_core.so";
+        private const string MacLibraryName = "libattriax_core.dylib";
 
         private readonly AttriaxDesktopEngineWorker _worker = new AttriaxDesktopEngineWorker();
 
@@ -932,13 +933,17 @@ namespace Attriax.Unity.Internal.Engine
 
             public static NativeLibrary Load()
             {
-                var isWindows = Application.platform == RuntimePlatform.WindowsPlayer ||
-                                Application.platform == RuntimePlatform.WindowsEditor;
-                var fileName = isWindows ? WindowsLibraryName : LinuxLibraryName;
+                var platform = Application.platform;
+                var isWindows = platform == RuntimePlatform.WindowsPlayer ||
+                                platform == RuntimePlatform.WindowsEditor;
+                var isMac = platform == RuntimePlatform.OSXPlayer ||
+                            platform == RuntimePlatform.OSXEditor;
+                // macOS takes the Unix (dlopen) code path, just like Linux.
+                var fileName = isWindows ? WindowsLibraryName : isMac ? MacLibraryName : LinuxLibraryName;
 
                 IntPtr module = IntPtr.Zero;
                 string? loadedFrom = null;
-                foreach (var candidate in CandidatePaths(fileName, isWindows))
+                foreach (var candidate in CandidatePaths(fileName, isWindows, isMac))
                 {
                     if (!File.Exists(candidate))
                     {
@@ -972,9 +977,28 @@ namespace Attriax.Unity.Internal.Engine
                 return new NativeLibrary(module, isWindows);
             }
 
-            private static IEnumerable<string> CandidatePaths(string fileName, bool isWindows)
+            private static IEnumerable<string> CandidatePaths(string fileName, bool isWindows, bool isMac)
             {
                 var dataPath = Application.dataPath;
+
+                if (isMac)
+                {
+                    // Editor: the package-embedded universal (arm64 + x86_64) dylib.
+                    yield return Path.GetFullPath(Path.Combine(
+                        "Packages", "com.attriax.unity", "Runtime", "Plugins", "macOS", fileName));
+                    // Standalone .app: Application.dataPath is
+                    // <App>.app/Contents/Resources/Data, so Unity bundles native plugins
+                    // into <App>.app/Contents/PlugIns/.
+                    var contents = Path.GetDirectoryName(Path.GetDirectoryName(dataPath));
+                    if (!string.IsNullOrEmpty(contents))
+                    {
+                        yield return Path.Combine(contents, "PlugIns", fileName);
+                    }
+
+                    yield return Path.Combine(dataPath, "Plugins", fileName);
+                    yield break;
+                }
+
                 // Standalone player: <App>_Data/Plugins/x86_64/<lib>.
                 yield return Path.Combine(dataPath, "Plugins", "x86_64", fileName);
                 yield return Path.Combine(dataPath, "Plugins", fileName);
@@ -1068,6 +1092,10 @@ namespace Attriax.Unity.Internal.Engine
 
             private const int RtldNow = 2;
 
+            // Three tiers: Linux resolves via libdl.so.2 (glibc) or libdl; macOS has no
+            // physical libdl, so it falls through to the process-internal dl* symbols
+            // (dlopen/dlsym/dlclose live in libSystem, reachable via __Internal in both
+            // the Mono Editor and an IL2CPP standalone player).
             private static IntPtr UnixDlopen(string path)
             {
                 try
@@ -1076,7 +1104,14 @@ namespace Attriax.Unity.Internal.Engine
                 }
                 catch (DllNotFoundException)
                 {
-                    return dlopen_1(path, RtldNow);
+                    try
+                    {
+                        return dlopen_1(path, RtldNow);
+                    }
+                    catch (DllNotFoundException)
+                    {
+                        return dlopen_sys(path, RtldNow);
+                    }
                 }
             }
 
@@ -1088,7 +1123,14 @@ namespace Attriax.Unity.Internal.Engine
                 }
                 catch (DllNotFoundException)
                 {
-                    return dlsym_1(handle, symbol);
+                    try
+                    {
+                        return dlsym_1(handle, symbol);
+                    }
+                    catch (DllNotFoundException)
+                    {
+                        return dlsym_sys(handle, symbol);
+                    }
                 }
             }
 
@@ -1100,7 +1142,14 @@ namespace Attriax.Unity.Internal.Engine
                 }
                 catch (DllNotFoundException)
                 {
-                    return dlclose_1(handle);
+                    try
+                    {
+                        return dlclose_1(handle);
+                    }
+                    catch (DllNotFoundException)
+                    {
+                        return dlclose_sys(handle);
+                    }
                 }
             }
 
@@ -1121,6 +1170,16 @@ namespace Attriax.Unity.Internal.Engine
 
             [DllImport("libdl", EntryPoint = "dlclose")]
             private static extern int dlclose_1(IntPtr handle);
+
+            // Process-internal (macOS: libSystem's dl* symbols; reachable via __Internal).
+            [DllImport("__Internal", EntryPoint = "dlopen", CharSet = CharSet.Ansi, BestFitMapping = false)]
+            private static extern IntPtr dlopen_sys(string fileName, int flags);
+
+            [DllImport("__Internal", EntryPoint = "dlsym", CharSet = CharSet.Ansi, BestFitMapping = false)]
+            private static extern IntPtr dlsym_sys(IntPtr handle, string symbol);
+
+            [DllImport("__Internal", EntryPoint = "dlclose")]
+            private static extern int dlclose_sys(IntPtr handle);
         }
 
         /// <summary>

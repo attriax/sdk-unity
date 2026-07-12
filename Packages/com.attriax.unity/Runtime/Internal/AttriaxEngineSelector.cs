@@ -91,9 +91,19 @@ namespace Attriax.Unity.Internal
 
                 case RuntimePlatform.OSXPlayer:
                 case RuntimePlatform.OSXEditor:
-                    // FUTURE (Mac-gated): the macOS .dylib is not built yet (needs a Mac
-                    // build). Stay on the managed C# engine until it exists.
+#if UNITY_EDITOR_OSX || (!UNITY_EDITOR && UNITY_STANDALONE_OSX)
+                    // U-5a: drive the KMP core through its macOS C-ABI dylib
+                    // (libattriax_core.dylib) via the SAME Engine.AttriaxDesktopEnginePlatform
+                    // dlopen binding the Windows/Linux desktop uses, bridged onto
+                    // IAttriaxEngine by the generic Engine.AttriaxEnginePlatformAdapter. The
+                    // Editor loads the same universal dylib as the standalone player, so play
+                    // mode exercises the real engine.
+                    return new Engine.AttriaxEnginePlatformAdapter(
+                        config,
+                        new Engine.AttriaxDesktopEnginePlatform());
+#else
                     return null;
+#endif
 
                 case RuntimePlatform.WebGLPlayer:
 #if UNITY_WEBGL && !UNITY_EDITOR
