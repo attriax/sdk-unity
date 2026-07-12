@@ -1,5 +1,7 @@
 #nullable enable
-#if UNITY_EDITOR_WIN || UNITY_EDITOR_LINUX || (!UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX))
+// Shared C-ABI JSON marshalling: compiled wherever a C-ABI engine binding is — the
+// Windows/Linux/macOS desktop dlopen platform AND the iOS __Internal platform.
+#if UNITY_EDITOR_WIN || UNITY_EDITOR_LINUX || UNITY_EDITOR_OSX || (!UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX || UNITY_STANDALONE_OSX || UNITY_IOS))
 #define ATTRIAX_DESKTOP_ENGINE
 #endif
 #if ATTRIAX_DESKTOP_ENGINE
