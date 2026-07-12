@@ -11,11 +11,14 @@ namespace Attriax.Unity.Editor
     /// binding (<c>AttriaxIosEnginePlatform</c>) links + resolves.
     /// </summary>
     /// <remarks>
-    /// Unity already adds the imported xcframework to "Link Binary With Libraries", so
-    /// this pass only adds (1) the Apple system frameworks the static KMP core
-    /// references — mirroring the Flutter iOS plugin's podspec — and (2) <c>-u</c> linker
-    /// flags that keep the flat <c>@CName</c> C entry points from being dead-stripped, so
-    /// the IL2CPP <c>[DllImport("__Internal")]</c> P/Invokes resolve them.
+    /// Unity already adds the imported xcframework to the UnityFramework target's "Link
+    /// Binary With Libraries" (where IL2CPP's <c>libGameAssembly</c> references the
+    /// <c>attriax_*</c> symbols), so the static lib is linked and the C-ABI symbols
+    /// resolve naturally — this pass only adds the Apple system frameworks the static KMP
+    /// core references, mirroring the Flutter iOS plugin's podspec. (No <c>-u</c>
+    /// keep-symbol flags: IL2CPP already references the entry points, so they are not
+    /// dead-stripped, and forcing them on the main app target — which does not link the
+    /// static lib — makes the app link fail with undefined <c>attriax_*</c>.)
     /// </remarks>
     internal static class AttriaxIosBuildPostprocessor
     {
@@ -37,17 +40,6 @@ namespace Attriax.Unity.Editor
             "Security",
         };
 
-        // The flat C-ABI entry points that must survive dead-stripping so IL2CPP's
-        // __Internal P/Invokes bind to them.
-        private static readonly string[] CAbiSymbols =
-        {
-            "_attriax_create",
-            "_attriax_dispatch",
-            "_attriax_register_event_callback",
-            "_attriax_free_string",
-            "_attriax_destroy",
-        };
-
         [PostProcessBuild(1000)]
         public static void OnPostprocessBuild(BuildTarget target, string pathToBuiltProject)
         {
@@ -60,26 +52,13 @@ namespace Attriax.Unity.Editor
             var project = new PBXProject();
             project.ReadFromFile(projectPath);
 
-            // Apply to both the UnityFramework target (which links the plugins) and the
-            // main app target, so the frameworks + keep-symbols flags are present wherever
-            // the static lib and IL2CPP's generated references end up.
-            var targets = new[]
+            // The static lib + IL2CPP's libGameAssembly (which references the attriax_*
+            // symbols) both live in the UnityFramework target, so the system frameworks
+            // the KMP core links against are added there.
+            var frameworkTargetGuid = project.GetUnityFrameworkTargetGuid();
+            foreach (var framework in RequiredFrameworks)
             {
-                project.GetUnityFrameworkTargetGuid(),
-                project.GetUnityMainTargetGuid(),
-            };
-
-            foreach (var targetGuid in targets)
-            {
-                foreach (var framework in RequiredFrameworks)
-                {
-                    project.AddFrameworkToProject(targetGuid, framework + ".framework", weak: false);
-                }
-
-                foreach (var symbol in CAbiSymbols)
-                {
-                    project.AddBuildProperty(targetGuid, "OTHER_LDFLAGS", "-u " + symbol);
-                }
+                project.AddFrameworkToProject(frameworkTargetGuid, framework + ".framework", weak: false);
             }
 
             project.WriteToFile(projectPath);
