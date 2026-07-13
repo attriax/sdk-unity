@@ -11,8 +11,10 @@ Be respectful, direct, and constructive in review and issue discussions.
 1. Clone the workspace and initialize the Unity repository locally.
 2. Install the root Node dependencies with `npm install` from the workspace
    root.
-3. Open `sdk-unity/` in Unity `6000.2.7f2` unless the repository documents a
-   newer required version.
+3. Open `sdk-unity/` in the Unity Editor version pinned in
+   `ProjectSettings/ProjectVersion.txt` (currently `6000.4.6f1`; the package's
+   minimum supported version is `6000.2`, set in
+   `Packages/com.attriax.unity/package.json`).
 4. Create a feature branch before making changes.
 
 ## Before You Commit
@@ -24,23 +26,16 @@ npm run unity:test:editor
 npm run sdk:unity:validate
 ```
 
-When contract-driven transport code changed, run this instead:
-
-```bash
-npm run sdk:unity:generate
-```
-
 ## Contribution Expectations
 
-- Keep public runtime behavior aligned with `sdk-flutter/` unless a
-  Unity-specific divergence is deliberate and documented.
+- The engine is native (the shared `sdk-kmp` core, or `sdk-js` for WebGL) —
+  see `NATIVE_ENGINE_REWRAP.md`. Behavior changes belong there, not in this
+  repo's C#; this repo only owns the platform bindings under
+  `Runtime/Internal/Engine/` + `Runtime/Plugins/` and the public facade.
 - Add EditMode tests for logic changes in `Runtime/Internal/`.
 - Update the public sample when user-visible integration behavior changes.
 - Update repository and package documentation when setup, release, or
   behavior expectations change.
-- Keep generated files under
-  `Runtime/Internal/Generated/AttriaxSdkClient/`
-  generated; do not hand-edit them unless you are fixing generation tooling.
 
 ## Pull Request Notes
 
@@ -49,7 +44,8 @@ Summaries should explain:
 - what changed
 - why it changed
 - how it was validated
-- whether Android/iOS behavior was re-tested when native code changed
+- whether device/host behavior was re-tested on the platform(s) whose native
+  binding changed (Android / iOS / Windows / Linux / macOS / WebGL)
 
 ## Reporting Issues
 

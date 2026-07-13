@@ -16,7 +16,7 @@ what the Git-URL install (`?path=Packages/com.attriax.unity`) and the
 ```text
 sdk-unity/
 ├── Assets/
-│   └── Editor/                                   # Batch export entrypoint for .unitypackage
+│   └── Editor/                                   # Batch build/export entrypoints (Android/Desktop/iOS/WebGL builds, .unitypackage export)
 ├── Packages/
 │   ├── manifest.json                             # Unity-project manifest (package auto-discovered as embedded)
 │   └── com.attriax.unity/                        # Embedded, publishable UPM package
@@ -24,13 +24,15 @@ sdk-unity/
 │       ├── README.md
 │       ├── CHANGELOG.md
 │       ├── LICENSE
-│       ├── Runtime/                              # Public API, runtime assembly, shared managers
-│       │   ├── Internal/                         # Queueing, synchronization, context, lifecycle, generated gateway
-│       │   │   └── Generated/
-│       │   │       └── AttriaxSdkClient/         # Generated internal transport client
+│       ├── Runtime/                              # Public API + thin native-engine wrapper (see NATIVE_ENGINE_REWRAP.md)
+│       │   ├── Internal/
+│       │   │   └── Engine/                       # IAttriaxEnginePlatform + per-platform bindings/mappers/adapter
 │       │   └── Plugins/
-│       │       ├── Android/                      # Android native bridge
-│       │       └── iOS/                          # iOS native bridge
+│       │       ├── Android/                      # .androidlib + com.attriax:core AAR dependency (JNI)
+│       │       ├── iOS/                           # AttriaxCoreCApi.xcframework (C-ABI static lib) + signal .mm
+│       │       ├── macOS/                        # libattriax_core.dylib (C-ABI, dlopen)
+│       │       ├── x86_64/Windows|Linux/          # attriax_core.dll / libattriax_core.so (C-ABI, dlopen)
+│       │       └── WebGL/                         # .jslib router + vendored @attriax/js .jspre bundle
 │       ├── Editor/                               # Editor tooling shipped with the package
 │       ├── Samples~/                             # Public samples imported through Package Manager
 │       ├── Documentation~/                       # Package documentation (excluded from import)
@@ -38,7 +40,7 @@ sdk-unity/
 │           └── Editor/                           # EditMode regression tests
 ├── dist/                                         # Generated .unitypackage and batch test results
 ├── export-unitypackage.ps1                       # Supported Unity export wrapper
-├── SDK_CLIENT_GENERATION.md                      # Generated-client workflow
+├── NATIVE_ENGINE_REWRAP.md                       # Native-engine migration: final architecture, decisions, verification status
 └── PUBLISHING.md
 ```
 
@@ -47,11 +49,16 @@ sdk-unity/
 - `Packages/com.attriax.unity/Runtime/Attriax.cs` is the primary public entry
   point.
 - `AttriaxBehaviour.cs` exposes the MonoBehaviour-owned integration path.
-- `Runtime/Internal/AttriaxRuntime.cs` coordinates queueing, context,
-  synchronization, sessions, app-open flows, and deep links.
-- `Runtime/Internal/Generated/AttriaxSdkClient/` stays embedded in the runtime
-  package so internal runtime code can consume generated internal types without
-  a separate assembly boundary.
+- **The engine is native, not C#.** The managed C# engine (the old
+  `AttriaxRuntime` + its exclusive managers, stores, and generated HTTP
+  client) was deleted; see `NATIVE_ENGINE_REWRAP.md`. `Runtime/Internal/Engine/`
+  now holds `IAttriaxEnginePlatform` and the five platform bindings
+  (Android/iOS/Windows+Linux/macOS/WebGL), each driving either the shared KMP
+  core or (WebGL only) `@attriax/js`. `AttriaxEngineSelector` picks the
+  binding for the running platform; there is no C# fallback.
+- `Runtime/Internal/AttriaxLifecycleDispatcher.cs` is the remaining
+  Unity-glue manager: it feeds lifecycle/deep-link signals into the engine and
+  marshals native→C# callbacks onto the main thread. It holds no engine state.
 - `Samples~/` should demonstrate public integration paths only; internal QA
   flows belong elsewhere.
 
