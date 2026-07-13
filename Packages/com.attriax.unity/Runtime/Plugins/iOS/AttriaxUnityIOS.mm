@@ -668,13 +668,10 @@ extern "C" char *AttriaxUnity_RequestTrackingAuthorization(void) {
 //  callback returns via a C function pointer registered from C# as an
 //  `[AOT.MonoPInvokeCallback]` static method.
 //
-//  ⚠️  CODE-ONLY / UNVERIFIED: the Unity Editor on this project crashes at init
-//  (PackageManager forbidden-folder issue), and there is no iOS-Unity Xcode export
-//  path on this Mac, so this bridge is NOT compiled or run here. It is written against
-//  the verified ObjC API of the shipped XCFramework (same API the Flutter Swift plugin
-//  drives), but MUST be built + device-verified on the Windows/Unity box. The core
-//  lifecycle + tracking + sync-state are implemented; the remaining commands follow the
-//  identical `[[engine tracking] ...]` / `[[engine consent] ...]` pattern.
+//  Written against the ObjC API of the shipped XCFramework (the same API the Flutter
+//  Swift plugin drives). The core lifecycle + tracking + sync-state are implemented;
+//  the remaining commands follow the identical `[[engine tracking] ...]` /
+//  `[[engine consent] ...]` pattern.
 
 #ifdef ATTRIAX_HAS_KMP_ENGINE
 

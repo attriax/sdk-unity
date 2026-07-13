@@ -309,7 +309,7 @@ namespace Attriax.Unity.Internal.Engine
         Task SetAnonymousTracking(bool enabled);
 
         /// <summary>
-        /// Set the CCPA "do not sell / share" election (Epic 10.1; KMP
+        /// Set the CCPA "do not sell / share" election (KMP
         /// <c>consent.ccpa</c>). A non-null value is forwarded so the next
         /// app-open/identify carries it TOP-LEVEL as <c>doNotSell</c> /
         /// <c>usPrivacy</c>; an omitted (null) field is left unchanged. An explicit

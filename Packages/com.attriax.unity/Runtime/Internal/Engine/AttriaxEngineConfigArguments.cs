@@ -82,7 +82,7 @@ namespace Attriax.Unity.Internal.Engine
                 };
             }
 
-            // CCPA — top-level, omitted when unset (Epic 10.1).
+            // CCPA — top-level, omitted when unset.
             if (config.DoNotSell.HasValue)
             {
                 args["doNotSell"] = config.DoNotSell.Value;
