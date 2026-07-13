@@ -1,10 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.attriax.unity">
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="com.android.vending.INSTALL_REFERRER" />
-    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
-
+    <!--
+        Runtime permissions (INTERNET / ACCESS_NETWORK_STATE / INSTALL_REFERRER /
+        AD_ID) are declared by the shared KMP core AAR (com.attriax:core) and
+        inherited here via Gradle manifest merging. Only the in-app WebView browser
+        Activity backing the bridge's openBrowserUrl API remains — wrapper-owned UX
+        the engine cannot host (the engine only fires an external ACTION_VIEW).
+    -->
     <application>
         <activity
             android:name=".AttriaxUnityInAppBrowserActivity"
