@@ -6,6 +6,12 @@
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 /[Mm]emoryCaptures/
+/.utmp/
+
+# Native build tool caches that can appear anywhere under the tree (e.g. inside
+# the Android .androidlib plugin folder) — never track these regardless of depth.
+**/.gradle/
+**/.idea/
 
 # Stray .meta files Unity generates for the transient project folders above when
 # this package is opened as a standalone Unity project. If committed, consumers
@@ -37,6 +43,12 @@
 /dist/*.log
 /dist/unity-editmode-test-results.xml
 /.generated-sdk-client-tmp/
+
+# Build outputs from the dev/test project's platform build scripts
+# (Assets/Editor/Attriax{Android,Ios,WebGL,Desktop}Build.cs), plus stray
+# platform artifacts that can land elsewhere.
+*.apk
+*.aab
 
 # Unity test results (EditMode/PlayMode artifacts, regenerated on every run)
 /[Tt]est[Rr]esults/
