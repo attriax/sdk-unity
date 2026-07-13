@@ -103,12 +103,8 @@ namespace Attriax.Unity.Internal.Engine
         // Tracking.
         // -----------------------------------------------------------------
 
-        public Task RecordEvent(string name, IDictionary<string, object>? eventData = null, bool flushImmediately = false)
-        {
-            var args = Args(("name", name), ("flushImmediately", flushImmediately));
-            Put(args, "eventData", eventData);
-            return CallVoid("recordEvent", args);
-        }
+        public Task RecordEvent(string name, IDictionary<string, object>? eventData = null, bool flushImmediately = false) =>
+            CallVoid("recordEvent", AttriaxEngineArgs.RecordEvent(name, eventData, flushImmediately));
 
         public Task RecordPageView(
             string pageName,
@@ -117,15 +113,9 @@ namespace Attriax.Unity.Internal.Engine
             string? previousPageName = null,
             IDictionary<string, object>? parameters = null,
             string source = "manual",
-            bool flushImmediately = false)
-        {
-            var args = Args(("pageName", pageName), ("source", source), ("flushImmediately", flushImmediately));
-            Put(args, "pageClass", pageClass);
-            Put(args, "pageTitle", pageTitle);
-            Put(args, "previousPageName", previousPageName);
-            Put(args, "parameters", parameters);
-            return CallVoid("recordPageView", args);
-        }
+            bool flushImmediately = false) =>
+            CallVoid("recordPageView", AttriaxEngineArgs.RecordPageView(
+                pageName, pageClass, pageTitle, previousPageName, parameters, source, flushImmediately));
 
         public Task RecordPurchase(
             double revenue,
@@ -149,33 +139,12 @@ namespace Attriax.Unity.Internal.Engine
             bool? test = null,
             string? validationId = null,
             IDictionary<string, object>? metadata = null,
-            bool flushImmediately = true)
-        {
-            var args = Args(
-                ("revenue", revenue),
-                ("currency", currency),
-                ("revenueInMicros", revenueInMicros),
-                ("quantity", quantity),
-                ("flushImmediately", flushImmediately));
-            Put(args, "purchaseType", purchaseType);
-            Put(args, "productId", productId);
-            Put(args, "transactionId", transactionId);
-            Put(args, "originalTransactionId", originalTransactionId);
-            Put(args, "validationProvider", validationProvider);
-            Put(args, "validationEnvironment", validationEnvironment);
-            Put(args, "purchaseToken", purchaseToken);
-            Put(args, "receiptData", receiptData);
-            Put(args, "signedPayload", signedPayload);
-            Put(args, "receiptSignature", receiptSignature);
-            Put(args, "isRenewal", isRenewal);
-            Put(args, "store", store);
-            Put(args, "packageName", packageName);
-            Put(args, "voided", voided);
-            Put(args, "test", test);
-            Put(args, "validationId", validationId);
-            Put(args, "metadata", metadata);
-            return CallVoid("recordPurchase", args);
-        }
+            bool flushImmediately = true) =>
+            CallVoid("recordPurchase", AttriaxEngineArgs.RecordPurchase(
+                revenue, currency, revenueInMicros, purchaseType, productId, transactionId,
+                originalTransactionId, validationProvider, validationEnvironment, purchaseToken,
+                receiptData, signedPayload, receiptSignature, isRenewal, quantity, store, packageName,
+                voided, test, validationId, metadata, flushImmediately));
 
         public Task RecordRefund(
             double revenue,
@@ -192,26 +161,11 @@ namespace Attriax.Unity.Internal.Engine
             bool? test = null,
             string? reason = null,
             IDictionary<string, object>? metadata = null,
-            bool flushImmediately = true)
-        {
-            var args = Args(
-                ("revenue", revenue),
-                ("currency", currency),
-                ("revenueInMicros", revenueInMicros),
-                ("quantity", quantity),
-                ("flushImmediately", flushImmediately));
-            Put(args, "purchaseType", purchaseType);
-            Put(args, "productId", productId);
-            Put(args, "transactionId", transactionId);
-            Put(args, "originalTransactionId", originalTransactionId);
-            Put(args, "store", store);
-            Put(args, "packageName", packageName);
-            Put(args, "voided", voided);
-            Put(args, "test", test);
-            Put(args, "reason", reason);
-            Put(args, "metadata", metadata);
-            return CallVoid("recordRefund", args);
-        }
+            bool flushImmediately = true) =>
+            CallVoid("recordRefund", AttriaxEngineArgs.RecordRefund(
+                revenue, currency, revenueInMicros, purchaseType, productId, transactionId,
+                originalTransactionId, quantity, store, packageName, voided, test, reason, metadata,
+                flushImmediately));
 
         public Task RecordAdRevenue(
             double revenue,
@@ -223,21 +177,10 @@ namespace Attriax.Unity.Internal.Engine
             string? adPlacement = null,
             bool? test = null,
             IDictionary<string, object>? metadata = null,
-            bool flushImmediately = true)
-        {
-            var args = Args(
-                ("revenue", revenue),
-                ("currency", currency),
-                ("revenueInMicros", revenueInMicros),
-                ("flushImmediately", flushImmediately));
-            Put(args, "adNetwork", adNetwork);
-            Put(args, "adFormat", adFormat);
-            Put(args, "adType", adType);
-            Put(args, "adPlacement", adPlacement);
-            Put(args, "test", test);
-            Put(args, "metadata", metadata);
-            return CallVoid("recordAdRevenue", args);
-        }
+            bool flushImmediately = true) =>
+            CallVoid("recordAdRevenue", AttriaxEngineArgs.RecordAdRevenue(
+                revenue, currency, revenueInMicros, adNetwork, adFormat, adType, adPlacement, test,
+                metadata, flushImmediately));
 
         public Task RecordAdEvent(
             string eventName,
@@ -253,23 +196,12 @@ namespace Attriax.Unity.Internal.Engine
             double? rewardAmount = null,
             bool? test = null,
             IDictionary<string, object>? metadata = null,
-            bool flushImmediately = true)
-        {
-            var args = Args(("eventName", eventName), ("flushImmediately", flushImmediately));
-            Put(args, "adNetwork", adNetwork);
-            Put(args, "mediationNetwork", mediationNetwork);
-            Put(args, "adUnitId", adUnitId);
-            Put(args, "adPlacement", adPlacement);
-            Put(args, "adFormat", adFormat);
-            Put(args, "adType", adType);
-            Put(args, "failureReason", failureReason);
-            Put(args, "loadLatencyMs", loadLatencyMs);
-            Put(args, "rewardType", rewardType);
-            Put(args, "rewardAmount", rewardAmount);
-            Put(args, "test", test);
-            Put(args, "metadata", metadata);
-            return CallVoid("recordAdEvent", args);
-        }
+            bool flushImmediately = true) =>
+            // The JNI bridge crosses the reserved event name under `eventName`.
+            CallVoid("recordAdEvent", AttriaxEngineArgs.RecordAdEvent(
+                type: null, eventName: eventName, adNetwork, mediationNetwork, adUnitId, adPlacement,
+                adFormat, adType, failureReason, loadLatencyMs, rewardType, rewardAmount, test,
+                metadata, flushImmediately));
 
         public Task RecordNotification(
             string type,
@@ -280,17 +212,10 @@ namespace Attriax.Unity.Internal.Engine
             string? source = null,
             IDictionary<string, object>? payload = null,
             IDictionary<string, object>? metadata = null,
-            bool flushImmediately = false)
-        {
-            var args = Args(("type", type), ("notificationId", notificationId), ("flushImmediately", flushImmediately));
-            Put(args, "linkId", linkId);
-            Put(args, "campaignId", campaignId);
-            Put(args, "title", title);
-            Put(args, "source", source);
-            Put(args, "payload", payload);
-            Put(args, "metadata", metadata);
-            return CallVoid("recordNotification", args);
-        }
+            bool flushImmediately = false) =>
+            CallVoid("recordNotification", AttriaxEngineArgs.RecordNotification(
+                type, notificationId, linkId, campaignId, title, source, payload, metadata,
+                flushImmediately));
 
         public Task RecordError(
             string message,
@@ -299,41 +224,21 @@ namespace Attriax.Unity.Internal.Engine
             bool fatal = false,
             string source = "manual",
             string? reason = null,
-            IDictionary<string, object>? metadata = null)
-        {
-            var args = Args(
-                ("message", message),
-                ("exceptionType", exceptionType),
-                ("fatal", fatal),
-                ("source", source));
-            Put(args, "stackTrace", stackTrace);
-            Put(args, "reason", reason);
-            Put(args, "metadata", metadata);
-            return CallVoid("recordError", args);
-        }
+            IDictionary<string, object>? metadata = null) =>
+            CallVoid("recordError", AttriaxEngineArgs.RecordError(
+                message, exceptionType, stackTrace, fatal, source, reason, metadata));
 
-        public Task SetUser(string? userId = null, string? userName = null)
-        {
-            var args = new Dictionary<string, object?> { ["userId"] = userId };
-            Put(args, "userName", userName);
-            return CallVoid("setUser", args);
-        }
+        public Task SetUser(string? userId = null, string? userName = null) =>
+            CallVoid("setUser", AttriaxEngineArgs.SetUser(userId, userName));
 
-        public Task SetUserProperty(string name, object? value)
-        {
-            var args = new Dictionary<string, object?> { ["name"] = name, ["value"] = value };
-            return CallVoid("setUserProperty", args);
-        }
+        public Task SetUserProperty(string name, object? value) =>
+            CallVoid("setUserProperty", AttriaxEngineArgs.SetUserProperty(name, value));
 
         public Task SetUserProperties(IDictionary<string, object> properties) =>
-            CallVoid("setUserProperties", new Dictionary<string, object?> { ["properties"] = properties });
+            CallVoid("setUserProperties", AttriaxEngineArgs.SetUserProperties(properties));
 
-        public Task ClearUserProperties(IList<string>? propertyNames = null)
-        {
-            var args = new Dictionary<string, object?>();
-            Put(args, "propertyNames", propertyNames);
-            return CallVoid("clearUserProperties", args);
-        }
+        public Task ClearUserProperties(IList<string>? propertyNames = null) =>
+            CallVoid("clearUserProperties", AttriaxEngineArgs.ClearUserProperties(propertyNames));
 
         public Task RegisterPushToken(AttriaxPushTokenProvider provider, string? token, IDictionary<string, object>? metadata = null)
         {
@@ -360,9 +265,9 @@ namespace Attriax.Unity.Internal.Engine
 
         public async Task<AttriaxDeepLinkEvent?> RecordDeepLink(Uri uri, IDictionary<string, object>? metadata = null, string source = "manual")
         {
-            var args = Args(("uri", uri.ToString()), ("source", source));
-            Put(args, "metadata", metadata);
-            var token = await CallResult("recordDeepLink", args).ConfigureAwait(false);
+            var token = await CallResult(
+                "recordDeepLink",
+                AttriaxEngineArgs.RecordDeepLink(uri.ToString(), metadata, source)).ConfigureAwait(false);
             return AttriaxAndroidEngineMapper.ToDeepLinkEvent(token as JObject);
         }
 
@@ -418,12 +323,10 @@ namespace Attriax.Unity.Internal.Engine
             string? productId = null,
             string? transactionId = null)
         {
-            var args = Args(("receipt", receipt), ("test", test));
-            Put(args, "provider", provider);
-            Put(args, "environment", environment);
-            Put(args, "productId", productId);
-            Put(args, "transactionId", transactionId);
-            var token = await CallResult("validateReceipt", args).ConfigureAwait(false);
+            var token = await CallResult(
+                "validateReceipt",
+                AttriaxEngineArgs.ValidateReceipt(receipt, test, provider, environment, productId, transactionId))
+                .ConfigureAwait(false);
             return AttriaxAndroidEngineMapper.ToReceiptResult(token as JObject);
         }
 
@@ -432,12 +335,7 @@ namespace Attriax.Unity.Internal.Engine
         // -----------------------------------------------------------------
 
         public Task SetGdprConsent(bool analytics, bool attribution, bool adEvents) =>
-            CallVoid("setGdprConsent", new Dictionary<string, object?>
-            {
-                ["analytics"] = analytics,
-                ["attribution"] = attribution,
-                ["adEvents"] = adEvents,
-            });
+            CallVoid("setGdprConsent", AttriaxEngineArgs.SetGdprConsent(analytics, attribution, adEvents));
 
         public Task SetGdprConsentNotRequired() => CallVoid("setGdprConsentNotRequired");
 
@@ -485,13 +383,11 @@ namespace Attriax.Unity.Internal.Engine
             AttriaxSkanCoarseValue? coarseValue = null,
             bool lockWindow = false)
         {
-            var args = Args(("fineValue", fineValue), ("lockWindow", lockWindow));
-            if (coarseValue.HasValue)
-            {
-                args["coarseValue"] = CoarseToWire(coarseValue.Value);
-            }
-
-            var token = await CallResult("updateSkanConversionValue", args).ConfigureAwait(false);
+            var token = await CallResult(
+                "updateSkanConversionValue",
+                AttriaxEngineArgs.UpdateSkanConversionValue(
+                    fineValue, coarseValue.HasValue ? CoarseToWire(coarseValue.Value) : null, lockWindow))
+                .ConfigureAwait(false);
             return AttriaxAndroidEngineMapper.ToSkanUpdateResult(token as JObject);
         }
 
@@ -633,16 +529,16 @@ namespace Attriax.Unity.Internal.Engine
         // Dispatch plumbing.
         // -----------------------------------------------------------------
 
-        private Task CallVoid(string method, IDictionary<string, object?>? args = null) =>
+        private Task CallVoid(string method, object? args = null) =>
             _worker.Enqueue(() => Dispatch(method, args));
 
-        private async Task<JToken?> CallResult(string method, IDictionary<string, object?>? args = null)
+        private async Task<JToken?> CallResult(string method, object? args = null)
         {
             var json = await _worker.Enqueue(() => Dispatch(method, args)).ConfigureAwait(false);
             return UnwrapResult(json);
         }
 
-        private string? Dispatch(string method, IDictionary<string, object?>? args)
+        private string? Dispatch(string method, object? args)
         {
             var bridge = _bridge
                 ?? throw new InvalidOperationException("Attriax Android engine is not initialized.");
@@ -670,17 +566,6 @@ namespace Attriax.Unity.Internal.Engine
             }
 
             return new Dictionary<string, object?> { ["timeoutMs"] = timeoutMs.Value };
-        }
-
-        private static Dictionary<string, object?> Args(params (string Key, object? Value)[] entries)
-        {
-            var map = new Dictionary<string, object?>();
-            foreach (var (key, value) in entries)
-            {
-                map[key] = value;
-            }
-
-            return map;
         }
 
         private static void Put(IDictionary<string, object?> args, string key, object? value)
