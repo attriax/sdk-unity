@@ -71,6 +71,9 @@ typedef struct {
 } libattriax_core_kref_com_attriax_sdk_AttriaxConfig;
 typedef struct {
   libattriax_core_KNativePtr pinned;
+} libattriax_core_kref_kotlin_Function0;
+typedef struct {
+  libattriax_core_KNativePtr pinned;
 } libattriax_core_kref_com_attriax_sdk_Attriax;
 typedef struct {
   libattriax_core_KNativePtr pinned;
@@ -81,9 +84,6 @@ typedef struct {
 typedef struct {
   libattriax_core_KNativePtr pinned;
 } libattriax_core_kref_com_attriax_sdk_apple_AttriaxAppleScheduler;
-typedef struct {
-  libattriax_core_KNativePtr pinned;
-} libattriax_core_kref_kotlin_Function0;
 typedef struct {
   libattriax_core_KNativePtr pinned;
 } libattriax_core_kref_com_attriax_sdk_internal_AttriaxScheduler_ScheduledHandle;
@@ -722,6 +722,9 @@ typedef struct {
 } libattriax_core_kref_com_attriax_sdk_AttriaxSkanState;
 typedef struct {
   libattriax_core_KNativePtr pinned;
+} libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig;
+typedef struct {
+  libattriax_core_KNativePtr pinned;
 } libattriax_core_kref_com_attriax_sdk_AttriaxSkanCoarseValue;
 typedef struct {
   libattriax_core_KNativePtr pinned;
@@ -759,6 +762,27 @@ typedef struct {
 typedef struct {
   libattriax_core_KNativePtr pinned;
 } libattriax_core_kref_com_attriax_sdk_AttriaxSkanUpdateStatus_ERROR;
+typedef struct {
+  libattriax_core_KNativePtr pinned;
+} libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule;
+typedef struct {
+  libattriax_core_KNativePtr pinned;
+} libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition;
+typedef struct {
+  libattriax_core_KNativePtr pinned;
+} libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition;
+typedef struct {
+  libattriax_core_KNativePtr pinned;
+} libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue;
+typedef struct {
+  libattriax_core_KNativePtr pinned;
+} libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_StringValue;
+typedef struct {
+  libattriax_core_KNativePtr pinned;
+} libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_NumberValue;
+typedef struct {
+  libattriax_core_KNativePtr pinned;
+} libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_BoolValue;
 typedef struct {
   libattriax_core_KNativePtr pinned;
 } libattriax_core_kref_com_attriax_sdk_AttriaxSynchronizationState;
@@ -837,7 +861,7 @@ typedef struct {
               libattriax_core_KType* (*_type)(void);
               libattriax_core_kref_com_attriax_sdk_AttriaxApple (*_instance)();
               const char* (*get_VERSION)(libattriax_core_kref_com_attriax_sdk_AttriaxApple thiz);
-              libattriax_core_kref_com_attriax_sdk_Attriax (*create)(libattriax_core_kref_com_attriax_sdk_AttriaxApple thiz, libattriax_core_kref_com_attriax_sdk_AttriaxConfig config, const char* userAgent);
+              libattriax_core_kref_com_attriax_sdk_Attriax (*create)(libattriax_core_kref_com_attriax_sdk_AttriaxApple thiz, libattriax_core_kref_com_attriax_sdk_AttriaxConfig config, const char* userAgent, libattriax_core_kref_kotlin_Function0 advertisingIdSupplier);
             } AttriaxApple;
             struct {
               struct {
@@ -857,6 +881,7 @@ typedef struct {
               struct {
                 libattriax_core_KType* (*_type)(void);
                 libattriax_core_kref_com_attriax_sdk_apple_AttriaxAppleUrlSessionHttpClient (*AttriaxAppleUrlSessionHttpClient)(const char* baseUrl, const char* userAgent, libattriax_core_KLong requestTimeoutMs);
+                libattriax_core_kref_com_attriax_sdk_internal_HttpResponse (*get)(libattriax_core_kref_com_attriax_sdk_apple_AttriaxAppleUrlSessionHttpClient thiz, const char* path);
                 libattriax_core_kref_com_attriax_sdk_internal_HttpResponse (*post)(libattriax_core_kref_com_attriax_sdk_apple_AttriaxAppleUrlSessionHttpClient thiz, const char* path, const char* body);
               } AttriaxAppleUrlSessionHttpClient;
               struct {
@@ -1426,6 +1451,7 @@ typedef struct {
                   const char* (*get_RECEIPTS_VALIDATE)(libattriax_core_kref_com_attriax_sdk_internal_request_AttriaxEndpoints thiz);
                   const char* (*get_REVENUE_CONVERT)(libattriax_core_kref_com_attriax_sdk_internal_request_AttriaxEndpoints thiz);
                   const char* (*get_SESSIONS)(libattriax_core_kref_com_attriax_sdk_internal_request_AttriaxEndpoints thiz);
+                  const char* (*get_SKAN_CV_CONFIG)(libattriax_core_kref_com_attriax_sdk_internal_request_AttriaxEndpoints thiz);
                   const char* (*get_UNINSTALL_TOKENS)(libattriax_core_kref_com_attriax_sdk_internal_request_AttriaxEndpoints thiz);
                   const char* (*get_USERS)(libattriax_core_kref_com_attriax_sdk_internal_request_AttriaxEndpoints thiz);
                 } AttriaxEndpoints;
@@ -1873,6 +1899,7 @@ typedef struct {
               } AttriaxTransportException;
               struct {
                 libattriax_core_KType* (*_type)(void);
+                libattriax_core_kref_com_attriax_sdk_internal_HttpResponse (*get)(libattriax_core_kref_com_attriax_sdk_internal_HttpClient thiz, const char* path);
                 libattriax_core_kref_com_attriax_sdk_internal_HttpResponse (*post)(libattriax_core_kref_com_attriax_sdk_internal_HttpClient thiz, const char* path, const char* body);
               } HttpClient;
               struct {
@@ -2464,6 +2491,7 @@ typedef struct {
               libattriax_core_kref_com_attriax_sdk_AttriaxRawDeepLinkEvent (*get_rawInitialDeepLink)(libattriax_core_kref_com_attriax_sdk_AttriaxDeepLinks thiz);
               void (*addListener)(libattriax_core_kref_com_attriax_sdk_AttriaxDeepLinks thiz, libattriax_core_kref_com_attriax_sdk_AttriaxDeepLinkListener listener);
               void (*addRawListener)(libattriax_core_kref_com_attriax_sdk_AttriaxDeepLinks thiz, libattriax_core_kref_com_attriax_sdk_AttriaxRawDeepLinkListener listener);
+              void (*completeInitialLinkIfAbsent)(libattriax_core_kref_com_attriax_sdk_AttriaxDeepLinks thiz);
               libattriax_core_kref_com_attriax_sdk_AttriaxCreateDynamicLinkResult (*createDynamicLink)(libattriax_core_kref_com_attriax_sdk_AttriaxDeepLinks thiz, const char* name, const char* destinationUrl, const char* group, const char* prefix, libattriax_core_kref_com_attriax_sdk_AttriaxDynamicLinkSocialPreview socialPreview, libattriax_core_kref_com_attriax_sdk_AttriaxDynamicLinkUtms utms, libattriax_core_kref_com_attriax_sdk_AttriaxDynamicLinkRedirects redirects, libattriax_core_kref_kotlin_collections_Map data);
               void (*handleUri)(libattriax_core_kref_com_attriax_sdk_AttriaxDeepLinks thiz, const char* rawUri, libattriax_core_KBoolean isInitialLink);
               libattriax_core_kref_com_attriax_sdk_AttriaxDeepLinkEvent (*recordDeepLink)(libattriax_core_kref_com_attriax_sdk_AttriaxDeepLinks thiz, const char* uri, libattriax_core_kref_kotlin_collections_Map metadata, const char* source);
@@ -2697,6 +2725,7 @@ typedef struct {
             struct {
               libattriax_core_KType* (*_type)(void);
               libattriax_core_kref_com_attriax_sdk_AttriaxSkanState (*get_state)(libattriax_core_kref_com_attriax_sdk_AttriaxSkan thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig (*fetchConversionConfig)(libattriax_core_kref_com_attriax_sdk_AttriaxSkan thiz);
               libattriax_core_kref_com_attriax_sdk_AttriaxSkanUpdateResult (*updateConversionValue)(libattriax_core_kref_com_attriax_sdk_AttriaxSkan thiz, libattriax_core_KInt fineValue, libattriax_core_kref_com_attriax_sdk_AttriaxSkanCoarseValue coarseValue, libattriax_core_KBoolean lockWindow);
             } AttriaxSkan;
             struct {
@@ -2783,6 +2812,116 @@ typedef struct {
               libattriax_core_KInt (*hashCode)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConfig thiz);
               const char* (*toString)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConfig thiz);
             } AttriaxSkanConfig;
+            struct {
+              libattriax_core_KType* (*_type)(void);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig (*AttriaxSkanConversionConfig)(libattriax_core_kref_kotlin_Int schemaVersion, const char* schemaUpdatedAt, libattriax_core_KBoolean enabled, libattriax_core_kref_kotlin_collections_List rules, const char* disclaimer);
+              const char* (*get_disclaimer)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz);
+              libattriax_core_KBoolean (*get_enabled)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz);
+              libattriax_core_kref_kotlin_collections_List (*get_rules)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz);
+              const char* (*get_schemaUpdatedAt)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz);
+              libattriax_core_kref_kotlin_Int (*get_schemaVersion)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz);
+              libattriax_core_kref_kotlin_Int (*component1)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz);
+              const char* (*component2)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz);
+              libattriax_core_KBoolean (*component3)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz);
+              libattriax_core_kref_kotlin_collections_List (*component4)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz);
+              const char* (*component5)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig (*copy)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz, libattriax_core_kref_kotlin_Int schemaVersion, const char* schemaUpdatedAt, libattriax_core_KBoolean enabled, libattriax_core_kref_kotlin_collections_List rules, const char* disclaimer);
+              libattriax_core_KBoolean (*equals)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz, libattriax_core_kref_kotlin_Any other);
+              libattriax_core_KInt (*hashCode)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz);
+              const char* (*toString)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanConversionConfig thiz);
+            } AttriaxSkanConversionConfig;
+            struct {
+              libattriax_core_KType* (*_type)(void);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule (*AttriaxSkanCvRule)(const char* id, const char* groupId, const char* groupDisplayName, libattriax_core_KInt startBit, libattriax_core_KInt bitCount, libattriax_core_KInt rank, libattriax_core_KInt bitContribution, const char* whenEvent, libattriax_core_kref_kotlin_collections_List whenConditions, libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition whenRevenue, libattriax_core_kref_com_attriax_sdk_AttriaxSkanCoarseValue coarseValue, libattriax_core_KBoolean lockWindow);
+              libattriax_core_KInt (*get_bitContribution)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_KInt (*get_bitCount)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCoarseValue (*get_coarseValue)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              const char* (*get_groupDisplayName)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              const char* (*get_groupId)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              const char* (*get_id)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_KBoolean (*get_lockWindow)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_KInt (*get_rank)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_KInt (*get_startBit)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_kref_kotlin_collections_List (*get_whenConditions)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              const char* (*get_whenEvent)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition (*get_whenRevenue)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              const char* (*component1)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition (*component10)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCoarseValue (*component11)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_KBoolean (*component12)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              const char* (*component2)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              const char* (*component3)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_KInt (*component4)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_KInt (*component5)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_KInt (*component6)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_KInt (*component7)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              const char* (*component8)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_kref_kotlin_collections_List (*component9)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule (*copy)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz, const char* id, const char* groupId, const char* groupDisplayName, libattriax_core_KInt startBit, libattriax_core_KInt bitCount, libattriax_core_KInt rank, libattriax_core_KInt bitContribution, const char* whenEvent, libattriax_core_kref_kotlin_collections_List whenConditions, libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition whenRevenue, libattriax_core_kref_com_attriax_sdk_AttriaxSkanCoarseValue coarseValue, libattriax_core_KBoolean lockWindow);
+              libattriax_core_KBoolean (*equals)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz, libattriax_core_kref_kotlin_Any other);
+              libattriax_core_KInt (*hashCode)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+              const char* (*toString)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRule thiz);
+            } AttriaxSkanCvRule;
+            struct {
+              libattriax_core_KType* (*_type)(void);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition (*AttriaxSkanCvCondition)(const char* paramKey, const char* operator_, libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue value);
+              const char* (*get_operator)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition thiz);
+              const char* (*get_paramKey)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue (*get_value)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition thiz);
+              const char* (*component1)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition thiz);
+              const char* (*component2)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue (*component3)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition (*copy)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition thiz, const char* paramKey, const char* operator_, libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue value);
+              libattriax_core_KBoolean (*equals)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition thiz, libattriax_core_kref_kotlin_Any other);
+              libattriax_core_KInt (*hashCode)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition thiz);
+              const char* (*toString)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvCondition thiz);
+            } AttriaxSkanCvCondition;
+            struct {
+              libattriax_core_KType* (*_type)(void);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition (*AttriaxSkanCvRevenueCondition)(const char* operator_, libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue value);
+              const char* (*get_operator)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue (*get_value)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition thiz);
+              const char* (*component1)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue (*component2)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition thiz);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition (*copy)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition thiz, const char* operator_, libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue value);
+              libattriax_core_KBoolean (*equals)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition thiz, libattriax_core_kref_kotlin_Any other);
+              libattriax_core_KInt (*hashCode)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition thiz);
+              const char* (*toString)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvRevenueCondition thiz);
+            } AttriaxSkanCvRevenueCondition;
+            struct {
+              struct {
+                libattriax_core_KType* (*_type)(void);
+                libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_StringValue (*StringValue)(const char* value);
+                const char* (*get_value)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_StringValue thiz);
+                const char* (*component1)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_StringValue thiz);
+                libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_StringValue (*copy)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_StringValue thiz, const char* value);
+                libattriax_core_KBoolean (*equals)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_StringValue thiz, libattriax_core_kref_kotlin_Any other);
+                libattriax_core_KInt (*hashCode)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_StringValue thiz);
+                const char* (*toString)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_StringValue thiz);
+              } StringValue;
+              struct {
+                libattriax_core_KType* (*_type)(void);
+                libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_NumberValue (*NumberValue)(libattriax_core_KDouble value);
+                libattriax_core_KDouble (*get_value)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_NumberValue thiz);
+                libattriax_core_KDouble (*component1)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_NumberValue thiz);
+                libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_NumberValue (*copy)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_NumberValue thiz, libattriax_core_KDouble value);
+                libattriax_core_KBoolean (*equals)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_NumberValue thiz, libattriax_core_kref_kotlin_Any other);
+                libattriax_core_KInt (*hashCode)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_NumberValue thiz);
+                const char* (*toString)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_NumberValue thiz);
+              } NumberValue;
+              struct {
+                libattriax_core_KType* (*_type)(void);
+                libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_BoolValue (*BoolValue)(libattriax_core_KBoolean value);
+                libattriax_core_KBoolean (*get_value)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_BoolValue thiz);
+                libattriax_core_KBoolean (*component1)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_BoolValue thiz);
+                libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_BoolValue (*copy)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_BoolValue thiz, libattriax_core_KBoolean value);
+                libattriax_core_KBoolean (*equals)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_BoolValue thiz, libattriax_core_kref_kotlin_Any other);
+                libattriax_core_KInt (*hashCode)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_BoolValue thiz);
+                const char* (*toString)(libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue_BoolValue thiz);
+              } BoolValue;
+              libattriax_core_KType* (*_type)(void);
+              libattriax_core_kref_com_attriax_sdk_AttriaxSkanCvValue (*AttriaxSkanCvValue)();
+            } AttriaxSkanCvValue;
             struct {
               struct {
                 libattriax_core_kref_com_attriax_sdk_AttriaxSynchronizationState (*get)(); /* enum entry for INITIALIZING. */
