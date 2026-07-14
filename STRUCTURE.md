@@ -28,7 +28,7 @@ sdk-unity/
 │       │   ├── Internal/
 │       │   │   └── Engine/                       # IAttriaxEnginePlatform + per-platform bindings/mappers/adapter
 │       │   └── Plugins/
-│       │       ├── Android/                      # .androidlib + com.attriax:core AAR dependency (JNI)
+│       │       ├── Android/                      # .androidlib + com.attriax:core AAR dependency from Maven Central (JNI)
 │       │       ├── iOS/                           # AttriaxCoreCApi.xcframework (C-ABI static lib) + signal .mm
 │       │       ├── macOS/                        # libattriax_core.dylib (C-ABI, dlopen)
 │       │       ├── x86_64/Windows|Linux/          # attriax_core.dll / libattriax_core.so (C-ABI, dlopen)

@@ -46,7 +46,7 @@ Engine per platform, as shipped under `Packages/com.attriax.unity/Runtime/Plugin
 
 | Platform | Native engine | Artifact | Binding | C# platform class |
 |---|---|---|---|---|
-| Android (device/Editor via emulator) | KMP core | `com.attriax:core` AAR, pulled via the `.androidlib`'s Gradle dep | JNI via `AndroidJavaObject`/`AndroidJavaProxy` on a dedicated worker thread | `AttriaxAndroidEnginePlatform` |
+| Android (device/Editor via emulator) | KMP core | `com.attriax:core` AAR (from Maven Central), pulled via the `.androidlib`'s Gradle dep | JNI via `AndroidJavaObject`/`AndroidJavaProxy` on a dedicated worker thread | `AttriaxAndroidEnginePlatform` |
 | iOS | KMP core | `AttriaxCoreCApi.xcframework` (static lib, ios-arm64 + simulator) | `[DllImport("__Internal")]` P/Invoke, IL2CPP | `AttriaxIosEnginePlatform` |
 | Windows / Linux standalone + Editor (host OS) | KMP core | C-ABI shared lib (`attriax_core.dll` / `libattriax_core.so`) | Dynamic `LoadLibrary`/`dlopen` (not static `[DllImport]` — see Windows Editor note below) | `AttriaxDesktopEnginePlatform` |
 | macOS standalone + Editor | KMP core | `libattriax_core.dylib` (universal arm64+x86_64) | Dynamic `dlopen`, same class as Windows/Linux | `AttriaxDesktopEnginePlatform` (macOS-extended) |
@@ -125,10 +125,12 @@ automatically.
 Producing the native artifacts themselves is a manual, local step (no CI, per
 project rule), driven from `sdk-kmp`:
 
-1. `sdk-kmp`: `./gradlew :core:publishToMavenLocal` (Android AAR, resolved by
-   the `.androidlib`'s Gradle dependency) and the `sharedLib`/`staticLib`
-   assemble tasks for the desktop/iOS C-ABI artifacts; the iOS xcframework and
-   macOS dylib require building at a Mac.
+1. `sdk-kmp`: the Android AAR (`com.attriax:core`) resolves from **Maven Central**
+   via the `.androidlib`'s Gradle dependency — no local publish step needed for it.
+   Run the `sharedLib`/`staticLib` assemble tasks for the desktop/iOS C-ABI
+   artifacts (the iOS xcframework and macOS dylib require building at a Mac). For
+   development against an unreleased core, `./gradlew :core:publishToMavenLocal`
+   plus `mavenLocal()` in the `.androidlib` still works.
 2. Copy the produced artifacts into the matching `Runtime/Plugins/<platform>/`
    folder with correct `.meta` platform-inclusion flags (see the per-platform
    build scripts under `Assets/Editor/` — `AttriaxAndroidBuild.cs`,

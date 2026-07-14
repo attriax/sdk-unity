@@ -11,7 +11,7 @@
   P/Invoke, WebGL `.jslib`)
 - `Runtime/Internal/AttriaxLifecycleDispatcher.cs` — the remaining Unity-glue
   manager (lifecycle/deep-link signals in, main-thread callback marshaling out)
-- `Runtime/Plugins/Android/` — `.androidlib` + `com.attriax:core` AAR dependency
+- `Runtime/Plugins/Android/` — `.androidlib` + `com.attriax:core` AAR dependency (from Maven Central)
 - `Runtime/Plugins/iOS/` — `AttriaxCoreCApi.xcframework` (C-ABI static lib) + signal `.mm`
 - `Runtime/Plugins/macOS/`, `Runtime/Plugins/x86_64/Windows|Linux/` — desktop C-ABI shared libs
 - `Runtime/Plugins/WebGL/` — `.jslib` router + vendored `@attriax/js` bundle
