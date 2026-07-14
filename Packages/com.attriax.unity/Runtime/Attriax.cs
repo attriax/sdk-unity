@@ -214,26 +214,6 @@ namespace Attriax.Unity
             return _runtime.ValidateReceiptAsync(options);
         }
 
-        private static Dictionary<string, object> CloneMetadata(IDictionary<string, object>? metadata)
-        {
-            if (metadata == null || metadata.Count == 0)
-            {
-                return new Dictionary<string, object>();
-            }
-
-            return new Dictionary<string, object>(metadata);
-        }
-
-        private static void AddTrimmed(IDictionary<string, object> target, string key, string? value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return;
-            }
-
-            target[key] = value.Trim();
-        }
-
         /// <summary>
         /// Releases the SDK instance and pending subscriptions.
         /// </summary>

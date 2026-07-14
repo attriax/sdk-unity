@@ -94,6 +94,14 @@ namespace Attriax.Unity.Internal
         void ResetGdprConsent();
         Task RequestGdprDataErasureAsync();
 
+        // -- Consent: CCPA ---------------------------------------------------
+        // The platform surface models the CCPA election as a single combined write
+        // (clear-omitted, matching the KMP `AttriaxCcpaConsent.set`) plus two reads; the
+        // public facade layers its per-field setters on top of these three primitives.
+        Task<bool?> GetCcpaDoNotSellAsync();
+        Task<string?> GetCcpaUsPrivacyAsync();
+        Task SetCcpaConsentAsync(bool? doNotSell, string? usPrivacy);
+
         // -- Deep links ------------------------------------------------------
         AttriaxRawDeepLinkEvent? RawInitialDeepLinkValue { get; }
         AttriaxDeepLinkEvent? InitialDeepLinkValue { get; }

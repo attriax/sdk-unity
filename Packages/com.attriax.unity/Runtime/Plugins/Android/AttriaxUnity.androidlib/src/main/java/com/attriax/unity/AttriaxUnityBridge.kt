@@ -2,7 +2,6 @@ package com.attriax.unity
 
 import android.content.Context
 import com.attriax.sdk.Attriax
-import com.attriax.sdk.AttriaxAdEventType
 import com.attriax.sdk.AttriaxAttStatus
 import com.attriax.sdk.AttriaxBrowserAction
 import com.attriax.sdk.AttriaxConfig
@@ -10,17 +9,13 @@ import com.attriax.sdk.AttriaxCreateDynamicLinkResult
 import com.attriax.sdk.AttriaxDeepLinkEvent
 import com.attriax.sdk.AttriaxDeepLinkListener
 import com.attriax.sdk.AttriaxDeepLinkReferrerDetails
+import com.attriax.sdk.AttriaxDispatchResult
+import com.attriax.sdk.AttriaxDispatcher
 import com.attriax.sdk.AttriaxInstallReferrerDetails
-import com.attriax.sdk.AttriaxNotificationEventSource
-import com.attriax.sdk.AttriaxNotificationEventType
 import com.attriax.sdk.AttriaxRawDeepLinkEvent
 import com.attriax.sdk.AttriaxRawDeepLinkListener
 import com.attriax.sdk.AttriaxRevenueReceiptValidationResult
 import com.attriax.sdk.AttriaxSdk
-import com.attriax.sdk.AttriaxSdkSnapshot
-import com.attriax.sdk.AttriaxSkanCoarseValue
-import com.attriax.sdk.AttriaxSkanState
-import com.attriax.sdk.AttriaxSkanUpdateResult
 import com.attriax.sdk.AttriaxSynchronizationStateListener
 import com.attriax.sdk.internal.deeplink.AttriaxUri
 import org.json.JSONArray
@@ -51,9 +46,18 @@ interface AttriaxUnityBridgeListener {
  * This bridge is the Unity analog of the Flutter Android plugin
  * (`AttriaxAndroidPlugin.kt`): it builds one [Attriax] engine via [AttriaxSdk.create]
  * and exposes a flat [dispatch] command surface (method name + JSON args) plus a
- * [AttriaxUnityBridgeListener] callback for engine events. The command/serialization
- * mapping is reused wholesale from the Flutter plugin — the only difference is the
- * host (Unity `AndroidJavaObject` / `AndroidJavaProxy` instead of a Flutter
+ * [AttriaxUnityBridgeListener] callback for engine events.
+ *
+ * Like the Flutter plugin, [dispatch] forwards the bulk of the command surface to the
+ * KMP core's ONE canonical [AttriaxDispatcher.execute] table rather than owning a
+ * parallel `when`. A handful of commands stay engine-direct: those with no dispatch key
+ * (`tracking.enabled`, dynamic-link creation, the deep-link resolution waits) and those
+ * whose result the Unity C# mapper (`AttriaxAndroidEngineMapper`) reads from the
+ * wrapper's UPPERCASE-enum serializer shape (deep-link / referrer / receipt / sync
+ * state) rather than the canonical lowercase `.wire()` shape `execute` emits — see the
+ * per-branch notes in [dispatch]. Those deep-link serializers are also required by the
+ * event listeners, so they stay regardless. The only host difference vs Flutter is the
+ * transport (Unity `AndroidJavaObject` / `AndroidJavaProxy` instead of a Flutter
  * `MethodChannel` / `EventChannel`).
  *
  * Threading: [create] and [dispatch] are invoked from the C# side on a dedicated
@@ -91,229 +95,34 @@ class AttriaxUnityBridge private constructor(
     /**
      * Dispatch a single command by wire name. [argsJson] is the JSON object of
      * wire-keyed arguments (the same keys the Flutter `MethodChannel` and the KMP
-     * C-ABI `route(...)` use). Unknown methods throw.
+     * C-ABI `route(...)` use).
+     *
+     * Most commands forward 1:1 to the KMP core's canonical [AttriaxDispatcher.execute]
+     * (see [forward]); the branches below are the deliberate exceptions. Unknown methods
+     * throw (via [forward]'s [AttriaxDispatchResult.Unimplemented] arm).
      */
     fun dispatch(method: String, argsJson: String?): String? {
         val a = if (argsJson.isNullOrBlank()) JSONObject() else JSONObject(argsJson)
         return when (method) {
-            // ---- lifecycle ----
-            "flush" -> { engine.flush(); null }
-            "reset" -> { engine.reset(); null }
-            "submitAsaToken" -> { engine.submitAsaToken(str(a, "token") ?: ""); null }
-
-            // ---- primitive getters / setters ----
-            "getDeviceId" -> result(engine.deviceId)
-            "getIsInitialized" -> result(engine.isInitialized)
-            "getIsFirstLaunch" -> result(engine.isFirstLaunch)
-            "getSdkEnabled" -> result(engine.enabled)
-            "setSdkEnabled" -> { engine.enabled = bool(a, "enabled", true); null }
-            "getAnonymousTracking" -> result(engine.anonymousTrackingEnabled)
-            "setAnonymousTracking" -> { engine.anonymousTrackingEnabled = bool(a, "enabled", true); null }
+            // ---- engine-direct: no canonical dispatch key exists ----
+            // `tracking.enabled` is not modeled by AttriaxDispatcher.
             "getEventTrackingEnabled" -> result(engine.tracking.enabled)
             "setEventTrackingEnabled" -> { engine.tracking.enabled = bool(a, "enabled", true); null }
+
+            // ---- engine-direct: the Unity C# mapper (AttriaxAndroidEngineMapper) reads
+            //      these from the wrapper's serializer shape — UPPERCASE enum `.name`
+            //      (COLD_START / VERIFIED / REFERRER / the sync-state name) and the
+            //      `deepLinkUri` key — NOT the canonical lowercase `.wire()` / `deepLinkUrl`
+            //      shape that execute() emits. Forwarding would silently mis-map, so they
+            //      keep the local serializers (which the event listeners also depend on). ----
+
+            // Synchronization state (mapper switches on the UPPERCASE enum name).
             "getSynchronizationState" -> result(engine.synchronization.state.name)
-            "getIsSynchronized" -> result(engine.synchronization.isSynchronized)
-            "getIsWaitingForGdprConsent" -> result(engine.consent.gdpr.isWaitingForConsent)
-            "needsGdprConsent" -> result(engine.consent.gdpr.needsConsent(bool(a, "localOnly", false)))
+
+            // ATT: kept wrapper-side like the Flutter plugin — the Unity tracking-auth
+            // enum is richer than the engine's canonical status and the mapper consumes
+            // the `wireValue` directly.
             "getTrackingAuthorizationStatus" -> result(engine.consent.att.status.wireValue)
-            "getDoNotSell" -> result(engine.consent.ccpa.doNotSell)
-            "getUsPrivacy" -> result(engine.consent.ccpa.usPrivacy)
-            "getSdkSnapshot" -> resultObject(serializeSnapshot(engine.sdkSnapshot))
-            "getSkanState" -> resultObject(serializeSkanState(engine.skan.state))
-
-            // ---- referrer getters (KMP referrer getters are synchronous; the wire
-            //      timeoutMs is accepted for Flutter parity and ignored here) ----
-            "getOriginalInstallReferrer" ->
-                resultObject(serializeInstallReferrer(engine.referrer.getOriginalInstallReferrer()))
-            "getReinstallReferrer" ->
-                resultObject(serializeInstallReferrer(engine.referrer.getReinstallReferrer()))
-            "getRawInstallReferrer" -> result(engine.referrer.getRawInstallReferrer())
-            "getSessionReferrer" ->
-                resultObject(serializeDeepLinkReferrer(engine.referrer.getSessionReferrer()))
-            "getLatestDeepLinkReferrer" ->
-                resultObject(serializeDeepLinkReferrer(engine.referrer.getLatestDeepLinkReferrer()))
-
-            // ---- deep-link snapshot getters ----
-            "getLatestDeepLink" -> resultObject(serializeDeepLinkEvent(engine.deepLinks.latestDeepLink))
-            "getInitialDeepLink" -> resultObject(serializeDeepLinkEvent(engine.deepLinks.initialDeepLink))
-            "getRawInitialDeepLink" ->
-                resultObject(serializeRawDeepLinkEvent(engine.deepLinks.rawInitialDeepLink))
-            "getIsInitialDeepLinkResolved" -> result(engine.deepLinks.initialDeepLinkResolved)
-
-            // ---- tracking ----
-            "recordEvent" -> {
-                engine.recordEvent(
-                    name = str(a, "name") ?: "",
-                    eventData = map(a, "eventData"),
-                    flushImmediately = bool(a, "flushImmediately", false),
-                )
-                null
-            }
-            "recordPageView" -> {
-                engine.tracking.recordPageView(
-                    pageName = str(a, "pageName") ?: "",
-                    pageClass = str(a, "pageClass"),
-                    pageTitle = str(a, "pageTitle"),
-                    previousPageName = str(a, "previousPageName"),
-                    parameters = map(a, "parameters"),
-                    source = str(a, "source") ?: "manual",
-                    flushImmediately = bool(a, "flushImmediately", false),
-                )
-                null
-            }
-            "recordPurchase" -> {
-                engine.tracking.recordPurchase(
-                    revenue = double(a, "revenue", 0.0),
-                    currency = str(a, "currency") ?: "USD",
-                    revenueInMicros = bool(a, "revenueInMicros", false),
-                    purchaseType = str(a, "purchaseType"),
-                    productId = str(a, "productId"),
-                    transactionId = str(a, "transactionId"),
-                    originalTransactionId = str(a, "originalTransactionId"),
-                    validationProvider = str(a, "validationProvider"),
-                    validationEnvironment = str(a, "validationEnvironment"),
-                    purchaseToken = str(a, "purchaseToken"),
-                    receiptData = str(a, "receiptData"),
-                    signedPayload = str(a, "signedPayload"),
-                    receiptSignature = str(a, "receiptSignature"),
-                    isRenewal = kbool(a, "isRenewal"),
-                    quantity = int(a, "quantity", 1),
-                    store = str(a, "store"),
-                    packageName = str(a, "packageName"),
-                    voided = kbool(a, "voided"),
-                    test = kbool(a, "test"),
-                    validationId = str(a, "validationId"),
-                    metadata = map(a, "metadata"),
-                    flushImmediately = bool(a, "flushImmediately", true),
-                )
-                null
-            }
-            "recordRefund" -> {
-                engine.tracking.recordRefund(
-                    revenue = double(a, "revenue", 0.0),
-                    currency = str(a, "currency") ?: "USD",
-                    revenueInMicros = bool(a, "revenueInMicros", false),
-                    purchaseType = str(a, "purchaseType"),
-                    productId = str(a, "productId"),
-                    transactionId = str(a, "transactionId"),
-                    originalTransactionId = str(a, "originalTransactionId"),
-                    quantity = int(a, "quantity", 1),
-                    store = str(a, "store"),
-                    packageName = str(a, "packageName"),
-                    voided = kbool(a, "voided"),
-                    test = kbool(a, "test"),
-                    reason = str(a, "reason"),
-                    metadata = map(a, "metadata"),
-                    flushImmediately = bool(a, "flushImmediately", true),
-                )
-                null
-            }
-            "recordAdRevenue" -> {
-                engine.tracking.recordAdRevenue(
-                    revenue = double(a, "revenue", 0.0),
-                    currency = str(a, "currency") ?: "USD",
-                    revenueInMicros = bool(a, "revenueInMicros", false),
-                    adNetwork = str(a, "adNetwork"),
-                    adFormat = str(a, "adFormat"),
-                    adType = str(a, "adType"),
-                    adPlacement = str(a, "adPlacement"),
-                    test = kbool(a, "test"),
-                    metadata = map(a, "metadata"),
-                    flushImmediately = bool(a, "flushImmediately", true),
-                )
-                null
-            }
-            "recordAdEvent" -> {
-                // The platform interface sends the resolved reserved event name
-                // (`eventName`, e.g. "ad_show_failed"); resolve it back to the enum
-                // whose `eventName` matches so the engine's field->eventData lowering
-                // runs. Unknown names fall back to REQUEST.
-                engine.tracking.recordAdEvent(
-                    type = adEventType(str(a, "eventName")),
-                    adNetwork = str(a, "adNetwork"),
-                    mediationNetwork = str(a, "mediationNetwork"),
-                    adUnitId = str(a, "adUnitId"),
-                    adPlacement = str(a, "adPlacement"),
-                    adFormat = str(a, "adFormat"),
-                    adType = str(a, "adType"),
-                    failureReason = str(a, "failureReason"),
-                    loadLatencyMs = kdouble(a, "loadLatencyMs"),
-                    rewardType = str(a, "rewardType"),
-                    rewardAmount = kdouble(a, "rewardAmount"),
-                    test = kbool(a, "test"),
-                    metadata = map(a, "metadata"),
-                    flushImmediately = bool(a, "flushImmediately", true),
-                )
-                null
-            }
-            "recordNotification" -> {
-                engine.tracking.recordNotification(
-                    type = notificationType(str(a, "type")),
-                    notificationId = str(a, "notificationId") ?: "",
-                    linkId = str(a, "linkId"),
-                    campaignId = str(a, "campaignId"),
-                    title = str(a, "title"),
-                    source = notificationSource(str(a, "source")),
-                    payload = map(a, "payload"),
-                    metadata = map(a, "metadata"),
-                    flushImmediately = bool(a, "flushImmediately", false),
-                )
-                null
-            }
-            "recordError" -> {
-                engine.tracking.recordError(
-                    error = Throwable(str(a, "message") ?: str(a, "error") ?: "error"),
-                    stackTrace = str(a, "stackTrace"),
-                    fatal = bool(a, "fatal", false),
-                    source = str(a, "source") ?: "manual",
-                    reason = str(a, "reason"),
-                    metadata = map(a, "metadata"),
-                )
-                null
-            }
-            "setUser" -> {
-                engine.tracking.setUser(userId = str(a, "userId"), userName = str(a, "userName"))
-                null
-            }
-            "setUserProperty" -> {
-                engine.tracking.setUserProperty(str(a, "name") ?: "", jsonValue(a.opt("value")))
-                null
-            }
-            "setUserProperties" -> {
-                engine.tracking.setUserProperties(map(a, "properties") ?: emptyMap())
-                null
-            }
-            "clearUserProperties" -> {
-                engine.tracking.clearUserProperties(strList(a, "propertyNames"))
-                null
-            }
-            "registerPushToken" -> {
-                val token = str(a, "token")
-                val metadata = map(a, "metadata")
-                if (str(a, "provider") == "apns") {
-                    engine.tracking.registerApplePushToken(token, metadata)
-                } else {
-                    engine.tracking.registerFirebaseMessagingToken(token, metadata)
-                }
-                null
-            }
-
-            // ---- consent (GDPR / CCPA / ATT) ----
-            "setGdprConsent" -> {
-                engine.consent.gdpr.setConsent(
-                    analytics = bool(a, "analytics", false),
-                    attribution = bool(a, "attribution", false),
-                    adEvents = bool(a, "adEvents", false),
-                )
-                null
-            }
-            "setGdprConsentNotRequired" -> { engine.consent.gdpr.setNotRequired(); null }
-            "resetGdprConsent" -> { engine.consent.gdpr.reset(); null }
-            "requestGdprDataErasure" -> { engine.consent.gdpr.requestDataErasure(); null }
-            "setCcpaConsent" -> {
-                engine.consent.ccpa.set(doNotSell = kbool(a, "doNotSell"), usPrivacy = str(a, "usPrivacy"))
-                null
-            }
             "setTrackingAuthorizationStatus" -> {
                 engine.consent.att.setStatus(attStatus(str(a, "status")))
                 null
@@ -321,25 +130,12 @@ class AttriaxUnityBridge private constructor(
             "requestTrackingAuthorization" ->
                 result(engine.consent.att.requestAuthorization(klong(a, "timeoutMs")).wireValue)
 
-            // ---- SKAN ----
-            "updateSkanConversionValue" -> resultObject(
-                serializeSkanResult(
-                    engine.skan.updateConversionValue(
-                        fineValue = int(a, "fineValue", 0),
-                        coarseValue = coarse(str(a, "coarseValue")),
-                        lockWindow = bool(a, "lockWindow", false),
-                    ),
-                ),
-            )
-
-            // ---- deep links ----
-            "handleIncomingLink" -> {
-                engine.deepLinks.handleUri(
-                    rawUri = str(a, "uri") ?: "",
-                    isInitialLink = bool(a, "isInitialLink", false),
-                )
-                null
-            }
+            // Deep-link snapshot / resolution getters (UPPERCASE trigger + `rawEvent`).
+            "getLatestDeepLink" -> resultObject(serializeDeepLinkEvent(engine.deepLinks.latestDeepLink))
+            "getInitialDeepLink" -> resultObject(serializeDeepLinkEvent(engine.deepLinks.initialDeepLink))
+            "getRawInitialDeepLink" ->
+                resultObject(serializeRawDeepLinkEvent(engine.deepLinks.rawInitialDeepLink))
+            "getIsInitialDeepLinkResolved" -> result(engine.deepLinks.initialDeepLinkResolved)
             "recordDeepLink" -> resultObject(
                 serializeDeepLinkEvent(
                     engine.deepLinks.recordDeepLink(
@@ -357,9 +153,20 @@ class AttriaxUnityBridge private constructor(
                     if (raw == null) null else serializeDeepLinkEvent(engine.deepLinks.waitResolution(raw)),
                 )
             }
+            // No dispatch key for dynamic-link creation; stays engine-direct.
             "createDynamicLink" -> resultObject(serializeCreateDynamicLink(createDynamicLink(a)))
 
-            // ---- receipt validation ----
+            // Referrer getters (mapper expects UPPERCASE `attributionType` + `deepLinkUri`).
+            "getOriginalInstallReferrer" ->
+                resultObject(serializeInstallReferrer(engine.referrer.getOriginalInstallReferrer()))
+            "getReinstallReferrer" ->
+                resultObject(serializeInstallReferrer(engine.referrer.getReinstallReferrer()))
+            "getSessionReferrer" ->
+                resultObject(serializeDeepLinkReferrer(engine.referrer.getSessionReferrer()))
+            "getLatestDeepLinkReferrer" ->
+                resultObject(serializeDeepLinkReferrer(engine.referrer.getLatestDeepLinkReferrer()))
+
+            // Receipt validation (mapper switches on the UPPERCASE status name).
             "validateReceipt" -> resultObject(
                 serializeReceipt(
                     engine.validateReceipt(
@@ -373,9 +180,38 @@ class AttriaxUnityBridge private constructor(
                 ),
             )
 
-            else -> throw IllegalArgumentException("Unknown Attriax command: $method")
+            // ---- name remaps: the C# platform's command name differs from the key ----
+            "getSdkEnabled" -> forward("getEnabled", a)
+            "setSdkEnabled" -> forward("setEnabled", a)
+            // One C# command → the provider-split registration dispatch keys.
+            "registerPushToken" -> forward(
+                if (str(a, "provider") == "apns") "registerApplePushToken" else "registerFirebaseMessagingToken",
+                a,
+            )
+
+            // ---- everything else forwards 1:1 to the canonical dispatch table.
+            //      (`recordAdEvent` crosses the reserved name under `type`, `recordError`
+            //      under `message` — both aligned with AttriaxDispatcher on the C# side.) ----
+            else -> forward(method, a)
         }
     }
+
+    /**
+     * Forward [method] to the KMP core's canonical [AttriaxDispatcher.execute] and adapt
+     * its [AttriaxDispatchResult] to the bridge's JSON reply:
+     *  - [AttriaxDispatchResult.Ok] → a `{"result": <value>}` envelope (void commands
+     *    carry `null`, which the C# `CallVoid` path ignores);
+     *  - [AttriaxDispatchResult.Err] → a thrown exception (surfaced as a faulted C# Task,
+     *    matching the old hand-written dispatch's throw-on-error contract); and
+     *  - [AttriaxDispatchResult.Unimplemented] → an unknown-command throw.
+     */
+    private fun forward(method: String, a: JSONObject): String? =
+        when (val outcome = AttriaxDispatcher.execute(engine, method, jsonToMap(a))) {
+            is AttriaxDispatchResult.Ok -> resultEnvelope(outcome.value)
+            is AttriaxDispatchResult.Err -> throw IllegalStateException(outcome.message)
+            is AttriaxDispatchResult.Unimplemented ->
+                throw IllegalArgumentException("Unknown Attriax command: $method")
+        }
 
     /** Detach engine listeners and dispose the runtime (KMP `Attriax.dispose`). */
     fun destroy() {
@@ -431,30 +267,11 @@ class AttriaxUnityBridge private constructor(
     }
 
     // -------------------------------------------------------------------------
-    // Serialization (KMP result -> JSON for the C# marshaller). Best-effort, keyed
-    // to the C# type surface; mirrors the Flutter plugin's serializers.
+    // Serialization (KMP result -> JSON for the C# marshaller). Only the shapes the
+    // C# mapper reads from a wrapper-specific form (UPPERCASE enum `.name`, `deepLinkUri`)
+    // remain here; snapshot / skan maps are produced by AttriaxDispatcher.execute and
+    // forwarded verbatim. Best-effort, keyed to the C# type surface.
     // -------------------------------------------------------------------------
-
-    private fun serializeSnapshot(s: AttriaxSdkSnapshot): JSONObject = JSONObject()
-        .put("apiVersion", s.apiVersion)
-        .put("packageVersion", s.packageVersion)
-        .put("metadata", anyMapToJson(s.metadata))
-
-    private fun serializeSkanState(s: AttriaxSkanState?): JSONObject? {
-        if (s == null) return null
-        return JSONObject()
-            .put("enabled", s.enabled)
-            .put("fineValue", s.fineValue)
-            .put("coarseValue", s.coarseValue?.wireValue)
-            .put("lockWindow", s.lockWindow)
-    }
-
-    private fun serializeSkanResult(r: AttriaxSkanUpdateResult): JSONObject = JSONObject()
-        .put("status", r.status.wireValue)
-        .put("message", r.message)
-        .put("fineValue", r.fineValue)
-        .put("coarseValue", r.coarseValue?.wireValue)
-        .put("lockWindow", r.lockWindow)
 
     private fun serializeRawDeepLinkEvent(e: AttriaxRawDeepLinkEvent?): JSONObject? {
         if (e == null) return null
@@ -629,6 +446,15 @@ class AttriaxUnityBridge private constructor(
         private fun resultObject(value: JSONObject?): String =
             JSONObject().put("result", value ?: JSONObject.NULL).toString()
 
+        /**
+         * Wrap a canonical [AttriaxDispatcher] result value (primitive / `Map` / `List` /
+         * null) in the `{"result": …}` envelope, recursively lowering `Map`/`List` to
+         * `org.json` via [anyToJson] so nested shapes (snapshot metadata, skan maps)
+         * cross intact.
+         */
+        private fun resultEnvelope(value: Any?): String =
+            JSONObject().put("result", anyToJson(value)).toString()
+
         // ---- JSON readers (JSONObject-backed; mirror the Flutter plugin's Map helpers) ----
 
         private fun str(m: JSONObject, key: String): String? = m.opt(key) as? String
@@ -644,11 +470,6 @@ class AttriaxUnityBridge private constructor(
 
         private fun klong(m: JSONObject, key: String): Long? =
             if (m.has(key) && !m.isNull(key)) m.optLong(key) else null
-
-        private fun double(m: JSONObject, key: String, default: Double): Double = m.optDouble(key, default)
-
-        private fun kdouble(m: JSONObject, key: String): Double? =
-            if (m.has(key) && !m.isNull(key)) m.optDouble(key) else null
 
         private fun map(m: JSONObject, key: String): Map<String, Any?>? {
             val obj = m.optJSONObject(key) ?: return null
@@ -687,23 +508,6 @@ class AttriaxUnityBridge private constructor(
             "restricted" -> AttriaxAttStatus.RESTRICTED
             "not_determined", "notDetermined" -> AttriaxAttStatus.NOT_DETERMINED
             else -> AttriaxAttStatus.UNKNOWN
-        }
-
-        private fun coarse(wire: String?): AttriaxSkanCoarseValue? {
-            val normalized = wire?.lowercase() ?: return null
-            return AttriaxSkanCoarseValue.entries.firstOrNull { it.wireValue == normalized }
-        }
-
-        private fun adEventType(eventName: String?): AttriaxAdEventType =
-            AttriaxAdEventType.entries.firstOrNull { it.eventName == eventName } ?: AttriaxAdEventType.REQUEST
-
-        private fun notificationType(wire: String?): AttriaxNotificationEventType =
-            AttriaxNotificationEventType.entries.firstOrNull { it.wireValue == wire }
-                ?: AttriaxNotificationEventType.RECEIVED
-
-        private fun notificationSource(wire: String?): AttriaxNotificationEventSource? {
-            if (wire == null) return null
-            return AttriaxNotificationEventSource.entries.firstOrNull { it.wireValue == wire }
         }
 
         // ---- JSON writers ----

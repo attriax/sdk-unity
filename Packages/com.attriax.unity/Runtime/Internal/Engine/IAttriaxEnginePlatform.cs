@@ -40,8 +40,8 @@ namespace Attriax.Unity.Internal.Engine
     /// <c>collectInstallReferrer</c>, <c>readAttributionClipboard</c>,
     /// <c>collectWebViewUserAgent</c>, <c>setAutomaticCrashReportingEnabled</c>,
     /// <c>consumePendingCrashReport</c>, <c>openBrowserUrl</c>) are NOT mirrored
-    /// here: in Unity those signals are collected C#-side by
-    /// <c>AttriaxNativeBridge</c>, not routed through the engine platform.
+    /// here: the KMP core's per-platform adapters self-collect those signals now, so
+    /// the engine platform does not surface them.
     /// </para>
     /// </remarks>
     internal interface IAttriaxEnginePlatform

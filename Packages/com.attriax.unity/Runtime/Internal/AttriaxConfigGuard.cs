@@ -7,18 +7,17 @@ namespace Attriax.Unity.Internal
     /// Single source of truth for the fail-fast <see cref="AttriaxConfig"/> validation
     /// contract the Unity public API promises at construction time: a project token is
     /// required, and an explicitly-set API base URL must use HTTPS (localhost may use
-    /// HTTP for development). Both engines call this so <c>new Attriax(config)</c> throws
-    /// identically regardless of the backing engine — the managed C# engine
-    /// (<c>AttriaxRuntime</c>, whose <c>NormalizeConfig</c> mirrors these exact
-    /// checks) and the native engine adapter
-    /// (<see cref="Engine.AttriaxEnginePlatformAdapter"/>), which lowers config to the
-    /// native core and would otherwise skip this fail-fast validation entirely.
+    /// HTTP for development). The native engine adapter
+    /// (<see cref="Engine.AttriaxEnginePlatformAdapter"/>) lowers config to the native
+    /// core and would otherwise skip this fail-fast validation entirely, so it calls this
+    /// first — <c>new Attriax(config)</c> throws before any native work begins.
     /// </summary>
     internal static class AttriaxConfigGuard
     {
         /// <summary>
         /// Throws when <paramref name="config"/> is missing a project token or specifies
-        /// an insecure/invalid remote API base URL. Mirrors <c>AttriaxRuntime.NormalizeConfig</c>.
+        /// an insecure/invalid remote API base URL, matching the KMP core's own config
+        /// normalization so the fail-fast contract is identical across bindings.
         /// </summary>
         public static void Validate(AttriaxConfig config)
         {

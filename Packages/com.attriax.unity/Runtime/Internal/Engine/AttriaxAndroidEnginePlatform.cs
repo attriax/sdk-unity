@@ -197,9 +197,11 @@ namespace Attriax.Unity.Internal.Engine
             bool? test = null,
             IDictionary<string, object>? metadata = null,
             bool flushImmediately = true) =>
-            // The JNI bridge crosses the reserved event name under `eventName`.
+            // The reserved event name crosses under the canonical `type` key (matching
+            // AttriaxDispatcher / the iOS C-ABI path): AttriaxUnityBridge forwards to
+            // AttriaxDispatcher.execute, which resolves the AttriaxAdEventType from `type`.
             CallVoid("recordAdEvent", AttriaxEngineArgs.RecordAdEvent(
-                type: null, eventName: eventName, adNetwork, mediationNetwork, adUnitId, adPlacement,
+                type: eventName, eventName: null, adNetwork, mediationNetwork, adUnitId, adPlacement,
                 adFormat, adType, failureReason, loadLatencyMs, rewardType, rewardAmount, test,
                 metadata, flushImmediately));
 

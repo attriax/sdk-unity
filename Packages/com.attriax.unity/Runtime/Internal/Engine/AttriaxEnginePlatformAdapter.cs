@@ -41,9 +41,9 @@ namespace Attriax.Unity.Internal.Engine
     /// and the platform-event subscriptions are torn down on <see cref="Dispose"/>.</item>
     /// </list>
     /// <para>
-    /// Reads that a binding may not implement degrade to the same benign default the
-    /// managed C# engine would return rather than throwing into app code, mirroring
-    /// the Flutter bridge's <c>_readOr</c> / <c>_fireAndForget</c> contract.
+    /// Reads that a binding may not implement degrade to a benign default rather than
+    /// throwing into app code, mirroring the Flutter native bridge's <c>_readOr</c> /
+    /// <c>_fireAndForget</c> contract.
     /// </para>
     /// </remarks>
     internal sealed class AttriaxEnginePlatformAdapter : IAttriaxEngine
@@ -79,9 +79,9 @@ namespace Attriax.Unity.Internal.Engine
 
         public AttriaxEnginePlatformAdapter(AttriaxConfig config, IAttriaxEnginePlatform platform)
         {
-            // Fail fast with the same contract the managed C# engine enforces, so the
-            // native path rejects a missing token / insecure remote URL at construction
-            // rather than deferring to an opaque native-side failure.
+            // Fail fast with the shared AttriaxConfigGuard contract, so the native path
+            // rejects a missing token / insecure remote URL at construction rather than
+            // deferring to an opaque native-side failure.
             AttriaxConfigGuard.Validate(config);
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _platform = platform ?? throw new ArgumentNullException(nameof(platform));
@@ -500,6 +500,25 @@ namespace Attriax.Unity.Internal.Engine
         }
 
         // ------------------------------------------------------------------
+        // Consent: CCPA
+        // ------------------------------------------------------------------
+
+        public Task<bool?> GetCcpaDoNotSellAsync()
+        {
+            return ReadOrAsync(() => _platform.GetDoNotSell(), (bool?)null);
+        }
+
+        public Task<string?> GetCcpaUsPrivacyAsync()
+        {
+            return ReadOrAsync(() => _platform.GetUsPrivacy(), (string?)null);
+        }
+
+        public Task SetCcpaConsentAsync(bool? doNotSell, string? usPrivacy)
+        {
+            return FireAndForget(() => _platform.SetCcpaConsent(doNotSell, usPrivacy), "setCcpaConsent");
+        }
+
+        // ------------------------------------------------------------------
         // Deep links
         // ------------------------------------------------------------------
 
@@ -748,8 +767,8 @@ namespace Attriax.Unity.Internal.Engine
         }
 
         /// <summary>
-        /// Mirrors the managed engine's referrer contract: <c>null</c> before init or
-        /// while disabled; degrades any binding failure to <c>null</c>.
+        /// Referrer read contract: <c>null</c> before init or while disabled; degrades any
+        /// binding failure to <c>null</c>.
         /// </summary>
         private async Task<T?> ReadReferrerAsync<T>(Func<Task<T?>> reader)
             where T : class
@@ -869,7 +888,7 @@ namespace Attriax.Unity.Internal.Engine
         /// <summary>
         /// A minimal multicast fan-out backing the facade <c>Subscribe*</c> handles.
         /// Each subscription returns an <see cref="IDisposable"/> that detaches the
-        /// listener, mirroring the managed engine's <c>AttriaxEventHub</c>.
+        /// listener, mirroring the KMP core's event-hub fan-out.
         /// </summary>
         private sealed class Broadcast<T>
         {
