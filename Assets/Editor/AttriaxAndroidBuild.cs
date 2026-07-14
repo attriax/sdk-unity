@@ -120,45 +120,6 @@ namespace Attriax.Unity.Editor
             {
                 PatchManifest(manifest);
             }
-
-            // The androidlib pulls `com.attriax:core` from mavenLocal, but Unity's
-            // generated settings.gradle uses RepositoriesMode.PREFER_SETTINGS — which
-            // ignores project-level repositories, so mavenLocal is never searched.
-            // Inject it into the settings-level dependencyResolutionManagement block.
-            PatchSettingsGradle(Path.Combine(root, "settings.gradle"));
-        }
-
-        private static void PatchSettingsGradle(string settingsPath)
-        {
-            if (!File.Exists(settingsPath))
-            {
-                return;
-            }
-
-            var text = File.ReadAllText(settingsPath);
-            if (text.Contains("mavenLocal()"))
-            {
-                return;
-            }
-
-            // Target the dependencyResolutionManagement { repositories { … } } block
-            // (not pluginManagement's) so every module can resolve com.attriax:core.
-            var drmIdx = text.IndexOf("dependencyResolutionManagement", StringComparison.Ordinal);
-            if (drmIdx < 0)
-            {
-                return;
-            }
-
-            var reposIdx = text.IndexOf("repositories {", drmIdx, StringComparison.Ordinal);
-            if (reposIdx < 0)
-            {
-                return;
-            }
-
-            var insertAt = reposIdx + "repositories {".Length;
-            text = text.Insert(insertAt, "\n        mavenLocal()");
-            File.WriteAllText(settingsPath, text);
-            Debug.Log($"[AttriaxCleartextManifestPatch] Added mavenLocal() to {settingsPath}");
         }
 
         private static void PatchManifest(string manifestPath)

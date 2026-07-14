@@ -45,9 +45,6 @@ android {
 repositories {
     google()
     mavenCentral()
-    // The KMP core is published to the local Maven repository via
-    // `./gradlew :core:publishToMavenLocal` in sdk-kmp (child-before-root).
-    mavenLocal()
 }
 
 dependencies {
