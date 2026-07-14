@@ -53,7 +53,7 @@ repositories {
 dependencies {
     // The shared Kotlin Multiplatform engine (Android AAR variant, resolved via Gradle
     // module metadata from `com.attriax:core` -> `com.attriax:core-android`).
-    implementation 'com.attriax:core:0.5.0'
+    implementation 'com.attriax:core:0.6.0'
 
     implementation 'androidx.activity:activity:1.9.0'
     implementation 'androidx.core:core:1.13.1'
