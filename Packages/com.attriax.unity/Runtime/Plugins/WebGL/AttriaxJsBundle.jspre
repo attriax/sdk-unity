@@ -19,7 +19,7 @@ globalThis.AttriaxJs = (function (exports) {
 
   // src/types.ts
   var attriaxSdkApiVersion = "v1";
-  var attriaxSdkPackageVersion = "0.5.1";
+  var attriaxSdkPackageVersion = "0.6.0";
   var AttributionType = /* @__PURE__ */ ((AttributionType2) => {
     AttributionType2["Referrer"] = "referrer";
     AttributionType2["Fingerprint"] = "fingerprint";
@@ -77,7 +77,51 @@ globalThis.AttriaxJs = (function (exports) {
   var AttriaxConsent = class {
     constructor(client2) {
       __publicField(this, "gdpr");
+      __publicField(this, "ccpa");
       this.gdpr = new AttriaxGdprConsent(client2);
+      this.ccpa = new AttriaxCcpaConsent(client2);
+    }
+  };
+  var AttriaxCcpaConsent = class {
+    constructor(client2) {
+      __publicField(this, "client", client2);
+    }
+    /**
+     * Current CCPA do-not-sell election: the value supplied via
+     * {@link AttriaxConfig.doNotSell} or {@link setDoNotSell}/{@link set}, else
+     * `null` (unset → omitted from the wire).
+     */
+    get doNotSell() {
+      return this.client.currentCcpaDoNotSell;
+    }
+    /**
+     * Current raw IAB US-Privacy string: the value supplied via
+     * {@link AttriaxConfig.usPrivacy} or {@link setUsPrivacy}/{@link set}, else
+     * `null` (unset/blank → omitted from the wire).
+     */
+    get usPrivacy() {
+      return this.client.currentCcpaUsPrivacy;
+    }
+    /**
+     * Sets the CCPA do-not-sell election. It is emitted (unless `null`) top-level
+     * on the next app-open / identify. An explicit `false` is sent (it may clear a
+     * prior server-side latch); `null` returns to the omitted (unset) state.
+     */
+    setDoNotSell(value) {
+      this.client.setCcpaDoNotSell(value);
+    }
+    /**
+     * Sets the raw IAB US-Privacy string (for example `1YYN`). It is emitted
+     * (unless `null`/blank) top-level on the next app-open / identify, capped at 16
+     * characters. `null`/blank returns to the omitted state.
+     */
+    setUsPrivacy(value) {
+      this.client.setCcpaUsPrivacy(value);
+    }
+    /** Combined setter for both CCPA fields (see {@link setDoNotSell}/{@link setUsPrivacy}). */
+    set(doNotSell, usPrivacy) {
+      this.client.setCcpaDoNotSell(doNotSell);
+      this.client.setCcpaUsPrivacy(usPrivacy);
     }
   };
   var AttriaxGdprConsent = class {
@@ -607,6 +651,24 @@ globalThis.AttriaxJs = (function (exports) {
     return false;
   }
 
+  // src/internal/ad-events.ts
+  var ATTRIAX_AD_EVENT_NAME_BY_TYPE = {
+    request: "ad_request",
+    load: "ad_load",
+    load_failed: "ad_load_failed",
+    show: "ad_show",
+    show_failed: "ad_show_failed",
+    impression: "ad_impression",
+    click: "ad_click",
+    dismiss: "ad_dismiss",
+    reward: "ad_reward"
+  };
+  function isAdEventName(eventName) {
+    return eventName === "ad_revenue" || Object.values(ATTRIAX_AD_EVENT_NAME_BY_TYPE).includes(
+      eventName
+    );
+  }
+
   // src/internal/activation-coordinator.ts
   var AttriaxActivationCoordinator = class {
     constructor(options) {
@@ -957,7 +1019,10 @@ globalThis.AttriaxJs = (function (exports) {
         ...currentSession ? {
           sessionId: currentSession.id,
           sessionStartedAt: currentSession.startedAt.toISOString()
-        } : {}
+        } : {},
+        // CCPA fields ride top-level (like `attStatus`), never nested under
+        // `device`. A null doNotSell and a null/blank usPrivacy are omitted.
+        ...this.options.ccpaState.toWireFields()
       };
     }
     completeScheduled() {
@@ -1290,6 +1355,48 @@ globalThis.AttriaxJs = (function (exports) {
         enabled: resolvedEnabled,
         captureInitialUrlEnabled: options.captureInitialUrlEnabled
       });
+    }
+  };
+
+  // src/internal/ccpa-state.ts
+  var AttriaxCcpaState = class {
+    constructor(seed) {
+      __publicField(this, "doNotSellValue");
+      __publicField(this, "usPrivacyValue");
+      this.doNotSellValue = seed.doNotSell ?? null;
+      this.usPrivacyValue = seed.usPrivacy ?? null;
+    }
+    /** Current do-not-sell election, or `null` when unset. */
+    get doNotSell() {
+      return this.doNotSellValue;
+    }
+    /** Current raw IAB US-Privacy string, or `null` when unset. */
+    get usPrivacy() {
+      return this.usPrivacyValue;
+    }
+    setDoNotSell(value) {
+      this.doNotSellValue = value ?? null;
+    }
+    setUsPrivacy(value) {
+      this.usPrivacyValue = value ?? null;
+    }
+    /**
+     * Resolves the top-level CCPA wire fields for an app-open / identify request.
+     *
+     * A `null` `doNotSell` is omitted; an explicit `true`/`false` is emitted (a
+     * deliberate `false` may clear a prior server-side latch). A `null`/blank
+     * `usPrivacy` is omitted; otherwise it is emitted, defensively capped at 16
+     * characters (the API DTO's `@MaxLength(16)`).
+     */
+    toWireFields() {
+      const fields = {};
+      if (this.doNotSellValue != null) {
+        fields.doNotSell = this.doNotSellValue;
+      }
+      if (this.usPrivacyValue != null && this.usPrivacyValue.trim().length > 0) {
+        fields.usPrivacy = this.usPrivacyValue.slice(0, 16);
+      }
+      return fields;
     }
   };
 
@@ -3271,6 +3378,8 @@ globalThis.AttriaxJs = (function (exports) {
       automaticPageTracking: config.automaticPageTracking ?? true,
       gdprEnabled: config.gdprEnabled ?? false,
       anonymousTracking: config.anonymousTracking ?? true,
+      ...typeof config.doNotSell === "boolean" ? { doNotSell: config.doNotSell } : {},
+      ...config.usPrivacy != null ? { usPrivacy: config.usPrivacy } : {},
       sessionHeartbeatIntervalMs: config.sessionHeartbeatIntervalMs != null && config.sessionHeartbeatIntervalMs > 0 ? config.sessionHeartbeatIntervalMs : defaultSessionHeartbeatIntervalMs,
       firstLaunchSessionHeartbeatIntervalMs: config.firstLaunchSessionHeartbeatIntervalMs != null && config.firstLaunchSessionHeartbeatIntervalMs > 0 ? config.firstLaunchSessionHeartbeatIntervalMs : defaultFirstLaunchSessionHeartbeatIntervalMs,
       eventFlushIntervalMs,
@@ -4567,6 +4676,30 @@ globalThis.AttriaxJs = (function (exports) {
     }
   };
 
+  // src/internal/batch-identity.ts
+  function canShareBatchIdentity(left, right) {
+    return left.payload.deviceId === right.payload.deviceId && left.payload.deviceIdSource === right.payload.deviceIdSource;
+  }
+
+  // src/internal/request-body-builder.ts
+  function mapUserRequestToWire(payload) {
+    const { userId, userName, clearUser, ...rest } = payload;
+    return {
+      ...rest,
+      ...userId != null ? { externalUserId: userId } : {},
+      ...userName != null ? { externalUserName: userName } : {},
+      ...clearUser != null ? { clearExternalUser: clearUser } : {}
+    };
+  }
+  function toWireRequestBody(kind, payload) {
+    if (kind === "user") {
+      return mapUserRequestToWire(
+        payload
+      );
+    }
+    return payload;
+  }
+
   // src/internal/request-dispatcher.ts
   var SDK_BATCH_MAX_ITEM_COUNT = 100;
   var SDK_BATCH_MAX_BODY_BYTES = 256 * 1024;
@@ -4678,7 +4811,7 @@ globalThis.AttriaxJs = (function (exports) {
         case "user": {
           const userEntry = entry;
           await this.sendGeneratedRequest({
-            payload: this.mapUserPayload(userEntry.payload),
+            payload: mapUserRequestToWire(userEntry.payload),
             invoke: (body) => sdkControllerSetUserV1({
               body,
               client: this.options.sdkClient,
@@ -4789,27 +4922,13 @@ globalThis.AttriaxJs = (function (exports) {
         ...payload
       };
     }
-    mapUserPayload(payload) {
-      const {
-        userId,
-        userName,
-        clearUser,
-        ...rest
-      } = payload;
-      return {
-        ...rest,
-        ...userId != null ? { externalUserId: userId } : {},
-        ...userName != null ? { externalUserName: userName } : {},
-        ...clearUser != null ? { clearExternalUser: clearUser } : {}
-      };
-    }
     assertSharedBatchIdentity(entries) {
       const firstEntry = entries[0];
       if (!firstEntry) {
         return;
       }
       for (const entry of entries.slice(1)) {
-        if (!this.canShareBatchIdentity(firstEntry, entry)) {
+        if (!canShareBatchIdentity(firstEntry, entry)) {
           throw new AttriaxApiError(
             "Attriax batch entries must share the same device identity.",
             400,
@@ -4818,9 +4937,6 @@ globalThis.AttriaxJs = (function (exports) {
           );
         }
       }
-    }
-    canShareBatchIdentity(left, right) {
-      return left.payload.deviceId === right.payload.deviceId && left.payload.deviceIdSource === right.payload.deviceIdSource;
     }
     fitsBatchEnvelope(entries) {
       if (entries.length === 0) {
@@ -4886,16 +5002,14 @@ globalThis.AttriaxJs = (function (exports) {
       };
     }
     // Normalize a queued entry to its wire shape before it goes into a batch
-    // item body. User entries store the public field names (userId/userName/
-    // clearUser); they must be mapped to the wire DTO (externalUserId/
-    // externalUserName/clearExternalUser) exactly like the single-request path
-    // (see mapUserPayload usage above), otherwise the batch item body carries
-    // unknown properties the API rejects with HTTP 400.
+    // item body. Routes through the shared {@link toWireRequestBody} builder so
+    // the batch item body carries exactly the same wire fields as the
+    // single-request path. `user` entries store the public field names
+    // (userId/userName/clearUser) which the builder maps to the wire DTO
+    // (externalUserId/externalUserName/clearExternalUser); skipping that mapping
+    // here is the batch-path drift the API rejects with HTTP 400.
     toBatchItemPayload(entry) {
-      if (entry.kind === "user") {
-        return this.mapUserPayload(entry.payload);
-      }
-      return entry.payload;
+      return toWireRequestBody(entry.kind, entry.payload);
     }
     stripBatchSharedIdentity(payload) {
       const {
@@ -6067,7 +6181,7 @@ globalThis.AttriaxJs = (function (exports) {
           break;
         }
         const firstEntry = entries[0];
-        if (firstEntry && !this.canShareBatchIdentity(firstEntry, entry)) {
+        if (firstEntry && !canShareBatchIdentity(firstEntry, entry)) {
           break;
         }
         entries.push(entry);
@@ -6088,9 +6202,6 @@ globalThis.AttriaxJs = (function (exports) {
         return { batch: [], dropped: true };
       }
       return { batch: entries.slice(0, 1), dropped: false };
-    }
-    canShareBatchIdentity(left, right) {
-      return left.payload.deviceId === right.payload.deviceId && left.payload.deviceIdSource === right.payload.deviceIdSource;
     }
     resolvePending(id, value) {
       const pending = this.pendingRequests.get(id);
@@ -6439,6 +6550,10 @@ globalThis.AttriaxJs = (function (exports) {
         payload: {
           deviceId: this.options.contextManager.requireDeviceId(),
           deviceIdSource: this.options.contextManager.requireDeviceIdSource(),
+          // CCPA fields ride identify top-level, same omit/cap rules as the
+          // app-open; snapshotted here so the next identify reflects the current
+          // election.
+          ...this.options.ccpaState.toWireFields(),
           ...payload
         }
       }, {
@@ -6550,22 +6665,20 @@ globalThis.AttriaxJs = (function (exports) {
     }
     return void 0;
   }
-  function isAdEventName(eventName) {
-    return eventName === "ad_revenue" || eventName === "ad_request" || eventName === "ad_load" || eventName === "ad_load_failed" || eventName === "ad_show" || eventName === "ad_show_failed" || eventName === "ad_impression" || eventName === "ad_click" || eventName === "ad_dismiss" || eventName === "ad_reward";
-  }
 
   // src/internal/attriax-client.ts
-  var ATTRIAX_AD_EVENT_NAME_BY_TYPE = {
-    request: "ad_request",
-    load: "ad_load",
-    load_failed: "ad_load_failed",
-    show: "ad_show",
-    show_failed: "ad_show_failed",
-    impression: "ad_impression",
-    click: "ad_click",
-    dismiss: "ad_dismiss",
-    reward: "ad_reward"
-  };
+  var CONSENT_DEVICE_IDENTITY_KINDS = [
+    "event",
+    "notification",
+    "trackCrash",
+    "session",
+    "deepLinkResolve"
+  ];
+  function hasConsentDeviceIdentityPayload(entry) {
+    return CONSENT_DEVICE_IDENTITY_KINDS.includes(
+      entry.kind
+    );
+  }
   var AttriaxClient = class {
     constructor(config) {
       /**
@@ -6577,6 +6690,7 @@ globalThis.AttriaxJs = (function (exports) {
       __publicField(this, "deepLinks");
       __publicField(this, "referrer");
       __publicField(this, "configValue");
+      __publicField(this, "ccpaState");
       __publicField(this, "logger");
       __publicField(this, "storageManager");
       __publicField(this, "sdkClient");
@@ -6606,6 +6720,10 @@ globalThis.AttriaxJs = (function (exports) {
       __publicField(this, "disposed", false);
       __publicField(this, "captureInitialUrlEnabled", true);
       this.configValue = normalizeConfig(config);
+      this.ccpaState = new AttriaxCcpaState({
+        doNotSell: this.configValue.doNotSell,
+        usPrivacy: this.configValue.usPrivacy
+      });
       this.logger = new AttriaxLogger({
         enableDebugLogs: this.configValue.enableDebugLogs
       });
@@ -6711,7 +6829,8 @@ globalThis.AttriaxJs = (function (exports) {
         config: this.configValue,
         contextManager: this.contextManager,
         sessionManager: this.sessionManager,
-        requestManager: this.requestManager
+        requestManager: this.requestManager,
+        ccpaState: this.ccpaState
       });
       this.installReferrerManager = new AttriaxInstallReferrerManager({
         store: installReferrerStore,
@@ -6766,7 +6885,8 @@ globalThis.AttriaxJs = (function (exports) {
         logger: this.logger,
         requestManager: this.requestManager,
         sessionManager: this.configValue.sessionTrackingEnabled ? this.sessionManager : void 0,
-        settingsState: this.settingsState
+        settingsState: this.settingsState,
+        ccpaState: this.ccpaState
       });
       this.browserBindingsManager = new AttriaxBrowserBindingsManager({
         automaticPageTrackingEnabled: this.configValue.automaticPageTracking,
@@ -6976,6 +7096,20 @@ globalThis.AttriaxJs = (function (exports) {
       this.assertNotDisposed();
       this.consentManager.reset();
     }
+    get currentCcpaDoNotSell() {
+      return this.ccpaState.doNotSell;
+    }
+    get currentCcpaUsPrivacy() {
+      return this.ccpaState.usPrivacy;
+    }
+    setCcpaDoNotSell(value) {
+      this.assertNotDisposed();
+      this.ccpaState.setDoNotSell(value);
+    }
+    setCcpaUsPrivacy(value) {
+      this.assertNotDisposed();
+      this.ccpaState.setUsPrivacy(value);
+    }
     get currentInitialDeepLink() {
       return this.deepLinkManager.initialDeepLink;
     }
@@ -6994,6 +7128,12 @@ globalThis.AttriaxJs = (function (exports) {
     /**
      * Initializes the SDK, captures browser context, schedules the standard
      * app-open request in the background, and starts queue synchronization.
+     *
+     * INVARIANT — init() MUST NOT BLOCK on the network. It awaits only local
+     * context capture, then fire-and-forgets the heavy work (`void flushQueue()` /
+     * `void flushPendingSync()`); the app-open POST and sync run in the background.
+     * The returned Promise resolves on LOCAL readiness, not a server round-trip.
+     * Any future addition here that can block must be scheduled, not awaited.
      */
     async init(options = {}) {
       this.assertNotDisposed();
@@ -7477,70 +7617,17 @@ globalThis.AttriaxJs = (function (exports) {
       if (!deviceId) {
         return null;
       }
-      switch (entry.kind) {
-        case "event":
-          if (entry.payload.deviceId) {
-            return null;
-          }
-          return {
-            ...entry,
-            payload: {
-              ...entry.payload,
-              deviceId,
-              deviceIdSource: this.contextManager.requireDeviceIdSource()
-            }
-          };
-        case "notification":
-          if (entry.payload.deviceId) {
-            return null;
-          }
-          return {
-            ...entry,
-            payload: {
-              ...entry.payload,
-              deviceId,
-              deviceIdSource: this.contextManager.requireDeviceIdSource()
-            }
-          };
-        case "trackCrash":
-          if (entry.payload.deviceId) {
-            return null;
-          }
-          return {
-            ...entry,
-            payload: {
-              ...entry.payload,
-              deviceId,
-              deviceIdSource: this.contextManager.requireDeviceIdSource()
-            }
-          };
-        case "session":
-          if (entry.payload.deviceId) {
-            return null;
-          }
-          return {
-            ...entry,
-            payload: {
-              ...entry.payload,
-              deviceId,
-              deviceIdSource: this.contextManager.requireDeviceIdSource()
-            }
-          };
-        case "deepLinkResolve":
-          if (entry.payload.deviceId) {
-            return null;
-          }
-          return {
-            ...entry,
-            payload: {
-              ...entry.payload,
-              deviceId,
-              deviceIdSource: this.contextManager.requireDeviceIdSource()
-            }
-          };
-        default:
-          return null;
+      if (!hasConsentDeviceIdentityPayload(entry) || entry.payload.deviceId) {
+        return null;
       }
+      return {
+        ...entry,
+        payload: {
+          ...entry.payload,
+          deviceId,
+          deviceIdSource: this.contextManager.requireDeviceIdSource()
+        }
+      };
     }
     isRequestAllowedByResolvedConsent(entry) {
       return this.trackingDecisionForQueuedEntry(entry).capture;
@@ -7553,50 +7640,15 @@ globalThis.AttriaxJs = (function (exports) {
       return decision.capture && !decision.attachDeviceIdentity && Boolean(entry.payload.deviceId);
     }
     anonymizeQueuedEntry(entry) {
-      switch (entry.kind) {
-        case "event": {
-          const {
-            deviceId: _deviceId,
-            deviceIdSource: _deviceIdSource,
-            ...payload
-          } = entry.payload;
-          return { ...entry, payload };
-        }
-        case "notification": {
-          const {
-            deviceId: _deviceId,
-            deviceIdSource: _deviceIdSource,
-            ...payload
-          } = entry.payload;
-          return { ...entry, payload };
-        }
-        case "trackCrash": {
-          const {
-            deviceId: _deviceId,
-            deviceIdSource: _deviceIdSource,
-            ...payload
-          } = entry.payload;
-          return { ...entry, payload };
-        }
-        case "session": {
-          const {
-            deviceId: _deviceId,
-            deviceIdSource: _deviceIdSource,
-            ...payload
-          } = entry.payload;
-          return { ...entry, payload };
-        }
-        case "deepLinkResolve": {
-          const {
-            deviceId: _deviceId,
-            deviceIdSource: _deviceIdSource,
-            ...payload
-          } = entry.payload;
-          return { ...entry, payload };
-        }
-        default:
-          return entry;
+      if (!hasConsentDeviceIdentityPayload(entry)) {
+        return entry;
       }
+      const {
+        deviceId: _deviceId,
+        deviceIdSource: _deviceIdSource,
+        ...payload
+      } = entry.payload;
+      return { ...entry, payload };
     }
     normalizeRevenueCurrency(revenue, currency) {
       const normalizedCurrency = trimOrUndefined2(
@@ -7656,7 +7708,7 @@ globalThis.AttriaxJs = (function (exports) {
       switch (entry.kind) {
         case "event":
           return this.trackingDecisionFor(
-            isAdEventName2(entry.payload.eventName) ? "adEvents" : "analytics"
+            isAdEventName(entry.payload.eventName) ? "adEvents" : "analytics"
           );
         case "notification":
           return this.trackingDecisionFor("analytics");
@@ -7698,11 +7750,6 @@ globalThis.AttriaxJs = (function (exports) {
   }
   function getDeepLinkSessionObservedAt(event) {
     return event.rawEvent?.receivedAt ?? event.consumedAt;
-  }
-  function isAdEventName2(eventName) {
-    return eventName === "ad_revenue" || Object.values(ATTRIAX_AD_EVENT_NAME_BY_TYPE).includes(
-      eventName
-    );
   }
   function assertFiniteRevenue(revenue) {
     if (!Number.isFinite(revenue)) {
@@ -7956,6 +8003,7 @@ globalThis.AttriaxJs = (function (exports) {
   exports.AttriaxAnalyticsEventKeys = AttriaxAnalyticsEventKeys;
   exports.AttriaxAnalyticsParamKeys = AttriaxAnalyticsParamKeys;
   exports.AttriaxApiError = AttriaxApiError;
+  exports.AttriaxCcpaConsent = AttriaxCcpaConsent;
   exports.AttriaxConsent = AttriaxConsent;
   exports.AttriaxDeepLinkResolutionStatus = AttriaxDeepLinkResolutionStatus;
   exports.AttriaxDeepLinkTrigger = AttriaxDeepLinkTrigger;
