@@ -1,8 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
+- Add the runtime CCPA facade `AttriaxConsent.Ccpa` (`doNotSell` / `usPrivacy`), routed through the platform binding and mirroring the existing GDPR consent surface.
+- Every target now runs the shared Attriax native engine instead of the managed C# engine: Android binds over JNI, Windows/Linux/macOS and the Editor over the Kotlin Multiplatform core's C-ABI, iOS over the static library, and WebGL over the `@attriax/js` engine. The managed C# runtime has been removed. The public C# API is unchanged — no migration is required.
+- The Android library now resolves the shared core (`com.attriax:core:0.6.0`) from Maven Central, so no local publish step is needed to build the package.
 - Raise the batch body-size cap from 48 KB to 256 KB per request to match the higher `/api/sdk/v1/batch` limit; oversized-batch splitting and single-item drop behavior are unchanged.
+- Fix: `RecordAdEvent` sent the ad-event name under the wrong wire key on Android, so the backend did not classify the event. The Android binding now forwards through the shared dispatcher, removing the drift.
+- Remove the dead pre-rewrap native bridge and other code left unreachable by the engine migration.
 
 ## 0.5.0
 
