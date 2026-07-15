@@ -36,7 +36,9 @@ namespace Attriax.Unity.Internal
             var gameObject = new GameObject("AttriaxConfiguredHost");
             var host = gameObject.AddComponent<AttriaxConfiguredHost>();
             host.ApplySettings(settings);
-            if (settings.PersistConfiguredInstanceAcrossSceneLoads)
+            // DontDestroyOnLoad is only legal in play mode; Unity throws outside it (e.g. EditMode tests,
+            // editor scripts), which would abort host creation before the singleton is registered below.
+            if (settings.PersistConfiguredInstanceAcrossSceneLoads && Application.isPlaying)
             {
                 DontDestroyOnLoad(gameObject);
             }
@@ -77,7 +79,9 @@ namespace Attriax.Unity.Internal
             _instance = this;
             EnsureInstanceCreated();
 
-            if (_settings != null && _settings.PersistConfiguredInstanceAcrossSceneLoads)
+            // DontDestroyOnLoad is only legal in play mode; Unity throws outside it, which would abort
+            // Awake before the duplicate-behaviour diagnostic below runs.
+            if (_settings != null && _settings.PersistConfiguredInstanceAcrossSceneLoads && Application.isPlaying)
             {
                 DontDestroyOnLoad(gameObject);
             }
