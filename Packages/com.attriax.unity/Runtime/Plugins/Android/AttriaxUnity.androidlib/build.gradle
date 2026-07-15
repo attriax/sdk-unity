@@ -1,22 +1,37 @@
 // The Attriax Unity Android library. Phase 2 native-engine re-wrap: this module now
 // hosts the KMP engine (the `com.attriax:core` AAR) and exposes `AttriaxUnityBridge`
 // (Kotlin) to the Unity C# platform. The AGP classpath is provided by the Unity
-// Gradle template; the Kotlin Gradle plugin is added here (buildscript) so the module
-// compiles Kotlin whether or not the host template already ships Kotlin support.
+// Gradle template; Kotlin support is resolved below in a way that spans every Unity 6
+// Android export (see the `builtInKotlin` note).
 buildscript {
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        // Match the Kotlin version the `com.attriax:core` AAR was compiled with (KMP
-        // core: Kotlin 2.0.21) so the consumed metadata stays binary-compatible.
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21'
+        // Only used on Unity exports whose AGP has no built-in Kotlin (see below).
+        // Range chosen to cover every AGP 8.x that Unity 6 exports (AGP 7.3.1-8.11.1
+        // per the KGP/AGP compatibility table); Unity 6000.2 exports AGP 8.7.2, which
+        // the previously pinned 2.0.21 did not officially cover.
+        // A newer KGP consumes the Kotlin 2.0.21-compiled `com.attriax:core` AAR fine
+        // (the Kotlin metadata/ABI is forward-compatible for consumers).
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.20'
     }
 }
 
 apply plugin: 'com.android.library'
-apply plugin: 'org.jetbrains.kotlin.android'
+
+// AGP 9+ ships built-in Kotlin support and enables it by default, registering the
+// `kotlin` extension itself. Applying `org.jetbrains.kotlin.android` on top of that
+// fails at configuration time with "Cannot add extension with name 'kotlin', as there
+// is an extension already registered with that name" (which AGP then reports as the
+// misleading "does not specify `compileSdk`"). AGP 8.x, which Unity 6000.2 and earlier
+// Unity 6 versions export, has no built-in Kotlin and still needs the plugin applied.
+// Feature-detect rather than version-sniff, so this spans both without an AGP version
+// check: if AGP already provides the Kotlin extension, use it; otherwise apply KGP.
+if (project.extensions.findByName('kotlin') == null) {
+    apply plugin: 'org.jetbrains.kotlin.android'
+}
 
 android {
     namespace "com.attriax.unity"
@@ -24,7 +39,8 @@ android {
 
     defaultConfig {
         minSdk 21
-        targetSdk 34
+        // No `targetSdk`: it is meaningless for library modules and AGP 9 removed it
+        // from the library DSL.
         consumerProguardFiles("consumer-rules.pro")
     }
 
@@ -33,12 +49,17 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-
-    lintOptions {
+    // `lint`, not the AGP 9-removed `lintOptions` (AGP 7.0+ understands `lint`).
+    lint {
         abortOnError false
+    }
+}
+
+// The `kotlin { compilerOptions { … } }` DSL, not the AGP 9-removed
+// `android { kotlinOptions { … } }`. Works for both built-in Kotlin and KGP.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
     }
 }
 

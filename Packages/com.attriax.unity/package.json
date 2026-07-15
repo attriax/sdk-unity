@@ -3,7 +3,7 @@
   "version": "0.6.0",
   "displayName": "Attriax Unity SDK",
   "description": "Attriax attribution, deep-link, dynamic-link, and analytics SDK for Unity applications.",
-  "unity": "6000.2",
+  "unity": "6000.0",
   "author": {
     "name": "Attriax",
     "url": "https://attriax.com"

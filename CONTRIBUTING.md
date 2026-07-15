@@ -13,8 +13,15 @@ Be respectful, direct, and constructive in review and issue discussions.
    root.
 3. Open `sdk-unity/` in the Unity Editor version pinned in
    `ProjectSettings/ProjectVersion.txt` (currently `6000.4.6f1`; the package's
-   minimum supported version is `6000.2`, set in
+   minimum supported version is `6000.0` — i.e. all of Unity 6 — set in
    `Packages/com.attriax.unity/package.json`).
+
+   The Android library must configure and compile on every Unity 6 Android
+   export. That spans two AGP generations: Unity 6000.2 and earlier export
+   AGP 8.x (no built-in Kotlin — the Kotlin Gradle plugin is applied), while
+   Unity 6000.4 exports AGP 9.x (built-in Kotlin, where applying KGP is an
+   error). `Runtime/Plugins/Android/AttriaxUnity.androidlib/build.gradle`
+   feature-detects this; see the comments there before changing it.
 4. Create a feature branch before making changes.
 
 ## Before You Commit
