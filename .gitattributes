@@ -1,0 +1,34 @@
+# Line-ending policy for sdk-unity.
+#
+# NOTE: .gitattributes do not cross repository boundaries, so this submodule does
+# not inherit the workspace-root .gitattributes. It needs its own.
+#
+# Git for Windows ships core.autocrlf=true as a SYSTEM default
+# (C:/Program Files/Git/etc/gitconfig). It makes Git check text files out as CRLF
+# and cache the CRLF-expanded size in the index stat cache. Tooling that rewrites a
+# file with LF then produces a smaller real size, and Git reports it modified from
+# the stat cache alone — without hashing the content. `git diff` is empty, and
+# `git update-index --really-refresh` refuses to correct it. The file is permanently
+# phantom-dirty.
+#
+# The Unity Editor is exactly that kind of tooling: it serializes .unity / .asset /
+# .meta / .asmdef YAML with LF on every save, regardless of platform. This repo is
+# consumed as a Git UPM package, so a fresh clone on any consumer's Windows machine
+# is the normal case, not an edge case.
+#
+# `build.gradle` is consumed by Unity's Android Gradle build (which runs it through
+# a JVM on any host), and `export-unitypackage.ps1` is PowerShell, conventionally
+# CRLF on Windows and safest pinned that way.
+#
+# Deliberately targeted at the Unity-serialized asset types rather than a blanket
+# `* text=auto eol=lf`, which would rewrite the whole working tree on next checkout.
+*.unity   text eol=lf
+*.asset   text eol=lf
+*.meta    text eol=lf
+*.asmdef  text eol=lf
+*.prefab  text eol=lf
+*.mat     text eol=lf
+*.anim    text eol=lf
+*.controller text eol=lf
+*.gradle  text eol=lf
+*.ps1     text eol=crlf
