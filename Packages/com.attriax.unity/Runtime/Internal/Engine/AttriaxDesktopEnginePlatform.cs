@@ -29,9 +29,11 @@ namespace Attriax.Unity.Internal.Engine
     /// <para>
     /// The library is loaded <b>dynamically</b> (Windows <c>LoadLibraryEx</c> /
     /// <c>GetProcAddress</c>, Unix <c>dlopen</c> / <c>dlsym</c>) rather than through a
-    /// by-name <c>[DllImport("attriax_core")]</c>, so the Editor can load — and a
-    /// future domain-reload path could unload — the native lib without a hard link
-    /// that the loader would lock. The five exported functions
+    /// by-name <c>[DllImport("attriax_core")]</c>, so the Editor resolves it from the
+    /// package's plugin folder without a hard link that the loader would lock. It is
+    /// loaded ONCE per process and never unloaded (see <c>NativeLibrary.Load</c>);
+    /// engine instances are created and destroyed independently through their handles.
+    /// The five exported functions
     /// (<c>attriax_create</c>, <c>attriax_dispatch</c>,
     /// <c>attriax_register_event_callback</c>, <c>attriax_free_string</c>,
     /// <c>attriax_destroy</c>) are bound to Cdecl delegates.
@@ -161,8 +163,9 @@ namespace Attriax.Unity.Internal.Engine
                     _selfHandle.Free();
                 }
 
-                library?.Dispose();
-                _library = null;
+                // The module is deliberately NOT unloaded — see NativeLibrary.Load.
+                // _library is left non-null so a late event callback can still reach
+                // FreeString; _handle == Zero is what marks this platform torn down.
             }).ContinueWith(_ => _worker.Dispose(), TaskScheduler.Default);
         }
 
@@ -783,14 +786,17 @@ namespace Attriax.Unity.Internal.Engine
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate void DestroyDelegate(IntPtr handle);
 
-        private sealed class NativeLibrary : IDisposable
+        private sealed class NativeLibrary
         {
+            private static readonly object LoadGate = new object();
+            private static NativeLibrary? _shared;
+
             private readonly CreateDelegate _create;
             private readonly DispatchDelegate _dispatch;
             private readonly RegisterCallbackDelegate _registerCallback;
             private readonly FreeStringDelegate _freeString;
             private readonly DestroyDelegate _destroy;
-            private IntPtr _module;
+            private readonly IntPtr _module;
             private readonly bool _isWindows;
 
             private NativeLibrary(IntPtr module, bool isWindows)
@@ -815,7 +821,40 @@ namespace Attriax.Unity.Internal.Engine
 
             public void Destroy(IntPtr handle) => _destroy(handle);
 
+            /// <summary>
+            /// Loads the native core ONCE per process and returns the shared binding.
+            /// </summary>
+            /// <remarks>
+            /// <para>
+            /// The module is loaded once and <b>never unloaded</b>. The core is a
+            /// Kotlin/Native shared library: its runtime spins up its own threads (the
+            /// session/heartbeat dispatcher, the Ktor transport's worker pool) whose
+            /// lifetime is NOT bounded by <c>attriax_destroy</c> — that call disposes the
+            /// engine behind one handle, not the K/N runtime behind the module. Calling
+            /// <c>FreeLibrary</c>/<c>dlclose</c> therefore unmaps code that live threads
+            /// are still parked in, which faults the moment one of them is scheduled or
+            /// the process walks thread state at exit (an access violation on teardown).
+            /// Re-loading the module afterwards — as consecutive PlayMode tests did — also
+            /// re-enters K/N runtime initialization for an already-initialized runtime,
+            /// which is undefined.
+            /// </para>
+            /// <para>
+            /// Keeping one module for the process lifetime matches the Flutter desktop
+            /// binding, which opens the same library through <c>dart:ffi</c>
+            /// <c>DynamicLibrary.open</c> and never closes it, and costs nothing: the OS
+            /// reclaims the mapping at process exit. Engine instances remain
+            /// independently create/destroy-able through their handles.
+            /// </para>
+            /// </remarks>
             public static NativeLibrary Load()
+            {
+                lock (LoadGate)
+                {
+                    return _shared ??= LoadUncached();
+                }
+            }
+
+            private static NativeLibrary LoadUncached()
             {
                 var platform = Application.platform;
                 var isWindows = platform == RuntimePlatform.WindowsPlayer ||
@@ -933,31 +972,9 @@ namespace Attriax.Unity.Internal.Engine
                 return Marshal.GetDelegateForFunctionPointer<T>(symbol);
             }
 
-            public void Dispose()
-            {
-                var module = _module;
-                _module = IntPtr.Zero;
-                if (module == IntPtr.Zero)
-                {
-                    return;
-                }
-
-                try
-                {
-                    if (_isWindows)
-                    {
-                        FreeLibrary(module);
-                    }
-                    else
-                    {
-                        UnixDlclose(module);
-                    }
-                }
-                catch
-                {
-                    // Unloading is best-effort.
-                }
-            }
+            // NB: there is deliberately no Unload/Dispose here — see Load(). Unmapping the
+            // Kotlin/Native core while its runtime threads are alive is an access
+            // violation, so the module is held for the process lifetime.
 
             // -- Windows (kernel32) --
 
@@ -969,16 +986,13 @@ namespace Attriax.Unity.Internal.Engine
             [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Ansi, BestFitMapping = false)]
             private static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
 
-            [DllImport("kernel32", SetLastError = true)]
-            private static extern bool FreeLibrary(IntPtr hModule);
-
             // -- Unix (libdl); try libdl.so.2 first, then libdl --
 
             private const int RtldNow = 2;
 
             // Three tiers: Linux resolves via libdl.so.2 (glibc) or libdl; macOS has no
             // physical libdl, so it falls through to the process-internal dl* symbols
-            // (dlopen/dlsym/dlclose live in libSystem, reachable via __Internal in both
+            // (dlopen/dlsym live in libSystem, reachable via __Internal in both
             // the Mono Editor and an IL2CPP standalone player).
             private static IntPtr UnixDlopen(string path)
             {
@@ -1018,33 +1032,11 @@ namespace Attriax.Unity.Internal.Engine
                 }
             }
 
-            private static int UnixDlclose(IntPtr handle)
-            {
-                try
-                {
-                    return dlclose_2(handle);
-                }
-                catch (DllNotFoundException)
-                {
-                    try
-                    {
-                        return dlclose_1(handle);
-                    }
-                    catch (DllNotFoundException)
-                    {
-                        return dlclose_sys(handle);
-                    }
-                }
-            }
-
             [DllImport("libdl.so.2", EntryPoint = "dlopen", CharSet = CharSet.Ansi, BestFitMapping = false)]
             private static extern IntPtr dlopen_2(string fileName, int flags);
 
             [DllImport("libdl.so.2", EntryPoint = "dlsym", CharSet = CharSet.Ansi, BestFitMapping = false)]
             private static extern IntPtr dlsym_2(IntPtr handle, string symbol);
-
-            [DllImport("libdl.so.2", EntryPoint = "dlclose")]
-            private static extern int dlclose_2(IntPtr handle);
 
             [DllImport("libdl", EntryPoint = "dlopen", CharSet = CharSet.Ansi, BestFitMapping = false)]
             private static extern IntPtr dlopen_1(string fileName, int flags);
@@ -1052,18 +1044,12 @@ namespace Attriax.Unity.Internal.Engine
             [DllImport("libdl", EntryPoint = "dlsym", CharSet = CharSet.Ansi, BestFitMapping = false)]
             private static extern IntPtr dlsym_1(IntPtr handle, string symbol);
 
-            [DllImport("libdl", EntryPoint = "dlclose")]
-            private static extern int dlclose_1(IntPtr handle);
-
             // Process-internal (macOS: libSystem's dl* symbols; reachable via __Internal).
             [DllImport("__Internal", EntryPoint = "dlopen", CharSet = CharSet.Ansi, BestFitMapping = false)]
             private static extern IntPtr dlopen_sys(string fileName, int flags);
 
             [DllImport("__Internal", EntryPoint = "dlsym", CharSet = CharSet.Ansi, BestFitMapping = false)]
             private static extern IntPtr dlsym_sys(IntPtr handle, string symbol);
-
-            [DllImport("__Internal", EntryPoint = "dlclose")]
-            private static extern int dlclose_sys(IntPtr handle);
         }
 
         /// <summary>

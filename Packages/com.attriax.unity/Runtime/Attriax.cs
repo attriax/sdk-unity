@@ -16,6 +16,7 @@ namespace Attriax.Unity
             new Dictionary<string, WeakReference<Attriax>>(StringComparer.Ordinal);
 
         private readonly IAttriaxEngine _runtime;
+        private readonly AttriaxSceneTracker? _sceneTracker;
 
         /// <summary>
         /// Creates a new SDK instance from an explicit runtime configuration.
@@ -28,6 +29,12 @@ namespace Attriax.Unity
             }
 
             _runtime = AttriaxEngineSelector.Create(config);
+            // Scene tracking is a wrapper concern — the native engine has no notion of a
+            // Unity scene — so the SDK instance owns the hook. Null when the app opted
+            // out, which keeps AutomaticSceneTracking=false a true no-op.
+            _sceneTracker = config.AutomaticSceneTracking
+                ? new AttriaxSceneTracker(_runtime)
+                : null;
             Consent = new AttriaxConsent(_runtime);
             Synchronization = new AttriaxSynchronization(_runtime);
             Tracking = new AttriaxTracking(_runtime);
@@ -186,9 +193,15 @@ namespace Attriax.Unity
         /// Initializes the SDK instance, captures runtime context, and schedules the
         /// standard app-open request in the background when the SDK is enabled.
         /// </summary>
-        public Task InitializeAsync(AttriaxInitOptions? options = null)
+        public async Task InitializeAsync(AttriaxInitOptions? options = null)
         {
-            return _runtime.InitializeAsync(options ?? new AttriaxInitOptions());
+            await _runtime.InitializeAsync(options ?? new AttriaxInitOptions()).ConfigureAwait(false);
+
+            // Started only after the engine is up, so the automatic page view for the
+            // launch scene queues behind the app-open rather than racing it. Start()
+            // marshals to the Unity main thread itself (this continuation lands on the
+            // engine's background worker).
+            _sceneTracker?.Start();
         }
 
         /// <summary>
@@ -219,6 +232,9 @@ namespace Attriax.Unity
         /// </summary>
         public void Dispose()
         {
+            // Unhook the scene listener BEFORE the engine goes away, so a scene load
+            // racing teardown cannot dispatch into a disposed engine.
+            _sceneTracker?.Dispose();
             _runtime.Dispose();
 
             lock (ActiveInstances)
