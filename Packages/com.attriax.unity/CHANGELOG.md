@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.1
+
+- **Fixed: the WebGL target could not initialize in 0.6.0.** On Unity WebGL, every awaited engine
+  command parked forever — .NET queues `ConfigureAwait(false)` continuations to the ThreadPool when
+  Unity's synchronization context is current, and the ThreadPool never runs on the single-threaded
+  web player, so `InitializeAsync` (and everything after it) hung at "Initializing". Engine command
+  completions on WebGL now run with the synchronization context detached so continuations inline,
+  matching the worker-thread behavior of the other targets. Verified in-browser end to end.
+- Fixed WebGL double page-view tracking: the binding now disables `@attriax/js`'s own URL-based
+  automatic page tracking, since scene tracking (`source: automatic_scene`) is owned by the Unity
+  layer. Without this, every scene change on WebGL would have produced both a URL page view and a
+  scene page view once initialization was fixed.
+- Restored automatic scene `page_view` tracking (`AttriaxSceneTracker`): removed together with the
+  managed C# engine in the 0.6.0 re-wrap and never replaced, so `AttriaxConfig.AutomaticSceneTracking`
+  was dead config. The launch scene reports its asset path as `pageClass`; navigations report the
+  scene name with a correctly chained `previousPageName`. Verified on-device (Android) and
+  in-browser (WebGL); gated by the PlayMode suite on desktop.
+- Fixed a `0xC0000005` crash on Editor/desktop teardown: the native core library is now loaded once
+  per process and never unloaded (its runtime threads outlive a single engine handle), matching the
+  Flutter binding's behavior.
+
 ## 0.6.0
 
 - Add the runtime CCPA facade `AttriaxConsent.Ccpa` (`doNotSell` / `usPrivacy`), routed through the platform binding and mirroring the existing GDPR consent surface.
