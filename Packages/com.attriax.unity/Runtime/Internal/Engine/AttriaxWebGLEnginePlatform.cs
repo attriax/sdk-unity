@@ -115,7 +115,16 @@ namespace Attriax.Unity.Internal.Engine
         {
             EnsureCallbacksRegistered();
 
-            var configJson = JsonConvert.SerializeObject(config.ToEngineArguments());
+            var engineArguments = config.ToEngineArguments();
+            // sdk-js (unlike the KMP engines) ships its own URL-based automatic page
+            // tracking and defaults it to ON. Page tracking is a Unity wrapper concern
+            // (AttriaxSceneTracker emits `automatic_scene` page views), so the engine's
+            // tracker must be disabled here or every WebGL session double-tracks: one
+            // `automatic_page_tracking` page_view for the hosting URL plus the scene
+            // ones. WebGL-only injection — the shared ToEngineArguments stays 1:1 with
+            // the KMP config surface, which has no such key.
+            engineArguments["automaticPageTracking"] = false;
+            var configJson = JsonConvert.SerializeObject(engineArguments);
             var handle = AttriaxWebGL_Create(configJson);
             if (handle == 0)
             {
@@ -663,7 +672,15 @@ namespace Attriax.Unity.Internal.Engine
             }
 
             var requestId = Interlocked.Increment(ref _nextRequestId);
-            var tcs = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Deliberately NOT TaskCreationOptions.RunContinuationsAsynchronously (the
+            // desktop twin's pattern): that flag queues await-continuations to the
+            // ThreadPool, and Unity WebGL is single-threaded — ThreadPool work never
+            // executes — so every engine await (starting with init) would hang forever.
+            // Inline continuations are safe here: the result trampoline always runs on
+            // the one main thread, and it copies the result out of the JS-owned buffer
+            // into a managed string BEFORE completing the task, so continuations never
+            // touch memory the .jslib is about to free.
+            var tcs = new TaskCompletionSource<string?>();
             PendingResults[requestId] = tcs;
 
             try
@@ -673,7 +690,7 @@ namespace Attriax.Unity.Internal.Engine
             catch (Exception exception)
             {
                 PendingResults.TryRemove(requestId, out _);
-                tcs.TrySetException(exception);
+                CompleteDetached(() => tcs.TrySetException(exception));
             }
 
             return tcs.Task;
@@ -696,11 +713,45 @@ namespace Attriax.Unity.Internal.Engine
             }
             catch (Exception exception)
             {
-                tcs.TrySetException(exception);
+                CompleteDetached(() => tcs.TrySetException(exception));
                 return;
             }
 
-            tcs.TrySetResult(json);
+            CompleteDetached(() => tcs.TrySetResult(json));
+        }
+
+        /// <summary>
+        /// Completes a parked <see cref="TaskCompletionSource{TResult}"/> with no ambient
+        /// <see cref="SynchronizationContext"/>, so the waiting <c>ConfigureAwait(false)</c>
+        /// continuations run INLINE on this stack — the same way they run on the
+        /// desktop/Android twins, whose completions happen on worker threads.
+        /// </summary>
+        /// <remarks>
+        /// On WebGL every completion happens on the single Unity main thread, where
+        /// <see cref="SynchronizationContext.Current"/> is Unity's synchronization
+        /// context. The .NET awaiter machinery refuses to inline a
+        /// <c>ConfigureAwait(false)</c> continuation while a non-default context is
+        /// current (<c>AwaitTaskContinuation.IsValidLocationForInlining</c>) and queues
+        /// it to the ThreadPool instead — which never runs on the single-threaded web
+        /// player, so every engine await would hang forever (this shipped as a
+        /// permanently-stuck "Initializing Attriax SDK..."; task #71 found it via the
+        /// scene-tracker verification). Clearing the context for the duration of the
+        /// completion makes inlining valid again; continuations that captured the Unity
+        /// context (plain <c>await</c>s in app code) still post to the player loop as
+        /// usual.
+        /// </remarks>
+        private static void CompleteDetached(Action complete)
+        {
+            var previous = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(null);
+            try
+            {
+                complete();
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(previous);
+            }
         }
 
         private static JToken? UnwrapResult(string? json)
